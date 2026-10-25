@@ -57,6 +57,7 @@ func HandleDriveDelete(s *service.BotService, message *tgbotapi.Message, args st
 		fmt.Sprintf("⚠️ *Xác nhận xóa*\n\nBạn có chắc muốn xóa:\n📁 `%s`\\?",
 			utils.EscapeMarkdownV2(targetPath)))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg.ReplyMarkup = deleteConfirmKeyboard(s, args)
 	_, _ = s.Bot.Send(msg)
 }
 

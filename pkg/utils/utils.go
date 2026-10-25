@@ -248,14 +248,16 @@ func IsMagnetLink(s string) bool {
 	return strings.HasPrefix(s, "magnet:?")
 }
 
+// TruncateString shortens s to at most maxLen runes, never splitting a UTF-8 character.
 func TruncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	r := []rune(s)
+	if len(r) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return s[:maxLen]
+		return string(r[:maxLen])
 	}
-	return s[:maxLen-1] + "…"
+	return string(r[:maxLen-1]) + "…"
 }
 
 func StatusEmoji(status string) string {

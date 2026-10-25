@@ -88,7 +88,20 @@ func HandleStats(s *service.BotService, message *tgbotapi.Message) {
 }
 
 func GetStatsKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👤 Của tôi", "stats:my"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Hôm nay", "stats:today"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📈 Tuần", "stats:weekly"),
+			tgbotapi.NewInlineKeyboardButtonData("📉 Tháng", "stats:monthly"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Làm mới", "stats:"+CmdRefresh),
+			tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "stats:"+CmdClose),
+		),
+	)
 }
 
 func FormatStatsMessage(stats map[string]interface{}, userStats *UserStats, dailyStats *DailyStats, userDailyStats *DailyStats) string {
@@ -352,13 +365,23 @@ func HandleStatsCallback(s *service.BotService, callback *tgbotapi.CallbackQuery
 	}
 
 	if text != "" {
+		keyboard := GetStatsKeyboard()
+		if action != CmdRefresh {
+			keyboard = tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", "stats:"+CmdRefresh),
+				tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "stats:"+CmdClose),
+			))
+		}
+
 		if callback.Message.Photo != nil {
 			editMsg := tgbotapi.NewEditMessageCaption(callback.Message.Chat.ID, callback.Message.MessageID, text)
 			editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+			editMsg.ReplyMarkup = &keyboard
 			_, _ = s.Bot.Send(editMsg)
 		} else {
 			editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 			editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+			editMsg.ReplyMarkup = &keyboard
 			_, _ = s.Bot.Send(editMsg)
 		}
 	}

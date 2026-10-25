@@ -609,6 +609,8 @@ func TestTruncateString(t *testing.T) {
 		{"exactly10!", "exactly10!", 10},
 		{"a-very-long-name", "a-very-l…", 9},
 		{"abcdef", "abc", 3},
+		{"Tiếng Việt", "Tiếng…", 6},
+		{"ệệệệ", "ệệ", 2},
 	}
 
 	for _, tt := range tests {

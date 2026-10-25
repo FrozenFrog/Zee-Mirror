@@ -99,6 +99,7 @@ func HandleSystem(s *service.BotService, message *tgbotapi.Message) {
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg.ReplyMarkup = systemKeyboard()
 	_, _ = s.Bot.Send(msg)
 }
 
@@ -156,6 +157,22 @@ func HandleLogs(s *service.BotService, message *tgbotapi.Message, _ string) {
 	}
 }
 
+func systemKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Làm mới", "system:"+CmdRefresh),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Chi tiết", "system:detailed"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📈 Logs", "system:logs"),
+			tgbotapi.NewInlineKeyboardButtonData("🧹 Dọn dẹp", "system:cleanup"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "system:"+CmdClose),
+		),
+	)
+}
+
 func HandleSystemCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
 	if len(parts) < 2 {
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
@@ -171,6 +188,8 @@ func HandleSystemCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+		kb := systemKeyboard()
+		editMsg.ReplyMarkup = &kb
 		_, _ = s.Bot.Send(editMsg)
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã làm mới"))
 
@@ -180,6 +199,8 @@ func HandleSystemCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+		kb := systemKeyboard()
+		editMsg.ReplyMarkup = &kb
 		_, _ = s.Bot.Send(editMsg)
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📊 Xem chi tiết"))
 

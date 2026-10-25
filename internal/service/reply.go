@@ -16,10 +16,23 @@ func (s *BotService) Reply(message *tgbotapi.Message, text string) {
 	}
 }
 
-func (s *BotService) SendOrEditMessage(chatID int64, messageID int, text string, _ interface{}) {
+// SendOrEditMessage edits messageID when set, otherwise sends a new message.
+// keyboard may be nil, an InlineKeyboardMarkup or a pointer to one.
+func (s *BotService) SendOrEditMessage(chatID int64, messageID int, text string, keyboard interface{}) {
+	var markup *tgbotapi.InlineKeyboardMarkup
+	switch kb := keyboard.(type) {
+	case tgbotapi.InlineKeyboardMarkup:
+		if len(kb.InlineKeyboard) > 0 {
+			markup = &kb
+		}
+	case *tgbotapi.InlineKeyboardMarkup:
+		markup = kb
+	}
+
 	if messageID != 0 {
 		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+		editMsg.ReplyMarkup = markup
 
 		if _, err := s.Bot.Send(editMsg); err == nil {
 			return
@@ -28,6 +41,9 @@ func (s *BotService) SendOrEditMessage(chatID int64, messageID int, text string,
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	if markup != nil {
+		msg.ReplyMarkup = *markup
+	}
 
 	if _, err := s.Bot.Send(msg); err != nil {
 		slog.Error("Failed to send message", "error", err)

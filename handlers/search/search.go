@@ -94,8 +94,14 @@ func HandleSearch(s *service.BotService, message *tgbotapi.Message, args string)
 	isSearchAll := message.Command() == "searchall"
 
 	if !isSearchAll {
+		sessionID := uuid.New().String()[:12]
+		SearchMu.Lock()
+		SearchSessions[sessionID] = &Session{CreatedAt: time.Now(), Query: query}
+		SearchMu.Unlock()
+
 		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔍 *Tìm kiếm:* `%s`\n\nChọn nguồn Torrent để bắt đầu tìm kiếm:", utils.EscapeMarkdownV2(query)))
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
+		msg.ReplyMarkup = providerKeyboard(sessionID)
 		_, _ = s.Bot.Send(msg)
 		return
 	}
@@ -167,6 +173,18 @@ func HandleSearchCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 
 	provider := parts[1]
 	query := strings.Join(parts[2:], ":")
+	if sid, ok := strings.CutPrefix(query, sessionQueryPrefix); ok {
+		SearchMu.RLock()
+		session, exists := SearchSessions[sid]
+		if exists {
+			query = session.Query
+		}
+		SearchMu.RUnlock()
+		if !exists {
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên đã hết hạn"))
+			return
+		}
+	}
 
 	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔍 Đang tìm kiếm..."))
 
@@ -210,7 +228,7 @@ func HandleSearchCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 
 		text := fmt.Sprintf("📭 *Không tìm thấy kết quả nào trên %s*\n\n_Hãy thử từ khóa khác hoặc nguồn khác\\._", provider)
 
-		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
+		editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, backCloseKeyboard(sessionID))
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 		return
@@ -280,8 +298,25 @@ func showSearchResults(s *service.BotService, chatID int64, messageID int, sessi
 		)
 	}
 
+	var numberRow []tgbotapi.InlineKeyboardButton
+	for i := range visibleItems {
+		numberRow = append(numberRow, tgbotapi.NewInlineKeyboardButtonData(
+			strconv.Itoa(start+i+1), fmt.Sprintf("t_item:%d:%s", start+i, sessionID)))
+	}
+	rows := [][]tgbotapi.InlineKeyboardButton{numberRow}
+	if totalPages > 1 {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⬅️", fmt.Sprintf("t_page:%d:%s", page-1, sessionID)),
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%d/%d", page+1, totalPages), fmt.Sprintf("t_page:%d:%s", page, sessionID)),
+			tgbotapi.NewInlineKeyboardButtonData("➡️", fmt.Sprintf("t_page:%d:%s", page+1, sessionID)),
+		))
+	}
+	rows = append(rows, backCloseKeyboard(sessionID).InlineKeyboard...)
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+
 	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+	editMsg.ReplyMarkup = &keyboard
 
 	if _, err := s.Bot.Send(editMsg); err != nil {
 		slog.Warn("Search results markdown error, using fallback", "error", err)
@@ -290,8 +325,39 @@ func showSearchResults(s *service.BotService, chatID int64, messageID int, sessi
 			fallbackText += fmt.Sprintf("%d. %s\nDung lượng: %s | Seed: %s\n\n", start+i+1, item.Title, item.Size, item.Seeders)
 		}
 		fallbackEdit := tgbotapi.NewEditMessageText(chatID, messageID, fallbackText)
+		fallbackEdit.ReplyMarkup = &keyboard
 		_, _ = s.Bot.Send(fallbackEdit)
 	}
+}
+
+// sessionQueryPrefix marks a t_search callback whose query lives in SearchSessions,
+// keeping callback_data under Telegram's 64-byte limit for long queries.
+const sessionQueryPrefix = "@"
+
+func providerKeyboard(sessionID string) tgbotapi.InlineKeyboardMarkup {
+	data := func(provider string) string {
+		return "t_search:" + provider + ":" + sessionQueryPrefix + sessionID
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🌟 Solid", data("solid")),
+			tgbotapi.NewInlineKeyboardButtonData("🏴‍☠️ PirateBay", data("apibay")),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🌸 Nyaa (Anime)", data("nyaa")),
+			tgbotapi.NewInlineKeyboardButtonData("🌍 Tất cả", data("all")),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("❌ Đóng", "t_close:"+sessionID),
+		),
+	)
+}
+
+func backCloseKeyboard(sessionID string) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", "t_back:"+sessionID),
+		tgbotapi.NewInlineKeyboardButtonData("❌ Đóng", "t_close:"+sessionID),
+	))
 }
 
 func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
@@ -314,7 +380,7 @@ func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 		SearchMu.RUnlock()
 
 		textRaw := fmt.Sprintf("🔍 Tìm kiếm: %s\n\nChọn nguồn tìm kiếm ổn định hơn:", query)
-		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, textRaw)
+		editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, textRaw, providerKeyboard(sessionID))
 
 		if _, err := s.Bot.Send(editMsg); err != nil {
 			slog.Warn("t_back edit error", "error", err)
@@ -388,13 +454,24 @@ func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 			utils.EscapeMarkdownV2Code(cleanMagnet),
 		)
 
+		page := 0
+		if index >= 0 {
+			page = index / 5
+		}
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", fmt.Sprintf("t_page:%d:%s", page, sessionID)),
+			tgbotapi.NewInlineKeyboardButtonData("❌ Đóng", "t_close:"+sessionID),
+		))
+
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+		editMsg.ReplyMarkup = &keyboard
 
 		if _, err := s.Bot.Send(editMsg); err != nil {
 			slog.Warn("Search item detail markdown error, using fallback", "error", err)
 			fallbackText := fmt.Sprintf("Chi tiết Torrent:\n\n%s\nDung lượng: %s\nMagnet:\n%s", title, size, cleanMagnet)
 			fallbackEdit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, fallbackText)
+			fallbackEdit.ReplyMarkup = &keyboard
 			_, _ = s.Bot.Send(fallbackEdit)
 		}
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))

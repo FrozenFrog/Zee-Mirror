@@ -21,7 +21,27 @@ func HandleMirrorWizard(s *service.BotService, message *tgbotapi.Message) {
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg.ReplyMarkup = wizardStartKeyboard()
 	_, _ = s.Bot.Send(msg)
+}
+
+func wizardStartKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("🔗 Nhập URL", "wizard:input_url")),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("✖️ Hủy", "dashboard:close")),
+	)
+}
+
+func wizardOptionsKeyboard(isZip bool) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📦 Zip: "+utils.BoolToEmoji(isZip), "wizard:toggle_zip"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🚀 Bắt đầu Mirror", "wizard:start"),
+			tgbotapi.NewInlineKeyboardButtonData("✖️ Hủy", "dashboard:close"),
+		),
+	)
 }
 
 func HandleMirrorWizardCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
@@ -42,7 +62,7 @@ func HandleMirrorWizardCallback(s *service.BotService, callback *tgbotapi.Callba
 			"Chào mừng đến với Mirror Wizard\\.\n"+
 				"Hãy chọn phương thức nhập bạn muốn\\.")
 
-		edit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
+		edit := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, wizardStartKeyboard())
 		edit.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(edit)
 
@@ -90,6 +110,7 @@ func showWizardOptionsMenu(s *service.BotService, chatID int64, url string, isZi
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	msg.LinkPreviewOptions = tgbotapi.LinkPreviewOptions{IsDisabled: true}
+	msg.ReplyMarkup = wizardOptionsKeyboard(isZip)
 	_, _ = s.Bot.Send(msg)
 }
 
@@ -123,10 +144,11 @@ func toggleWizardOption(s *service.BotService, callback *tgbotapi.CallbackQuery,
 		utils.BoolToEmoji(isZip),
 	)
 
-	edit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, newText)
+	edit := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, newText, wizardOptionsKeyboard(isZip))
 	edit.ParseMode = tgbotapi.ModeMarkdownV2
 	edit.LinkPreviewOptions = tgbotapi.LinkPreviewOptions{IsDisabled: true}
 	_, _ = s.Bot.Send(edit)
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
 func executeWizardTask(s *service.BotService, callback *tgbotapi.CallbackQuery) {

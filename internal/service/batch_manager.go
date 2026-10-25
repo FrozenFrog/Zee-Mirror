@@ -605,6 +605,11 @@ func (s *BotService) sendBatchCompletionMessage(batch *BatchTask) {
 
 	msg := tgbotapi.NewMessage(batch.ChatID, text)
 	msg.ParseMode = MarkdownV2
+	if strings.HasPrefix(batch.RemoteURL, "http") {
+		msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("📥 Tải xuống", batch.RemoteURL),
+		))
+	}
 
 	_, _ = s.Bot.Send(msg)
 }

@@ -3,6 +3,7 @@ package file
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"zee-mirror/internal/service"
 )
@@ -37,5 +38,35 @@ func TestFormatDriveFileList(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q", want)
 		}
+	}
+}
+
+func TestBuildDriveNavigationKeyboard(t *testing.T) {
+	s := &service.BotService{}
+	long := strings.Repeat("thư-mục-rất-dài-", 6)
+	files := []service.DriveFile{
+		{Name: long, IsDir: true},
+		{Name: "a.mkv"},
+	}
+
+	kb := buildDriveNavigationKeyboard(s, files, "Movies")
+	if len(kb.InlineKeyboard) != 3 {
+		t.Fatalf("rows = %d, want folder, file and nav rows", len(kb.InlineKeyboard))
+	}
+	if got := *kb.InlineKeyboard[1][0].CallbackData; got != "dr:i:Movies/a.mkv" {
+		t.Errorf("file callback = %q", got)
+	}
+	for _, row := range kb.InlineKeyboard {
+		for _, b := range row {
+			if len(*b.CallbackData) > 64 {
+				t.Errorf("callback_data %q exceeds 64 bytes", *b.CallbackData)
+			}
+			if !utf8.ValidString(b.Text) {
+				t.Errorf("button text %q is not valid UTF-8", b.Text)
+			}
+		}
+	}
+	if !strings.HasPrefix(*kb.InlineKeyboard[0][0].CallbackData, "dr:c:id:") {
+		t.Errorf("long folder path should use a cached id, got %q", *kb.InlineKeyboard[0][0].CallbackData)
 	}
 }

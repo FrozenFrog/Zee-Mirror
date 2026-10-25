@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"strings"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -45,23 +46,37 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 	}
 
 	var text string
+	var keyboard tgbotapi.InlineKeyboardMarkup
+	lang := s.GetUserLanguage(callback.From.ID)
+	backToHelp := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_back"), "help:main"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "help:"+CmdClose),
+	)
 
 	switch action {
 	case "main":
-		lang := s.GetUserLanguage(callback.From.ID)
 		text = service.GetHelpMainText(lang)
+		keyboard = service.GetHelpKeyboard(lang)
 
 	case "settings":
 		text = GetHelpSettings()
+		keyboard = tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_settings"), "settings:open"),
+			),
+			backToHelp,
+		)
 
 	case "all":
 		text = getHelpAllCommands()
+		keyboard = tgbotapi.NewInlineKeyboardMarkup(backToHelp)
 
 	case ActionBack:
-		lang := s.GetUserLanguage(callback.From.ID)
 		content := service.GetWelcomeMessage(lang, callback.From.FirstName)
+		kb := service.GetStartKeyboard(lang)
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, content)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+		editMsg.ReplyMarkup = &kb
 		_, _ = s.Bot.Send(editMsg)
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		return
@@ -76,7 +91,7 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 		return
 	}
 
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpMessage(s, callback, text, keyboard)
 }
 
 func normalizeHelpAction(action string) string {
@@ -104,9 +119,12 @@ func normalizeHelpAction(action string) string {
 	}
 }
 
-func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, text string, _ tgbotapi.InlineKeyboardMarkup) {
+func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+	if len(keyboard.InlineKeyboard) > 0 {
+		editMsg.ReplyMarkup = &keyboard
+	}
 	_, err := s.Bot.Send(editMsg)
 	if err != nil {
 		slog.Error("Error editing help message", "error", err)
@@ -114,6 +132,52 @@ func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, te
 	} else {
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	}
+}
+
+type helpButton struct {
+	label, action string
+}
+
+// helpCategoryKeyboard lists a category's commands two per row, then a back-to-help row.
+func helpCategoryKeyboard(lang string, buttons []helpButton) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(buttons); i += 2 {
+		row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(buttons[i].label, "help:"+buttons[i].action))
+		if i+1 < len(buttons) {
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(buttons[i+1].label, "help:"+buttons[i+1].action))
+		}
+		rows = append(rows, row)
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_back"), "help:main"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "help:"+CmdClose),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// helpCommandKeyboard is shown under a single command's help: back to its category, or close.
+func helpCommandKeyboard(lang, category string) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_back"), "help:"+category),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "help:"+CmdClose),
+	))
+}
+
+func sendHelpPage(s *service.BotService, callback *tgbotapi.CallbackQuery, category, action, text string, buttons []helpButton) {
+	lang := s.GetUserLanguage(callback.From.ID)
+	keyboard := helpCommandKeyboard(lang, category)
+	if action == category {
+		keyboard = helpCategoryKeyboard(lang, buttons)
+	}
+	sendHelpMessage(s, callback, text, keyboard)
+}
+
+var downloadHelpButtons = []helpButton{
+	{"📥 Mirror", "cmd_mirror"}, {"📤 Leech", "cmd_leech"},
+	{"🎬 YT Mirror", "cmd_ytdlp"}, {"🎬 YT Leech", "cmd_ytdlpleech"},
+	{"⚔️ Viking", "cmd_viking"}, {"🧲 Torrent", "cmd_torrent"},
+	{"📋 Clone", "cmd_clone"}, {"📦 Batch", "cmd_batch"},
+	{"🔍 Search", "cmd_search"},
 }
 
 func handleDownloadHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -143,8 +207,15 @@ func handleDownloadHelp(s *service.BotService, callback *tgbotapi.CallbackQuery,
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "download", action, text, downloadHelpButtons)
 	return true
+}
+
+var monitorHelpButtons = []helpButton{
+	{"📊 Status", "cmd_status"}, {"📈 Stats", "cmd_stats"},
+	{"🖥️ System", "cmd_system"}, {"🏥 Health", "cmd_health"},
+	{"📜 Logs", "cmd_logs"}, {"🏓 Ping", "cmd_ping"},
+	{"🚀 Speed", "cmd_speed"},
 }
 
 func handleMonitorHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -170,8 +241,14 @@ func handleMonitorHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "monitor", action, text, monitorHelpButtons)
 	return true
+}
+
+var filesHelpButtons = []helpButton{
+	{"📂 List (ls)", "cmd_ls"}, {"📁 Mkdir", "cmd_mkdir"},
+	{"🗑️ Remove", "cmd_rm"}, {"📦 Move", "cmd_mv"},
+	{"🔗 Share", "cmd_share"}, {"🔍 Find", "cmd_find"},
 }
 
 func handleFilesHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -195,8 +272,16 @@ func handleFilesHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, ac
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "files", action, text, filesHelpButtons)
 	return true
+}
+
+var mediaHelpButtons = []helpButton{
+	{"🎵 Extract Audio", "cmd_extractaudio"}, {"🗜️ Compress", "cmd_compress"},
+	{"🖼️ Thumbnail", "cmd_thumbnail"}, {"📸 Screenshots", "cmd_screenshots"},
+	{"💬 Soft-sub", "cmd_subtitle"}, {"🔥 Hard-sub", "cmd_hardsub"},
+	{"📐 Rescale", "cmd_rescale"}, {"🔄 Convert", "cmd_convert"},
+	{"ℹ️ Media Info", "cmd_mediainfo"},
 }
 
 func handleMediaHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -226,8 +311,13 @@ func handleMediaHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, ac
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "media", action, text, mediaHelpButtons)
 	return true
+}
+
+var taskHelpButtons = []helpButton{
+	{"📊 Status", "cmd_status"}, {"❌ Cancel", "cmd_cancel"},
+	{"🚫 Cancel All", "cmd_cancelall"},
 }
 
 func handleTaskHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -243,8 +333,12 @@ func handleTaskHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, act
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "task", action, text, taskHelpButtons)
 	return true
+}
+
+var storageHelpButtons = []helpButton{
+	{"📋 Storages", "cmd_storages"}, {"⚙️ Set Storage", "cmd_setstorage"},
 }
 
 func handleStorageHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -260,8 +354,14 @@ func handleStorageHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "storage", action, text, storageHelpButtons)
 	return true
+}
+
+var adminHelpButtons = []helpButton{
+	{"✅ Authorize", "cmd_authorize"}, {"❌ Unauthorize", "cmd_unauthorize"},
+	{"👥 Users", "cmd_users"}, {"📜 Log Channel", "cmd_setlogchannel"},
+	{"🚨 Alert Channel", "cmd_setalertchannel"},
 }
 
 func handleAdminHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -283,8 +383,12 @@ func handleAdminHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, ac
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "admin", action, text, adminHelpButtons)
 	return true
+}
+
+var recoveryHelpButtons = []helpButton{
+	{"🔄 Recover", "cmd_recover"}, {"📊 Status", "cmd_recoverystatus"},
 }
 
 func handleRecoveryHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
@@ -300,6 +404,6 @@ func handleRecoveryHelp(s *service.BotService, callback *tgbotapi.CallbackQuery,
 	default:
 		return false
 	}
-	sendHelpMessage(s, callback, text, tgbotapi.InlineKeyboardMarkup{})
+	sendHelpPage(s, callback, "recovery", action, text, recoveryHelpButtons)
 	return true
 }

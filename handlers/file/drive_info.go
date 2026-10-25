@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"zee-mirror/internal/domain"
 	"zee-mirror/internal/service"
 	"zee-mirror/pkg/utils"
 
@@ -116,8 +117,28 @@ func buildFileInfoMessage(relPath string, file service.DriveFile) string {
 	return text.String()
 }
 
-func buildFileInfoKeyboard(_ *service.BotService, _ string, _ string) tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
+func buildFileInfoKeyboard(s *service.BotService, relPath, cloudLink string) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	if strings.HasPrefix(cloudLink, "http") {
+		btnText := domain.BtnTextCloudLink
+		if s.Config.IndexURL != "" {
+			btnText = domain.BtnTextIndexURL
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonURL(btnText, cloudLink)))
+	}
+
+	dirPath := filepath.Dir(relPath)
+	if dirPath == "." || dirPath == "/" {
+		dirPath = ""
+	}
+	rows = append(rows,
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔙 Thư mục", driveCallbackData(s, "c", dirPath)),
+			tgbotapi.NewInlineKeyboardButtonData("🗑️ Xóa", driveCallbackData(s, "rm", relPath)),
+		),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "dr:x")),
+	)
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func getFileIcon(filename string) string {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 	"zee-mirror/internal/service"
@@ -235,10 +236,84 @@ func formatDriveFileList(path string, files []service.DriveFile) string {
 	return text.String()
 }
 
-func buildDriveNavigationKeyboard(_ *service.BotService, _ []service.DriveFile, _ string) tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
+// driveCallbackData builds "dr:<action>:<path>", caching long paths behind an id
+// to stay within Telegram's 64-byte callback_data limit.
+func driveCallbackData(s *service.BotService, action, path string) string {
+	data := "dr:" + action + ":" + path
+	if len(data) > 60 {
+		data = "dr:" + action + ":id:" + s.StorePath(path)
+	}
+	return data
 }
 
-func buildSearchNavigationKeyboard(_ *service.BotService, _ []service.DriveFile) tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
+func joinDrivePath(dir, name string) string {
+	if dir == "" {
+		return name
+	}
+	return strings.TrimSuffix(dir, "/") + "/" + name
+}
+
+func buildDriveNavigationKeyboard(s *service.BotService, files []service.DriveFile, currentRelPath string) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	folderCount := 0
+	for _, f := range files {
+		if f.IsDir && folderCount < 10 {
+			folderCount++
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("%d. %s %s", folderCount, IconFolder, utils.TruncateString(f.Name, 25)),
+				driveCallbackData(s, "c", joinDrivePath(currentRelPath, f.Name)),
+			)))
+		}
+	}
+
+	fileCount := 0
+	for _, f := range files {
+		if !f.IsDir && fileCount < 10 {
+			fileCount++
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("%d. %s %s", fileCount, getFileIcon(f.Name), utils.TruncateString(f.Name, 25)),
+				driveCallbackData(s, "i", joinDrivePath(currentRelPath, f.Name)),
+			)))
+		}
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("🔄 Làm mới", driveCallbackData(s, "c", currentRelPath)),
+		tgbotapi.NewInlineKeyboardButtonData("🏠 Gốc", "dr:h"),
+		tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "dr:x"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func buildSearchNavigationKeyboard(s *service.BotService, files []service.DriveFile) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i, f := range files {
+		if i >= 20 {
+			break
+		}
+		path := f.Path
+		if path == "" {
+			path = f.Name
+		}
+		action, icon := "i", getFileIcon(f.Name)
+		if f.IsDir {
+			action, icon = "c", IconFolder
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintf("%d. %s %s", i+1, icon, utils.TruncateString(filepath.Base(f.Name), 25)),
+			driveCallbackData(s, action, path),
+		)))
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "dr:x"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func deleteConfirmKeyboard(s *service.BotService, relPath string) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("✅ Xóa", driveCallbackData(s, "df", relPath)),
+		tgbotapi.NewInlineKeyboardButtonData("❌ Hủy", "dr:xf"),
+	))
 }

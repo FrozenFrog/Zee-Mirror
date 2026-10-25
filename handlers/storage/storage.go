@@ -95,21 +95,42 @@ func HandleStorages(s *service.BotService, message *tgbotapi.Message) {
 		return
 	}
 
+	text, keyboard := storageListMessage(s, providers)
+	msg := tgbotapi.NewMessage(message.Chat.ID, text)
+	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	msg.ReplyMarkup = keyboard
+	_, _ = s.Bot.Send(msg)
+}
+
+func storageListMessage(s *service.BotService, providers []Provider) (string, tgbotapi.InlineKeyboardMarkup) {
 	var text strings.Builder
 	text.WriteString("💾 *Các nhà cung cấp lưu trữ khả dụng*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
+	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, p := range providers {
 		fmt.Fprintf(&text, "%s *%s* \\(%s\\)\n", p.Icon, utils.EscapeMarkdownV2(p.Name), utils.EscapeMarkdownV2(p.Type))
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(p.Icon+" "+p.Name, "storage:select:"+p.Name),
+		))
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	text.WriteString("*Hiện tại:* `" + utils.EscapeMarkdownV2Code(s.TaskManager.RcloneDest) + "`\n\n")
-	text.WriteString("Chọn nơi lưu trữ để tải lên\\:")
+	text.WriteString("Chọn nơi lưu trữ để xem\\:")
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, text.String())
-	msg.ParseMode = tgbotapi.ModeMarkdownV2
-	_, _ = s.Bot.Send(msg)
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "storage:"+service.CmdClose),
+	))
+	return text.String(), tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// storageBackKeyboard returns to the actions of one storage.
+func storageBackKeyboard(storageName string) tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", "storage:select:"+storageName),
+		tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "storage:"+service.CmdClose),
+	))
 }
 
 func HandleStorageCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
@@ -125,6 +146,17 @@ func HandleStorageCallback(s *service.BotService, callback *tgbotapi.CallbackQue
 	}
 
 	switch action {
+	case "list":
+		providers, err := GetAvailableStorages(s)
+		if err != nil {
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi"))
+			return
+		}
+		text, keyboard := storageListMessage(s, providers)
+		editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, keyboard)
+		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+		_, _ = s.Bot.Send(editMsg)
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case "select":
 		handleStorageSelect(s, callback, storageName)
 	case "browse":
@@ -141,9 +173,21 @@ func HandleStorageCallback(s *service.BotService, callback *tgbotapi.CallbackQue
 func handleStorageSelect(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName string) {
 	text := fmt.Sprintf("💾 *Lưu trữ: %s*\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nChọn thao tác:", utils.EscapeMarkdownV2(storageName))
 
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📂 Duyệt", "storage:browse:"+storageName),
+			tgbotapi.NewInlineKeyboardButtonData("ℹ️ Thông tin", "storage:info:"+storageName),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", "storage:list"),
+			tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "storage:"+service.CmdClose),
+		),
+	)
+
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, keyboard)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
 func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName, path string) {
@@ -189,9 +233,10 @@ func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery
 		fmt.Fprintf(&text, "%s `%s`\n", icon, utils.EscapeMarkdownV2Code(utils.TruncateString(f.Name, 40)))
 	}
 
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text.String())
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), storageBackKeyboard(storageName))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
 func handleStorageInfo(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName string) {
@@ -224,9 +269,10 @@ func handleStorageInfo(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 		}
 	}
 
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text.String())
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), storageBackKeyboard(storageName))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
 func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args string) {

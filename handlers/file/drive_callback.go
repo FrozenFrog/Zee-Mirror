@@ -29,6 +29,8 @@ func HandleDriveCallback(s *service.BotService, callback *tgbotapi.CallbackQuery
 		handleInfoCallback(s, callback, parts)
 	case CmdClose, "x":
 		handleCloseCallback(s, callback)
+	case "rm":
+		handleAskDeleteCallback(s, callback, parts)
 	case "confirm_delete", "df":
 		handleConfirmDeleteCallback(s, callback, parts)
 	case "cancel_delete", "xf":
@@ -86,6 +88,15 @@ func handleConfirmDeleteCallback(s *service.BotService, callback *tgbotapi.Callb
 	executeDelete(s, callback, fullPath)
 }
 
+func handleAskDeleteCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
+	fullPath := resolveCallbackPath(s, parts)
+	text := fmt.Sprintf("⚠️ *Xác nhận xóa*\n\nBạn có chắc muốn xóa:\n📁 `%s`\\?", utils.EscapeMarkdownV2Code(fullPath))
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, deleteConfirmKeyboard(s, fullPath))
+	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
+	_, _ = s.Bot.Send(editMsg)
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+}
+
 func handleCancelDeleteCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
 	deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 	_, _ = s.Bot.Request(deleteMsg)
@@ -93,6 +104,10 @@ func handleCancelDeleteCallback(s *service.BotService, callback *tgbotapi.Callba
 }
 
 func executeDelete(s *service.BotService, callback *tgbotapi.CallbackQuery, fileName string) {
+	if !s.IsAdmin(callback.From.ID) {
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Chỉ Admin mới có thể xóa file"))
+		return
+	}
 	if fileName == "" || fileName == "/" || fileName == "." {
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Đường dẫn không hợp lệ"))
 		return
