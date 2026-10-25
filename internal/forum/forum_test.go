@@ -25,7 +25,7 @@ type recorder struct{ params []url.Values }
 
 func (r *recorder) Do(req *http.Request) (*http.Response, error) {
 	body, _ := io.ReadAll(req.Body)
-	values := url.Values{}
+	var values url.Values
 	mediaType, ct, _ := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if mediaType == "multipart/form-data" {
 		form, err := multipart.NewReader(bytes.NewReader(body), ct["boundary"]).ReadForm(1 << 20)

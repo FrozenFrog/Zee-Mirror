@@ -60,7 +60,8 @@ func (s *BotService) HandleTelegramFileDownload(message *tgbotapi.Message, fileI
 
 	if (fileName == secretfs.Cookies || fileName == secretfs.RcloneConfig) && message.From.ID == s.Config.OwnerID && s.Secrets != nil {
 		slog.Info("Secret file upload detected from owner", "file", fileName)
-		data, err := s.readTelegramFile(tgFile)
+		var data []byte
+		data, err = s.readTelegramFile(tgFile)
 		if err == nil {
 			err = s.Secrets.Set(context.Background(), fileName, data)
 		}

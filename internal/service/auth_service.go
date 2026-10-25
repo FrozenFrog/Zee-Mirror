@@ -167,9 +167,10 @@ func (s *BotService) chatScope(m *tgbotapi.Message) chatScope {
 		if c.ID != m.Chat.ID {
 			continue
 		}
-		if c.TopicID == 0 {
+		switch c.TopicID {
+		case 0:
 			scope = scopeChat
-		} else if c.TopicID == topic {
+		case topic:
 			return scopeTopic
 		}
 	}

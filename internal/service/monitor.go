@@ -49,7 +49,7 @@ func (s *BotService) GetSystemStats() SystemStats {
 		stats.MemoryUsed = v.Used
 		stats.MemoryFree = v.Available
 	}
-	if p, err := process.NewProcess(int32(os.Getpid())); err == nil {
+	if p, err := process.NewProcess(int32(os.Getpid())); err == nil { //nolint:gosec // G115: PIDs fit in int32
 		if info, err := p.MemoryInfo(); err == nil {
 			stats.MemoryBot = info.RSS
 		}

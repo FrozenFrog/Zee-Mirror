@@ -47,10 +47,10 @@ type msgKey struct {
 type Topics struct {
 	defaults map[int64]int
 
-	mu     sync.Mutex
 	topics map[msgKey]int
 	order  []msgKey
 	next   int
+	mu     sync.Mutex
 }
 
 // New uses the first "chat:topic" entry of each chat as its default topic.

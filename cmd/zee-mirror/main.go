@@ -50,7 +50,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll(cfg.ConfigDir, 0750); err != nil {
+	if err = os.MkdirAll(cfg.ConfigDir, 0750); err != nil {
 		slog.Error("Failed to create config directory", "dir", cfg.ConfigDir, "error", err)
 	}
 	setupLogger(cfg)
@@ -59,7 +59,7 @@ func main() {
 
 	slog.Info("Starting Zee-Mirror Bot...")
 
-	if err := cfg.Validate(); err != nil {
+	if err = cfg.Validate(); err != nil {
 		slog.Error("Invalid configuration", "error", err)
 		os.Exit(1)
 	}

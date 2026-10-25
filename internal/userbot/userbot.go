@@ -237,15 +237,16 @@ func parseMessageLink(link string) (messageRef, error) {
 		parts = parts[1:]
 	}
 
-	if len(parts) >= 3 && parts[0] == "c" {
+	switch {
+	case len(parts) >= 3 && parts[0] == "c":
 		id, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil {
 			return ref, fmt.Errorf("ID channel không hợp lệ")
 		}
 		ref.ChannelID = id
-	} else if len(parts) >= 2 {
+	case len(parts) >= 2:
 		ref.Username = parts[0]
-	} else {
+	default:
 		return ref, fmt.Errorf("link thiếu ID tin nhắn")
 	}
 

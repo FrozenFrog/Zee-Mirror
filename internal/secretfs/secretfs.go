@@ -106,7 +106,7 @@ func Open(ctx context.Context, repo repository.SettingsRepository, opts Options)
 	}
 
 	for name := range settingKeys {
-		if err := s.restore(ctx, name); err != nil {
+		if err = s.restore(ctx, name); err != nil {
 			s.cleanup()
 			return nil, fmt.Errorf("restore %s: %w", name, err)
 		}

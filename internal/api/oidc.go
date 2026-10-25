@@ -35,16 +35,16 @@ const (
 var oidcHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 type pendingLogin struct {
+	expires  time.Time
 	verifier string
 	nonce    string
-	expires  time.Time
 }
 
 type oidcAuth struct {
-	mu       sync.Mutex
-	issuer   string
 	provider *oidc.Provider
 	pending  map[string]pendingLogin
+	issuer   string
+	mu       sync.Mutex
 }
 
 // getProvider runs discovery once per issuer, on first use, so the bot starts
@@ -135,15 +135,7 @@ func (s *Server) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 
 	// The cookie ties the state to this browser, so a callback URL started
 	// by someone else cannot log the victim in.
-	http.SetCookie(w, &http.Cookie{
-		Name:     oidcStateCookie,
-		Value:    state,
-		Path:     oidcCookiePath,
-		MaxAge:   int(oidcLoginTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   strings.HasPrefix(cfg.OIDCRedirectURL, "https://"),
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, s.stateCookie(state, int(oidcLoginTTL.Seconds())))
 	http.Redirect(w, r, s.oauth2Config(provider).AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier)), http.StatusFound)
 }
 
@@ -153,7 +145,7 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: oidcStateCookie, Path: oidcCookiePath, MaxAge: -1, HttpOnly: true})
+	http.SetCookie(w, s.stateCookie("", -1))
 
 	q := r.URL.Query()
 	if e := q.Get("error"); e != "" {
@@ -197,7 +189,7 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		PreferredUsername string   `json:"preferred_username"`
 		Groups            []string `json:"groups"`
 	}
-	if err := idToken.Claims(&claims); err != nil {
+	if err = idToken.Claims(&claims); err != nil {
 		oidcFail(w, r, "Không đọc được thông tin tài khoản")
 		return
 	}
@@ -225,6 +217,20 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	// A fragment never reaches the server or its logs; the dashboard moves
 	// it into storage and drops it from the URL.
 	http.Redirect(w, r, "/#oidc_token="+url.QueryEscape(signed), http.StatusFound)
+}
+
+// stateCookie builds the login state cookie; a negative maxAge deletes it.
+// Secure follows the callback URL so plain-http setups can still sign in.
+func (s *Server) stateCookie(value string, maxAge int) *http.Cookie {
+	return &http.Cookie{ //nolint:gosec // G124: Secure is off only for http:// callback URLs
+		Name:     oidcStateCookie,
+		Value:    value,
+		Path:     oidcCookiePath,
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   strings.HasPrefix(s.Service.Config.OIDCRedirectURL, "https://"),
+		SameSite: http.SameSiteLaxMode,
+	}
 }
 
 func inAllowedGroups(groups, allowed []string) bool {
