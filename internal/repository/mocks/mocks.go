@@ -109,6 +109,11 @@ func (m *MockRepository) Upsert(ctx context.Context, user domain.User) error {
 	return args.Error(0)
 }
 
+func (m *MockRepository) EnsureUser(ctx context.Context, user domain.User) error {
+	args := m.Called(ctx, user)
+	return args.Error(0)
+}
+
 func (m *MockRepository) SetRole(ctx context.Context, id int64, role string) error {
 	args := m.Called(ctx, id, role)
 	return args.Error(0)

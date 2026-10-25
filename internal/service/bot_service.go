@@ -123,10 +123,14 @@ func NewBotService(bot *tgbotapi.BotAPI, cfg *config.Config, db repository.FullR
 	}
 	s.Notifications = NewNotificationService(bot, alertChannelID, cfg.OwnerID)
 
-	_ = db.Upsert(ctx, domain.User{
+	// EnsureUser leaves existing rows alone, so a restart keeps the Telegram
+	// username and settings SyncUser stored; the names below are placeholders
+	// until the user first talks to the bot.
+	_ = db.EnsureUser(ctx, domain.User{
 		ID:                cfg.OwnerID,
 		Username:          "Owner",
 		Role:              "owner",
+		Language:          i18n.DefaultLang,
 		CreatedAt:         time.Now(),
 		MaxDailyTasks:     -1,
 		MaxDailyBandwidth: -1,
@@ -134,10 +138,11 @@ func NewBotService(bot *tgbotapi.BotAPI, cfg *config.Config, db repository.FullR
 	})
 
 	for _, id := range cfg.AuthorizedUsers {
-		_ = db.Upsert(ctx, domain.User{
+		_ = db.EnsureUser(ctx, domain.User{
 			ID:                id,
 			Username:          "Authorized User",
 			Role:              "authorized",
+			Language:          i18n.DefaultLang,
 			CreatedAt:         time.Now(),
 			MaxDailyTasks:     cfg.DefaultMaxDailyTasks,
 			MaxDailyBandwidth: cfg.DefaultMaxDailyBandwidth,

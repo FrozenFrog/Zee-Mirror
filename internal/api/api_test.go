@@ -29,6 +29,7 @@ func newTestServer(t *testing.T) *Server {
 	mockRepo := new(mocks.MockRepository)
 	mockRepo.On("Get", mock.Anything, mock.Anything).Return("", nil).Maybe()
 	mockRepo.On("Upsert", mock.Anything, mock.AnythingOfType("domain.User")).Return(nil).Maybe()
+	mockRepo.On("EnsureUser", mock.Anything, mock.AnythingOfType("domain.User")).Return(nil).Maybe()
 	mockRepo.On("GetActive", mock.Anything).Return([]domain.TaskRecord{}, nil).Maybe()
 	// The scheduler polls every 30s, which a slow run of this package outlasts.
 	mockRepo.On("GetPendingScheduled", mock.Anything).Return([]domain.ScheduledTask{}, nil).Maybe()

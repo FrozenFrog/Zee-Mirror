@@ -34,6 +34,7 @@ type TaskRepository interface {
 type UserRepository interface {
 	GetByID(ctx context.Context, id int64) (*domain.User, error)
 	Upsert(ctx context.Context, user domain.User) error
+	EnsureUser(ctx context.Context, user domain.User) error
 	SetRole(ctx context.Context, id int64, role string) error
 	SetLimits(ctx context.Context, id int64, maxTasks int, maxBandwidth int64) error
 	SetExpiration(ctx context.Context, id int64, expiresAt time.Time) error

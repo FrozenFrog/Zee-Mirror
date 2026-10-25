@@ -276,3 +276,44 @@ func TestSetNotifyURLByUser(t *testing.T) {
 		t.Errorf("Save overwrote notify_url: %q", got.NotifyURL)
 	}
 }
+
+func TestEnsureUser_KeepsExistingRow(t *testing.T) {
+	db, tempDir := setupTestDB(t)
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	defer func() { _ = db.Close() }()
+	ctx := context.Background()
+
+	seed := domain.User{ID: 1, Username: "Owner", Role: "owner", Language: "vi", CreatedAt: time.Now(), MaxDailyTasks: -1, MaxDailyBandwidth: -1}
+	if err := db.EnsureUser(ctx, seed); err != nil {
+		t.Fatalf("EnsureUser insert: %v", err)
+	}
+	if u, err := db.GetByID(ctx, 1); err != nil || u.Username != "Owner" || u.Role != "owner" {
+		t.Fatalf("after insert got %+v, %v", u, err)
+	}
+
+	// The Telegram username and language stored by SyncUser survive a restart.
+	if err := db.Upsert(ctx, domain.User{ID: 1, Username: "realname", Role: "owner", Language: "en", CreatedAt: time.Now(), MaxDailyTasks: -1, MaxDailyBandwidth: -1}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	if err := db.EnsureUser(ctx, seed); err != nil {
+		t.Fatalf("EnsureUser existing: %v", err)
+	}
+	if u, _ := db.GetByID(ctx, 1); u.Username != "realname" || u.Language != "en" {
+		t.Errorf("existing row overwritten: %+v", u)
+	}
+
+	// A plain user listed in AUTHORIZED_USERS is promoted; an admin is not demoted.
+	_ = db.Upsert(ctx, domain.User{ID: 2, Username: "plain", Role: "user", CreatedAt: time.Now()})
+	_ = db.Upsert(ctx, domain.User{ID: 3, Username: "boss", Role: "admin", CreatedAt: time.Now()})
+	for _, id := range []int64{2, 3} {
+		if err := db.EnsureUser(ctx, domain.User{ID: id, Username: "Authorized User", Role: "authorized", CreatedAt: time.Now()}); err != nil {
+			t.Fatalf("EnsureUser %d: %v", id, err)
+		}
+	}
+	if u, _ := db.GetByID(ctx, 2); u.Role != "authorized" || u.Username != "plain" {
+		t.Errorf("user 2 = %+v, want promoted to authorized with its name kept", u)
+	}
+	if u, _ := db.GetByID(ctx, 3); u.Role != "admin" {
+		t.Errorf("user 3 role = %q, want admin", u.Role)
+	}
+}

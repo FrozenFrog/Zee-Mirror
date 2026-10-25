@@ -48,6 +48,18 @@ func (db *DB) Upsert(ctx context.Context, u domain.User) error {
 	return err
 }
 
+// EnsureUser inserts u when its id is new. An existing row keeps its
+// username, language and limits; only a plain "user" role is raised to u.Role.
+func (db *DB) EnsureUser(ctx context.Context, u domain.User) error {
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO users (id, username, role, language, created_at, max_daily_tasks, max_daily_bandwidth)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT(id) DO UPDATE SET
+			role = CASE WHEN users.role = 'user' THEN excluded.role ELSE users.role END
+	`, u.ID, u.Username, u.Role, u.Language, u.CreatedAt, u.MaxDailyTasks, u.MaxDailyBandwidth)
+	return err
+}
+
 func (db *DB) SetRole(ctx context.Context, id int64, role string) error {
 	_, err := db.ExecContext(ctx, "UPDATE users SET role = $1 WHERE id = $2", role, id)
 	return err
