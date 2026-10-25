@@ -186,7 +186,7 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 
 	if err != nil {
 		editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sent.MessageID,
-			fmt.Sprintf("❌ *Tìm kiếm file thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error())))
+			fmt.Sprintf("❌ *Tìm kiếm file thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(utils.RcloneError(err).Error())))
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 		return

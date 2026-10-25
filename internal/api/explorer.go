@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"zee-mirror/pkg/utils"
 )
 
 func (s *Server) handleExplorer(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +147,7 @@ func (s *Server) handleRemoteExplorer(w http.ResponseWriter, r *http.Request) {
 	cmd := execCommand(r.Context(), "rclone", "lsjson", remotePath, "--fast-list", "--config", configPath)
 	output, err := cmd.Output()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Rclone failed: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Rclone failed: %v", utils.RcloneError(err)), http.StatusInternalServerError)
 		return
 	}
 

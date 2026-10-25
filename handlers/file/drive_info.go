@@ -48,7 +48,7 @@ func getDriveMetadata(ctx context.Context, targetPath, configPath string) servic
 	cmd := exec.CommandContext(ctx, "rclone", "lsjson", targetPath, "--config", configPath)
 	output, err := cmd.Output()
 	if err != nil {
-		slog.Error("rclone lsjson failed for info", "error", err, "path", targetPath)
+		slog.Error("rclone lsjson failed for info", "error", utils.RcloneError(err), "path", targetPath)
 		return service.DriveFile{}
 	}
 

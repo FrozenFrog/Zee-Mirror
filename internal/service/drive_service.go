@@ -26,7 +26,7 @@ func (s *BotService) ListDriveFiles(path string) ([]DriveFile, error) {
 	cmd := execCommand(ctx, "rclone", args...)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("%w: rclone lsjson failed: %v", domain.ErrExternal, err)
+		return nil, fmt.Errorf("%w: rclone lsjson failed: %v", domain.ErrExternal, utils.RcloneError(err))
 	}
 
 	var files []DriveFile
