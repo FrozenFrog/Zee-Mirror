@@ -56,13 +56,14 @@ RUN apk add --no-cache \
     libcrypto3 \
     zlib && \
     apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev && \
-    pip3 install --break-system-packages --no-cache-dir -U yt-dlp speedtest-cli && \
+    pip3 install --break-system-packages --no-cache-dir -U 'yt-dlp[default]' speedtest-cli && \
     apk del .build-deps
 
 # gcc/musl-dev/python3-dev dipasang sebagai .build-deps sementara (untuk wheel builds),
 # lalu dihapus via apk del agar runtime image tetap ramping.
 # Menggunakan --no-cache-dir dan memastikan download versi terbaru setiap build
-# Cache bust for yt-dlp: 2026-06-16
+# yt-dlp[default] bundles yt-dlp-ejs, the YouTube JS challenge solver run with node.
+# Cache bust for yt-dlp: 2026-10-26
 
 
 COPY --from=rclone/rclone:1.75.1 /usr/local/bin/rclone /usr/bin/rclone

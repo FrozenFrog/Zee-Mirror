@@ -5,8 +5,43 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 	"zee-mirror/internal/domain"
 )
+
+// historyTask is the dashboard's view of a stored task. domain.TaskRecord has
+// no JSON tags, so encoding it directly yields "FileName"-style keys the
+// dashboard cannot read.
+type historyTask struct {
+	CreatedAt   time.Time  `json:"created_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	ID          string     `json:"id"`
+	Type        string     `json:"type"`
+	URL         string     `json:"url"`
+	FileName    string     `json:"file_name"`
+	Status      string     `json:"status"`
+	MD5         string     `json:"md5"`
+	Error       string     `json:"error,omitempty"`
+	FileSize    int64      `json:"file_size"`
+}
+
+func newHistoryTask(t *domain.TaskRecord) historyTask {
+	h := historyTask{
+		CreatedAt: t.CreatedAt,
+		ID:        t.ID,
+		Type:      t.Type,
+		URL:       t.URL,
+		FileName:  t.FileName,
+		Status:    t.Status,
+		MD5:       t.MD5,
+		Error:     t.Error,
+		FileSize:  t.TotalSize,
+	}
+	if t.CompletedAt.Valid {
+		h.CompletedAt = &t.CompletedAt.Time
+	}
+	return h
+}
 
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
@@ -90,8 +125,13 @@ func (s *Server) handleGetTaskHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	history := make([]historyTask, 0, len(tasks))
+	for i := range tasks {
+		history = append(history, newHistoryTask(&tasks[i]))
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(tasks); err != nil {
+	if err := json.NewEncoder(w).Encode(history); err != nil {
 		slog.Error("Failed to encode task history response", "error", err)
 	}
 }

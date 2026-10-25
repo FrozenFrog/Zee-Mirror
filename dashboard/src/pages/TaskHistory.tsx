@@ -12,8 +12,8 @@ interface HistoryTask {
   status: string;
   md5: string;
   created_at: string;
-  updated_at: string;
-  error_message: string;
+  completed_at?: string;
+  error?: string;
 }
 
 const TaskHistory: React.FC = () => {
@@ -33,7 +33,7 @@ const TaskHistory: React.FC = () => {
       const params: Record<string, string | number> = { limit, offset: page * limit };
       if (statusFilter) params.status = statusFilter;
       const res = await api.get('/api/tasks/history', { params });
-      setTasks(res.data.tasks || res.data || []);
+      setTasks(res.data || []);
     } catch (err) {
       console.error('Failed to fetch tasks', err);
     } finally {
@@ -134,7 +134,7 @@ const TaskHistory: React.FC = () => {
                           {t.file_name || t.url}
                         </div>
                       </td>
-                      <td className={`p-4 text-sm font-black uppercase ${statusColor(t.status)}`}>{statusLabel(t.status)}</td>
+                      <td className={`p-4 text-sm font-black uppercase ${statusColor(t.status)}`} title={t.error}>{statusLabel(t.status)}</td>
                       <td className="p-4 text-sm font-mono text-slate-500 dark:text-zinc-400">{formatSize(t.file_size)}</td>
                       <td className="p-4">
                         {t.md5 ? (

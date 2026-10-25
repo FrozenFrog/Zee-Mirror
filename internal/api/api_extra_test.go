@@ -253,3 +253,25 @@ func TestRequireAuth_PerUserAPIKey(t *testing.T) {
 	handler(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
+
+func TestHandleGetTaskHistory_JSONKeys(t *testing.T) {
+	s := newTestServer(t)
+	repo := s.Service.DB.(*mocks.MockRepository)
+	created := time.Date(2026, 10, 26, 3, 10, 0, 0, time.UTC)
+	repo.On("ListTasks", mock.Anything, domain.TaskFilter{Limit: 20, Status: "failed"}).Return([]domain.TaskRecord{{
+		ID: "abc", Type: "ytdlp", URL: "https://youtu.be/x", FileName: "clip.mp4", Status: "failed",
+		Error: "HTTP Error 403", TotalSize: 42, CreatedAt: created, Password: "secret",
+	}}, nil)
+
+	req := httptest.NewRequest("GET", "/api/tasks/history?limit=20&status=failed", nil)
+	rec := httptest.NewRecorder()
+	s.handleGetTaskHistory(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	for _, want := range []string{`"id":"abc"`, `"type":"ytdlp"`, `"file_name":"clip.mp4"`, `"status":"failed"`, `"file_size":42`, `"error":"HTTP Error 403"`, `"created_at":"2026-10-26T03:10:00Z"`} {
+		assert.Contains(t, body, want)
+	}
+	assert.NotContains(t, body, "secret")
+	assert.NotContains(t, body, "completed_at")
+}

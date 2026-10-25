@@ -45,7 +45,6 @@ func (e *Engine) GetFormats(ctx context.Context, url string) (map[int]downloader
 		"-j",
 		"--no-playlist",
 		"--no-check-certificate",
-		"--extractor-args", "youtube:player-client=web_creator,android_vr,ios,android",
 		"--socket-timeout", "60",
 		"--add-header", "Accept-Language: en-US,en;q=0.9",
 		"--js-runtime", "node",
@@ -56,20 +55,13 @@ func (e *Engine) GetFormats(ctx context.Context, url string) (map[int]downloader
 	cookiesPath := filepath.Join(e.ConfigDir, "cookies.txt")
 	if _, err := os.Stat(cookiesPath); err == nil {
 		args = append(args, "--cookies", cookiesPath)
-		args = append(args, "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
 	}
 
 	args = append(args, youtubeReferer(url)...)
 	args = append(args, url)
 	output, err := e.runYTDLP(ctx, args...)
 	if err != nil {
-		slog.Warn("YTDLP analysis first attempt failed, retrying with fallback clients...", "error", err)
-		for i, arg := range args {
-			if arg == "youtube:player-client=web_creator,android_vr,ios,android" {
-				args[i] = "youtube:player-client=web_creator,android_vr"
-				break
-			}
-		}
+		slog.Warn("YTDLP analysis first attempt failed, retrying...", "error", err)
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -160,7 +152,6 @@ func (e *Engine) GetPlaylistMetadata(ctx context.Context, url string) (*download
 		"--flat-playlist",
 		"-J",
 		"--no-check-certificate",
-		"--extractor-args", "youtube:player-client=web_creator,android_vr,ios,android",
 		"--socket-timeout", "60",
 		"--js-runtime", "node",
 		"--remote-components", "ejs:github",
@@ -344,13 +335,16 @@ func (e *Engine) buildYTDLPArgs(task *domain.Task, outputDir string) []string {
 		}
 	}
 
+	// No --extractor-args player-client or --user-agent: yt-dlp picks YouTube
+	// clients that work with or without cookies. Forcing web_creator/ios/
+	// android left only web_creator once cookies were set, whose formats need
+	// a PO token and fail with "HTTP Error 403: Forbidden".
 	args := []string{
 		"-o", filepath.Join(outputDir, outputTemplate),
 		"--newline", "--no-playlist",
 		"--continue",
 		"--no-check-certificate",
 		"--ignore-errors",
-		"--extractor-args", "youtube:player-client=web_creator,android_vr,ios,android",
 		"--socket-timeout", "120",
 		"--concurrent-fragments", "16",
 		"--buffer-size", "1M",
@@ -376,7 +370,6 @@ func (e *Engine) buildYTDLPArgs(task *domain.Task, outputDir string) []string {
 	cookiesPath := filepath.Join(e.ConfigDir, "cookies.txt")
 	if _, err := os.Stat(cookiesPath); err == nil {
 		args = append(args, "--cookies", cookiesPath)
-		args = append(args, "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
 	}
 
 	if task.Quality != "" {
