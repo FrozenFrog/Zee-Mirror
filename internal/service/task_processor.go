@@ -71,6 +71,7 @@ func (s *BotService) processTask(task *Task) {
 		}
 
 		task.Update(func() {
+			task.SourceURL = url
 			task.URL = fileURL
 			if task.TotalSize == 0 {
 				task.TotalSize = int64(tgFile.FileSize)
@@ -101,7 +102,7 @@ func (s *BotService) processTask(task *Task) {
 }
 
 func (s *BotService) executeDownloadEngine(engine downloader.DownloadEngine, task *Task) {
-	slog.Info("Starting download engine", "taskID", task.ID, "type", task.Type, "url", task.URL)
+	slog.Info("Starting download engine", "taskID", task.ID, "type", task.Type, "url", task.OriginalURL())
 	task.SetStatus(StatusDownloading)
 	task.Update(func() {
 		task.StartedAt = time.Now()

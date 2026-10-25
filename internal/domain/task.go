@@ -55,6 +55,7 @@ type Task struct {
 	ID                string
 	GID               string
 	URL               string
+	SourceURL         string
 	FileName          string
 	LocalPath         string
 	RemotePath        string
@@ -191,6 +192,17 @@ type TaskSnapshot struct {
 	Hardsub           bool          `json:"hardsub,omitempty"`
 }
 
+// OriginalURL returns the link the task was created from. SourceURL is set
+// once URL has been replaced by a resolved download link (a Telegram file link
+// embeds the bot token), so that link is never stored or shown. The caller
+// must hold Mu.
+func (t *Task) OriginalURL() string {
+	if t.SourceURL != "" {
+		return t.SourceURL
+	}
+	return t.URL
+}
+
 func (t *Task) GetSnapshot() TaskSnapshot {
 	t.Mu.RLock()
 	defer t.Mu.RUnlock()
@@ -199,7 +211,7 @@ func (t *Task) GetSnapshot() TaskSnapshot {
 		GID:               t.GID,
 		Type:              t.Type,
 		Status:            t.Status,
-		URL:               t.URL,
+		URL:               t.OriginalURL(),
 		FileName:          t.FileName,
 		LocalPath:         t.LocalPath,
 		RemotePath:        t.RemotePath,

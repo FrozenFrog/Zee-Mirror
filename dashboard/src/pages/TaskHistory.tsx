@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { History, ChevronLeft, ChevronRight } from 'lucide-react';
-import { statusLabel } from '../utils/format';
+import { statusLabel, describeSource } from '../utils/format';
 
 interface HistoryTask {
   id: string;
@@ -15,6 +15,25 @@ interface HistoryTask {
   completed_at?: string;
   error?: string;
 }
+
+const SourceLink: React.FC<{ url: string }> = ({ url }) => {
+  const src = describeSource(url);
+  const className = 'block text-sm truncate max-w-xs';
+  if (!src.href) {
+    return <span className={`${className} text-slate-500 dark:text-zinc-400`} title={url}>{src.label}</span>;
+  }
+  return (
+    <a
+      href={src.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={url}
+      className={`${className} font-medium text-primary hover:underline`}
+    >
+      {src.label}
+    </a>
+  );
+};
 
 const TaskHistory: React.FC = () => {
   const [tasks, setTasks] = useState<HistoryTask[]>([]);
@@ -115,6 +134,7 @@ const TaskHistory: React.FC = () => {
                   <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 border-b border-slate-200 dark:border-white/5">
                     <th className="p-4 pl-0">Loại</th>
                     <th className="p-4">Tên file</th>
+                    <th className="p-4">Nguồn</th>
                     <th className="p-4">Trạng thái</th>
                     <th className="p-4">Dung lượng</th>
                     <th className="p-4">MD5</th>
@@ -133,6 +153,9 @@ const TaskHistory: React.FC = () => {
                         <div className="text-sm font-bold text-slate-700 dark:text-zinc-300 truncate max-w-xs" title={t.file_name || t.url}>
                           {t.file_name || t.url}
                         </div>
+                      </td>
+                      <td className="p-4">
+                        <SourceLink url={t.url} />
                       </td>
                       <td className={`p-4 text-sm font-black uppercase ${statusColor(t.status)}`} title={t.error}>{statusLabel(t.status)}</td>
                       <td className="p-4 text-sm font-mono text-slate-500 dark:text-zinc-400">{formatSize(t.file_size)}</td>

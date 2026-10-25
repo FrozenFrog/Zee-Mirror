@@ -33,3 +33,31 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export const roleLabel = (role: string): string => ROLE_LABELS[role] ?? role
+
+export interface SourceInfo {
+  label: string
+  href?: string
+}
+
+// Short display form of a task's source link. href is only set for links a
+// browser can open; torrent tasks carry a "#select=" suffix for chosen files.
+export const describeSource = (raw: string): SourceInfo => {
+  if (!raw) return { label: '-' }
+  if (raw.startsWith('tgfileid://')) return { label: 'File Telegram' }
+  if (raw.startsWith('file://')) return { label: 'File cục bộ' }
+  if (raw.startsWith('magnet:')) {
+    const link = raw.split('#select=')[0]
+    const params = new URLSearchParams(link.slice(link.indexOf('?') + 1))
+    const name = params.get('dn') || params.get('xt')?.split(':').pop() || 'magnet'
+    return { label: `🧲 ${name}`, href: link }
+  }
+  try {
+    const u = new URL(raw)
+    if (u.protocol === 'http:' || u.protocol === 'https:') {
+      return { label: u.host.replace(/^www\./, '') + u.pathname, href: raw }
+    }
+  } catch {
+    // not a URL; show it as is
+  }
+  return { label: raw }
+}

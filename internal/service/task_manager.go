@@ -534,7 +534,7 @@ func (t *Task) SaveToDB() error {
 			GID:            t.GID,
 			Type:           string(t.Type),
 			Status:         string(t.Status),
-			URL:            t.URL,
+			URL:            t.OriginalURL(),
 			FileName:       t.FileName,
 			LocalPath:      t.LocalPath,
 			RemotePath:     t.RemotePath,
