@@ -236,6 +236,8 @@ cp ~/.config/rclone/rclone.conf config/rclone.conf
 
 > 💡 **Don't have rclone configured yet?** Run `rclone config` to create a remote interactively, then copy the generated config file.
 
+> 🔐 On startup the bot imports `config/rclone.conf` into the database (`settings` table) and **deletes it from disk**. From then on the config only lives in the database and in RAM (`SECRETS_DIR`, tmpfs `/dev/shm` by default); `config/rclone.conf` becomes a symlink into RAM. Refreshed OAuth tokens are written back to the database automatically. To replace the config later, drop a new `rclone.conf` into `config/` and restart, or send it to the bot as the owner. Set `ENCRYPTION_KEY` to encrypt it in the database.
+
 ### Step 4 — Deploy with Docker
 
 ```bash
@@ -541,6 +543,7 @@ To download from sites that require login or are strictly rate-limited (like **G
 2. Save the file as `cookies.txt`.
 3. Send the `cookies.txt` file directly to the bot in Telegram.
 4. The bot will automatically save and use these cookies for subsequent `/mirror`, `/leech`, and `/ytdlp` tasks!
+5. Cookies are stored in the database and mounted in RAM only (never written to disk); cookies refreshed by yt-dlp are saved back automatically. The owner can also send `rclone.conf` the same way.
 
 </details>
 

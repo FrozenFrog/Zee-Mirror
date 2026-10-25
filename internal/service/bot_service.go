@@ -11,6 +11,7 @@ import (
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/repository"
+	"zee-mirror/internal/secretfs"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -32,6 +33,7 @@ type BotService struct {
 	Config         *config.Config
 	Notifications  *NotificationService
 	RcloneUploader *uploader.RcloneUploader
+	Secrets        *secretfs.Store
 	SQLDB          *sql.DB
 	pathCacheClean chan struct{}
 	PathCache      sync.Map

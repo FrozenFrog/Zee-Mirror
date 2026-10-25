@@ -14,6 +14,7 @@ import (
 	"zee-mirror/internal/database"
 	"zee-mirror/internal/metrics"
 	"zee-mirror/internal/router"
+	"zee-mirror/internal/secretfs"
 	"zee-mirror/internal/service"
 	"zee-mirror/internal/userbot"
 	"zee-mirror/pkg/utils"
@@ -53,6 +54,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	secrets, err := secretfs.Open(context.Background(), db, secretfs.Options{
+		ConfigDir:     cfg.ConfigDir,
+		SeedDir:       cfg.SecretsSeedDir,
+		RAMBaseDir:    cfg.SecretsDir,
+		EncryptionKey: cfg.EncryptionKey,
+	})
+	if err != nil {
+		slog.Error("Failed to load rclone config and cookies into RAM", "error", err)
+		os.Exit(1)
+	}
+
 	bots, err := service.InitBots(cfg.BotTokens, cfg.TelegramAPI)
 	if err != nil || len(bots) == 0 {
 		slog.Error("Failed to initialize any bot instances", "error", err)
@@ -74,6 +86,7 @@ func main() {
 	defer aria2Daemon.Stop()
 
 	botSvc := service.NewBotService(primaryBot, cfg, db, db.DB)
+	botSvc.Secrets = secrets
 	go search.StartSearchSessionCleanup(botSvc.TaskManager.ShutdownChan)
 
 	sighup := make(chan os.Signal, 1)
@@ -172,6 +185,7 @@ func main() {
 	botSvc.Shutdown()
 	ub.Stop()
 	aria2Daemon.Stop()
+	secrets.Close()
 
 	sentry.Flush(5 * time.Second)
 	slog.Info("Zee-Mirror Bot has been gracefully shut down.")

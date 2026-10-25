@@ -42,9 +42,10 @@ spec:
               mountPath: /app/config
             - name: downloads
               mountPath: /app/downloads
+            # Seed only: imported into the database while it has no rclone config yet.
             - name: rclone
-              mountPath: /app/config/rclone.conf
-              subPath: rclone.conf
+              mountPath: /app/secrets-seed
+              readOnly: true
           startupProbe:
             httpGet:
               path: /api/health
@@ -74,5 +75,5 @@ spec:
             claimName: {{ include "zee-mirror.fullname" . }}-downloads
         - name: rclone
           secret:
-            name: {{ include "zee-mirror.fullname" . }}-rclone
+            secretName: {{ include "zee-mirror.fullname" . }}-rclone
             optional: true

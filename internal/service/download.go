@@ -1,14 +1,17 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"zee-mirror/internal/secretfs"
 	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
@@ -55,22 +58,19 @@ func (s *BotService) HandleTelegramFileDownload(message *tgbotapi.Message, fileI
 		return
 	}
 
-	if fileName == "cookies.txt" && message.From.ID == s.Config.OwnerID {
-		slog.Info("Cookies.txt upload detected from owner")
-		destPath := filepath.Join(s.Config.ConfigDir, "cookies.txt")
-
-		if filepath.IsAbs(tgFile.FilePath) {
-			translatedPath := strings.Replace(tgFile.FilePath, "/var/lib/telegram-bot-api", s.Config.DownloadDir, 1)
-			if copyErr := utils.CopyFile(translatedPath, destPath); copyErr == nil {
-				s.reply(message, "✅ *Cookies.txt Berhasil Diperbarui*")
-				return
-			}
+	if (fileName == secretfs.Cookies || fileName == secretfs.RcloneConfig) && message.From.ID == s.Config.OwnerID && s.Secrets != nil {
+		slog.Info("Secret file upload detected from owner", "file", fileName)
+		data, err := s.readTelegramFile(tgFile)
+		if err == nil {
+			err = s.Secrets.Set(context.Background(), fileName, data)
 		}
-
-		if dlErr := utils.DownloadFile(tgFile.Link(s.Bot.Token), destPath); dlErr == nil {
-			s.reply(message, "✅ *Cookies.txt Berhasil Diperbarui*")
+		if err != nil {
+			slog.Error("Failed to store uploaded secret file", "file", fileName, "error", err)
+			s.reply(message, fmt.Sprintf("❌ *Gagal menyimpan %s*", utils.EscapeMarkdownV2(fileName)))
 			return
 		}
+		s.reply(message, fmt.Sprintf("✅ *%s Berhasil Diperbarui*", utils.EscapeMarkdownV2(fileName)))
+		return
 	}
 
 	var fileURL string
@@ -115,6 +115,37 @@ func (s *BotService) HandleTelegramFileDownload(message *tgbotapi.Message, fileI
 	s.HandleAutoDelete(task)
 	s.UpdateSharedDashboard(message.Chat.ID, true)
 	slog.Info("Telegram download task created", "taskID", task.ID, "type", taskType)
+}
+
+// maxSecretFileSize caps cookies.txt / rclone.conf uploads read into memory.
+const maxSecretFileSize = 10 << 20
+
+// readTelegramFile loads a small upload into memory without staging a copy on disk.
+func (s *BotService) readTelegramFile(tgFile tgbotapi.File) ([]byte, error) {
+	if filepath.IsAbs(tgFile.FilePath) {
+		translatedPath := strings.Replace(tgFile.FilePath, "/var/lib/telegram-bot-api", s.Config.DownloadDir, 1)
+		if data, err := os.ReadFile(translatedPath); err == nil { // #nosec G304 -- path comes from the Bot API server
+			return data, nil
+		}
+	}
+
+	resp, err := http.Get(tgFile.Link(s.Bot.Token)) //nolint:gosec
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxSecretFileSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxSecretFileSize {
+		return nil, fmt.Errorf("file larger than %d bytes", maxSecretFileSize)
+	}
+	return data, nil
 }
 
 func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {

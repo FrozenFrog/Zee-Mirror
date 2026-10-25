@@ -10,6 +10,7 @@ data:
   LOG_LEVEL: {{ .Values.config.logLevel | quote }}
   LOG_FORMAT: {{ .Values.config.logFormat | quote }}
   DB_DRIVER: {{ .Values.config.dbDriver | quote }}
+  SECRETS_SEED_DIR: /app/secrets-seed
   DASHBOARD_PORT_INTERNAL: "{{ .Values.service.port }}"
   RCLONE_DEST: {{ .Values.config.rcloneDest | quote }}
   MAX_CONCURRENT_DOWNLOADS: "{{ .Values.config.maxConcurrentDownloads }}"

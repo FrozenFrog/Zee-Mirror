@@ -28,6 +28,8 @@ type Config struct {
 	SentryDSN                string
 	BotToken                 string
 	DatabaseURL              string
+	SecretsDir               string
+	SecretsSeedDir           string
 	RcloneBufferSize         string
 	AppHash                  string
 	RclonePacerMinSleep      string
@@ -101,8 +103,10 @@ func LoadConfig() *Config {
 		RclonePacerBurst:         getEnv("RCLONE_PACER_BURST", "200"),
 		RcloneLogLevel:           getEnv("RCLONE_LOG_LEVEL", "NOTICE"),
 		AutoCleanupDays:          getEnvInt("AUTO_CLEANUP_DAYS", 30),
-		DBDriver:                 getEnv("DB_DRIVER", "sqlite"),
+		DBDriver:                 getEnv("DB_DRIVER", "postgres"),
 		DatabaseURL:              os.Getenv("DATABASE_URL"),
+		SecretsDir:               getEnv("SECRETS_DIR", "/dev/shm"),
+		SecretsSeedDir:           os.Getenv("SECRETS_SEED_DIR"),
 		TGGetFileTimeout:         getEnvInt("TG_GETFILE_TIMEOUT", 600),
 		encryptionKeyHex:         os.Getenv("ENCRYPTION_KEY"),
 	}
