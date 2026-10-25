@@ -124,7 +124,7 @@ func (db *DB) GetWeeklyStats(ctx context.Context) ([]DailyStats, error) {
 	end := now.AddDate(0, 0, 1).Format("2006-01-02")
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT COALESCE(DATE(created_at), 'unknown') as day,
+		SELECT CAST(DATE(created_at) AS TEXT) as day,
 			COUNT(*) as total,
 			COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
@@ -176,7 +176,7 @@ func (db *DB) GetMonthlyStats(ctx context.Context) ([]DailyStats, error) {
 	end := now.AddDate(0, 0, 1).Format("2006-01-02")
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT COALESCE(DATE(created_at), 'unknown') as day,
+		SELECT CAST(DATE(created_at) AS TEXT) as day,
 			COUNT(*) as total,
 			COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,

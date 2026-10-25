@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,7 +48,6 @@ func (e *Engine) GetFormats(ctx context.Context, url string) (map[int]downloader
 		"--extractor-args", "youtube:player-client=web_creator,android_vr,ios,android",
 		"--socket-timeout", "60",
 		"--add-header", "Accept-Language: en-US,en;q=0.9",
-		"--add-header", "Referer: https://www.youtube.com/",
 		"--js-runtime", "node",
 		"--remote-components", "ejs:github",
 		"--playlist-items", "0",
@@ -59,6 +59,7 @@ func (e *Engine) GetFormats(ctx context.Context, url string) (map[int]downloader
 		args = append(args, "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
 	}
 
+	args = append(args, youtubeReferer(url)...)
 	args = append(args, url)
 	output, err := e.runYTDLP(ctx, args...)
 	if err != nil {
@@ -354,7 +355,6 @@ func (e *Engine) buildYTDLPArgs(task *domain.Task, outputDir string) []string {
 		"--concurrent-fragments", "16",
 		"--buffer-size", "1M",
 		"--add-header", "Accept-Language: en-US,en;q=0.9",
-		"--add-header", "Referer: https://www.youtube.com/",
 		"--js-runtime", "node",
 		"--remote-components", "ejs:github",
 		"--no-cache-dir",
@@ -389,8 +389,25 @@ func (e *Engine) buildYTDLPArgs(task *domain.Task, outputDir string) []string {
 		}
 	}
 
+	args = append(args, youtubeReferer(task.URL)...)
 	args = append(args, task.URL)
 	return args
+}
+
+// youtubeReferer returns the YouTube Referer header for YouTube links only.
+// Other sites' CDNs reject a foreign Referer: X/Twitter's video.twimg.com
+// answers it with "HTTP Error 403: Unauthorized".
+func youtubeReferer(rawURL string) []string {
+	u, err := neturl.Parse(rawURL)
+	if err != nil {
+		return nil
+	}
+	host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+	switch {
+	case host == "youtu.be", host == "youtube.com", strings.HasSuffix(host, ".youtube.com"):
+		return []string{"--add-header", "Referer: https://www.youtube.com/"}
+	}
+	return nil
 }
 
 func (e *Engine) parseProgress(stdout interface{}, onProgress func(downloader.ProgressUpdate)) {

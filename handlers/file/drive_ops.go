@@ -213,7 +213,9 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 	keyboard := buildSearchNavigationKeyboard(s, files)
 	editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sent.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
-	editMsg.ReplyMarkup = &keyboard
+	if len(keyboard.InlineKeyboard) > 0 {
+		editMsg.ReplyMarkup = &keyboard
+	}
 	_, _ = s.Bot.Send(editMsg)
 }
 

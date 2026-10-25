@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/google/uuid"
 )
 
 func HandleYTDLP(s *service.BotService, message *tgbotapi.Message, args string) {
@@ -103,11 +101,6 @@ func handleYTDLPGeneric(s *service.BotService, message *tgbotapi.Message, args s
 		return
 	}
 
-	if quality == "" && (strings.Contains(url, "youtube.com") || strings.Contains(url, "youtu.be")) {
-		showYTDLPQualityMenu(s, message, url, name, zip, password, taskType)
-		return
-	}
-
 	replyID := 0
 	if message.ReplyToMessage != nil {
 		replyID = message.ReplyToMessage.MessageID
@@ -134,74 +127,8 @@ func isYTDLPPlaylist(url string) bool {
 		strings.Contains(url, "&list=")) && !strings.Contains(url, "watch?v=")
 }
 
-func showYTDLPQualityMenu(s *service.BotService, message *tgbotapi.Message, url, name string, zip bool, password string, taskType service.TaskType) {
-	lang := s.GetUserLanguage(message.From.ID)
-	if isYTDLPPlaylist(url) {
-		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "ytdlp_playlist_error"))
-		msg.ParseMode = tgbotapi.ModeMarkdownV2
-		sentMsg, _ := s.Bot.Send(msg)
-		s.AutoDeleteMessage(message.Chat.ID, sentMsg.MessageID, 15*time.Second)
-		return
-	}
-
-	statusMsg, _ := s.Bot.Send(tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "ytdlp_analysis")))
-
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	resMap, err := s.TaskManager.YTDLPEngine.GetFormats(ctx, url)
-	if err != nil {
-		slog.Error("YTDLP analysis failed", "error", err)
-		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, i18n.T(lang, "ytdlp_analysis_failed", utils.EscapeMarkdownV2(err.Error())))
-		s.AutoDeleteMessage(statusMsg.Chat.ID, statusMsg.MessageID, 20*time.Second)
-		return
-	}
-
-	sortedHeights := getSortedHeights(resMap)
-
-	sessionID := createYTDLPSession(s, url, name, zip, password, taskType)
-	keyboard := buildYTDLPKeyboard(sortedHeights, resMap, sessionID)
-
-	text := i18n.T(lang, "ytdlp_select_quality")
-	if len(sortedHeights) == 0 {
-		text = i18n.T(lang, "ytdlp_no_resolution")
-	}
-
-	editMsg := tgbotapi.NewEditMessageText(statusMsg.Chat.ID, statusMsg.MessageID, text)
-	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
-	editMsg.ReplyMarkup = &keyboard
-	_, _ = s.Bot.Send(editMsg)
-}
-
-func getSortedHeights(resMap map[int]downloader.FormatInfo) []int {
-	var heights []int
-	for h := range resMap {
-		if h > 0 {
-			heights = append(heights, h)
-		}
-	}
-	sort.Sort(sort.Reverse(sort.IntSlice(heights)))
-	return heights
-}
-
-func createYTDLPSession(s *service.BotService, url, name string, zip bool, password string, taskType service.TaskType) string {
-	sessionID := uuid.New().String()[:12]
-	s.TaskManager.Mu.Lock()
-	defer s.TaskManager.Mu.Unlock()
-	s.TaskManager.YTDLPSessions[sessionID] = &service.YTDLPSession{
-		URL:      url,
-		FileName: name,
-		Zip:      zip,
-		Password: password,
-		Type:     taskType,
-	}
-	return sessionID
-}
-
-func buildYTDLPKeyboard(_ []int, _ map[int]downloader.FormatInfo, _ string) tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
-}
-
+// YTDLPQualityCallbackHandler serves quality buttons on messages sent before
+// downloads defaulted to the best quality (pick one with -q instead).
 func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
 	if len(parts) < 3 {
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên đã hết hạn"))

@@ -50,7 +50,9 @@ func HandleStats(s *service.BotService, message *tgbotapi.Message) {
 		msg := tgbotapi.NewPhoto(message.Chat.ID, tgbotapi.FileBytes{Name: "stats.png", Bytes: chartBytes})
 		msg.Caption = text
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
-		msg.ReplyMarkup = keyboard
+		if len(keyboard.InlineKeyboard) > 0 {
+			msg.ReplyMarkup = keyboard
+		}
 
 		sentMsg, err := s.Bot.Send(msg)
 		if err != nil {
@@ -58,7 +60,9 @@ func HandleStats(s *service.BotService, message *tgbotapi.Message) {
 
 			fallbackMsg := tgbotapi.NewMessage(message.Chat.ID, text)
 			fallbackMsg.ParseMode = tgbotapi.ModeMarkdownV2
-			fallbackMsg.ReplyMarkup = keyboard
+			if len(keyboard.InlineKeyboard) > 0 {
+				fallbackMsg.ReplyMarkup = keyboard
+			}
 			if sentTextMsg, err := s.Bot.Send(fallbackMsg); err == nil {
 				s.AutoDeleteMessage(message.Chat.ID, sentTextMsg.MessageID, 60*time.Second)
 			}
@@ -68,7 +72,9 @@ func HandleStats(s *service.BotService, message *tgbotapi.Message) {
 	} else {
 		msg := tgbotapi.NewMessage(message.Chat.ID, text)
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
-		msg.ReplyMarkup = keyboard
+		if len(keyboard.InlineKeyboard) > 0 {
+			msg.ReplyMarkup = keyboard
+		}
 		sentMsg, err := s.Bot.Send(msg)
 		if err != nil {
 			slog.Error("Error sending stats message", "error", err, "userID", message.From.ID)

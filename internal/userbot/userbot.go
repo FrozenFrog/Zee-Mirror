@@ -3,6 +3,7 @@ package userbot
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,8 @@ import (
 	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/telegram/message"
 	"github.com/gotd/td/telegram/peers"
+	"github.com/gotd/td/telegram/query"
+	"github.com/gotd/td/telegram/query/dialogs"
 	"github.com/gotd/td/tg"
 )
 
@@ -143,85 +146,20 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	}
 	u.Mu.RUnlock()
 
-	isPrivate := strings.Contains(link, "/c/")
-	parts := strings.Split(link, "/")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("định dạng link không hợp lệ")
-	}
-
-	msgIDStr := parts[len(parts)-1]
-	msgID, err := strconv.Atoi(msgIDStr)
+	ref, err := parseMessageLink(link)
 	if err != nil {
-		return "", fmt.Errorf("ID tin nhắn không hợp lệ")
+		return "", err
 	}
-
-	var identifier string
-	if len(parts) >= 2 {
-		identifier = parts[len(parts)-2]
-	}
+	msgID := ref.MsgID
 
 	ctx, cancel := context.WithTimeout(u.Context, 10*time.Minute)
 	defer cancel()
 
-	var inputPeer tg.InputPeerClass
-	var peer peers.Peer
-
-	if isPrivate {
-		p, resolveErr := u.Manager.Resolve(ctx, identifier)
-		if resolveErr != nil {
-			return "", fmt.Errorf("không xác định được channel riêng tư: %v (hãy chắc chắn userbot đã tham gia)", resolveErr)
-		}
-		peer = p
-	} else {
-		p, resolveErr := u.Manager.Resolve(ctx, "@"+identifier)
-		if resolveErr != nil {
-			return "", fmt.Errorf("không xác định được username: %v", resolveErr)
-		}
-		peer = p
-	}
-
-	inputPeer = peer.InputPeer()
-
-	msgs, err := u.Client.API().MessagesGetMessages(ctx, []tg.InputMessageClass{
-		&tg.InputMessageID{ID: msgID},
-	})
+	msg, err := u.fetchMessage(ctx, ref)
 	if err != nil {
-		if channel, ok := inputPeer.(*tg.InputPeerChannel); ok {
-			channelsMsgs, err2 := u.Client.API().ChannelsGetMessages(ctx, &tg.ChannelsGetMessagesRequest{
-				Channel: &tg.InputChannel{ChannelID: channel.ChannelID, AccessHash: channel.AccessHash},
-				ID:      []tg.InputMessageClass{&tg.InputMessageID{ID: msgID}},
-			})
-			if err2 == nil {
-				msgs = channelsMsgs
-			} else {
-				return "", err2
-			}
-		} else {
-			return "", err
-		}
+		return "", err
 	}
-
-	var media tg.MessageMediaClass
-	switch m := msgs.(type) {
-	case *tg.MessagesMessages:
-		if len(m.Messages) > 0 {
-			if msg, ok := m.Messages[0].(*tg.Message); ok {
-				media = msg.Media
-			}
-		}
-	case *tg.MessagesChannelMessages:
-		if len(m.Messages) > 0 {
-			if msg, ok := m.Messages[0].(*tg.Message); ok {
-				media = msg.Media
-			}
-		}
-	case *tg.MessagesMessagesSlice:
-		if len(m.Messages) > 0 {
-			if msg, ok := m.Messages[0].(*tg.Message); ok {
-				media = msg.Media
-			}
-		}
-	}
+	media := msg.Media
 
 	if media == nil {
 		return "", fmt.Errorf("không tìm thấy media trong tin nhắn")
@@ -268,6 +206,131 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	}
 
 	return outPath, nil
+}
+
+// messageRef is a parsed t.me message link: either a public username or the
+// numeric id of a private channel (t.me/c/<id>/...), plus the message id.
+type messageRef struct {
+	Username  string
+	ChannelID int64
+	MsgID     int
+}
+
+// parseMessageLink accepts t.me/<username>/<msg>, t.me/c/<id>/<msg> and their
+// forum topic forms (t.me/<username>/<topic>/<msg>, t.me/c/<id>/<topic>/<msg>).
+// The message id is always the last path segment.
+func parseMessageLink(link string) (messageRef, error) {
+	var ref messageRef
+	link = strings.TrimSpace(link)
+	if i := strings.IndexAny(link, "?#"); i >= 0 {
+		link = link[:i]
+	}
+	idx := strings.Index(link, "t.me/")
+	if idx < 0 {
+		return ref, fmt.Errorf("định dạng link không hợp lệ")
+	}
+	parts := strings.Split(strings.Trim(link[idx+len("t.me/"):], "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return ref, fmt.Errorf("định dạng link không hợp lệ")
+	}
+	if parts[0] == "s" {
+		parts = parts[1:]
+	}
+
+	if len(parts) >= 3 && parts[0] == "c" {
+		id, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return ref, fmt.Errorf("ID channel không hợp lệ")
+		}
+		ref.ChannelID = id
+	} else if len(parts) >= 2 {
+		ref.Username = parts[0]
+	} else {
+		return ref, fmt.Errorf("link thiếu ID tin nhắn")
+	}
+
+	msgID, err := strconv.Atoi(parts[len(parts)-1])
+	if err != nil || msgID <= 0 {
+		return ref, fmt.Errorf("ID tin nhắn không hợp lệ")
+	}
+	ref.MsgID = msgID
+	return ref, nil
+}
+
+var errDialogFound = errors.New("dialog found")
+
+// resolvePrivateChannel finds a channel by its numeric id. The peer cache is
+// in memory, so after a restart the access hash is only known once the
+// channel is seen again; the dialog list provides it for joined channels.
+func (u *UserBot) resolvePrivateChannel(ctx context.Context, id int64) (peers.Channel, error) {
+	if ch, err := u.Manager.ResolveChannelID(ctx, id); err == nil {
+		return ch, nil
+	}
+
+	var input *tg.InputChannel
+	err := query.GetDialogs(u.Client.API()).BatchSize(100).ForEach(ctx, func(_ context.Context, e dialogs.Elem) error {
+		if p, ok := e.Peer.(*tg.InputPeerChannel); ok && p.ChannelID == id {
+			input = &tg.InputChannel{ChannelID: p.ChannelID, AccessHash: p.AccessHash}
+			return errDialogFound
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, errDialogFound) {
+		return peers.Channel{}, err
+	}
+	if input == nil {
+		return peers.Channel{}, fmt.Errorf("userbot chưa tham gia channel/nhóm này")
+	}
+	return u.Manager.GetChannel(ctx, input)
+}
+
+// fetchMessage loads the message a link points to. Channel and supergroup
+// messages must go through channels.getMessages: messages.getMessages only
+// reads the account's own message box and returns an empty message for
+// channel ids instead of an error.
+func (u *UserBot) fetchMessage(ctx context.Context, ref messageRef) (*tg.Message, error) {
+	var peer peers.Peer
+	if ref.ChannelID != 0 {
+		ch, err := u.resolvePrivateChannel(ctx, ref.ChannelID)
+		if err != nil {
+			return nil, fmt.Errorf("không xác định được channel riêng tư: %v (hãy chắc chắn userbot đã tham gia)", err)
+		}
+		peer = ch
+	} else {
+		p, err := u.Manager.ResolveDomain(ctx, ref.Username)
+		if err != nil {
+			return nil, fmt.Errorf("không xác định được username %s: %v", ref.Username, err)
+		}
+		peer = p
+	}
+
+	ids := []tg.InputMessageClass{&tg.InputMessageID{ID: ref.MsgID}}
+	var (
+		res tg.MessagesMessagesClass
+		err error
+	)
+	if ch, ok := peer.InputPeer().(*tg.InputPeerChannel); ok {
+		res, err = u.Client.API().ChannelsGetMessages(ctx, &tg.ChannelsGetMessagesRequest{
+			Channel: &tg.InputChannel{ChannelID: ch.ChannelID, AccessHash: ch.AccessHash},
+			ID:      ids,
+		})
+	} else {
+		res, err = u.Client.API().MessagesGetMessages(ctx, ids)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("không lấy được tin nhắn: %v", err)
+	}
+
+	modified, ok := res.AsModified()
+	if !ok {
+		return nil, fmt.Errorf("không lấy được tin nhắn")
+	}
+	for _, m := range modified.GetMessages() {
+		if msg, ok := m.(*tg.Message); ok {
+			return msg, nil
+		}
+	}
+	return nil, fmt.Errorf("tin nhắn %d không tồn tại hoặc userbot không xem được", ref.MsgID)
 }
 
 type ProgressWriter struct {

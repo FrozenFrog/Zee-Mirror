@@ -25,11 +25,9 @@ func HandleDashboardCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 	}
 
 	text := getDashboardModeText(action)
-	keyboard := tgbotapi.InlineKeyboardMarkup{}
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
-	editMsg.ReplyMarkup = &keyboard
 	_, _ = s.Bot.Send(editMsg)
 	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }

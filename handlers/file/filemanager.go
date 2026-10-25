@@ -140,7 +140,9 @@ func renderDriveList(s *service.BotService, chatID int64, messageID int, relPath
 
 	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
-	editMsg.ReplyMarkup = &keyboard
+	if len(keyboard.InlineKeyboard) > 0 {
+		editMsg.ReplyMarkup = &keyboard
+	}
 
 	if _, err := s.Bot.Send(editMsg); err != nil {
 		slog.Error("Error sending final list message", "error", err)

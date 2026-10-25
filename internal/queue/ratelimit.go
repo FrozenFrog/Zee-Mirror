@@ -57,9 +57,11 @@ func (rl *UserRateLimiter) loadFromDB() {
 	count := 0
 	for rows.Next() {
 		var rec RateLimitRecord
-		if err := rows.Scan(&rec.UserID, &rec.Tokens, &rec.LastFetch); err != nil {
+		var lastFetch float64
+		if err := rows.Scan(&rec.UserID, &rec.Tokens, &lastFetch); err != nil {
 			continue
 		}
+		rec.LastFetch = time.Unix(0, int64(lastFetch*float64(time.Second)))
 
 		limiter := rate.NewLimiter(rl.rate, rl.burst)
 		elapsed := time.Since(rec.LastFetch).Seconds()
@@ -133,7 +135,9 @@ func (rl *UserRateLimiter) Persist() {
 
 	now := time.Now()
 	for _, rec := range records {
-		if _, err := stmt.ExecContext(ctx, rec.UserID, rec.Tokens, rec.LastFetch, now); err != nil {
+		// last_fetch is a REAL column holding Unix seconds.
+		lastFetch := float64(rec.LastFetch.UnixNano()) / float64(time.Second)
+		if _, err := stmt.ExecContext(ctx, rec.UserID, rec.Tokens, lastFetch, now); err != nil {
 			slog.Warn("Failed to persist rate limit", "userID", rec.UserID, "error", err)
 		}
 	}
