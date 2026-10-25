@@ -183,13 +183,10 @@ func TestRequireAuth_Session(t *testing.T) {
 	s := newTestServer(t)
 	repo := s.Service.DB.(*mocks.MockRepository)
 	repo.On("GetUserByAPIKey", mock.Anything, mock.Anything).Return((*domain.User)(nil), domain.ErrNotFound).Maybe()
-	repo.On("GetByID", mock.Anything, int64(7)).Return(&domain.User{ID: 7, Role: "admin", IsActive: true}, nil)
-	repo.On("GetByID", mock.Anything, int64(8)).Return(&domain.User{ID: 8, Role: "user", IsActive: true}, nil)
-	repo.On("GetByID", mock.Anything, int64(9)).Return(&domain.User{ID: 9, Role: "admin", IsActive: false}, nil)
 	handler := s.requireAuth(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 
-	session := func(uid string, method jwt.SigningMethod, key []byte, ttl time.Duration) string {
-		claims := jwt.MapClaims{"uid": uid, "exp": time.Now().Add(ttl).Unix()}
+	session := func(sub string, method jwt.SigningMethod, key []byte, ttl time.Duration) string {
+		claims := jwt.MapClaims{"sub": sub, "exp": time.Now().Add(ttl).Unix()}
 		signed, err := jwt.NewWithClaims(method, claims).SignedString(key)
 		assert.NoError(t, err)
 		return signed
@@ -199,13 +196,12 @@ func TestRequireAuth_Session(t *testing.T) {
 		token string
 		want  int
 	}{
-		{"admin", session("7", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusOK},
-		{"plain user role", session("8", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
-		{"expired user", session("9", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
-		{"expired token", session("7", jwt.SigningMethodHS256, s.sessionKey, -time.Hour), http.StatusUnauthorized},
-		{"wrong key", session("7", jwt.SigningMethodHS256, []byte("other"), time.Hour), http.StatusUnauthorized},
-		{"unexpected alg", session("7", jwt.SigningMethodHS512, s.sessionKey, time.Hour), http.StatusUnauthorized},
-		{"no uid", session("", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
+		{"oidc session", session("oidc:pocket-123", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusOK},
+		{"expired token", session("oidc:pocket-123", jwt.SigningMethodHS256, s.sessionKey, -time.Hour), http.StatusUnauthorized},
+		{"wrong key", session("oidc:pocket-123", jwt.SigningMethodHS256, []byte("other"), time.Hour), http.StatusUnauthorized},
+		{"unexpected alg", session("oidc:pocket-123", jwt.SigningMethodHS512, s.sessionKey, time.Hour), http.StatusUnauthorized},
+		{"other subject", session("7", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
+		{"no subject", session("", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
 	}
 	for _, tt := range tests {
 		for _, header := range []string{"Authorization", "X-API-Key"} {

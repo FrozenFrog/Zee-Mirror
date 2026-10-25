@@ -16,12 +16,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"zee-mirror/internal/config"
-	"zee-mirror/internal/domain"
-	"zee-mirror/internal/repository/mocks"
 )
 
 // fakeProvider is a minimal OIDC provider: discovery, JWKS and a token
@@ -83,20 +80,15 @@ func newFakeProvider(t *testing.T) *fakeProvider {
 	return p
 }
 
-func newOIDCServer(t *testing.T, p *fakeProvider, users []domain.User) *Server {
+func newOIDCServer(t *testing.T, p *fakeProvider) *Server {
 	t.Helper()
 	s := newTestServer(t)
 	cfg := s.Service.Config
-	cfg.OwnerID = 1
 	cfg.OIDCIssuer = p.srv.URL
 	cfg.OIDCClientID = "zee"
 	cfg.OIDCRedirectURL = "https://bot.example" + config.OIDCCallbackPath
 	cfg.OIDCProviderName = "Pocket-ID"
-	repo := s.Service.DB.(*mocks.MockRepository)
-	repo.On("GetAll", mock.Anything).Return(users, nil).Maybe()
-	for i := range users {
-		repo.On("GetByID", mock.Anything, users[i].ID).Return(&users[i], nil).Maybe()
-	}
+	cfg.OIDCAllowedGroups = []string{"zee-admin"}
 	return s
 }
 
@@ -143,12 +135,12 @@ func fragmentValue(t *testing.T, location, key string) string {
 	return v
 }
 
-func TestOIDC_SignInMapsUsername(t *testing.T) {
+// Group membership alone grants access: no bot user exists for "alice", and
+// the repository mock would fail the test if the sign-in looked one up.
+func TestOIDC_SignInByGroup(t *testing.T) {
 	p := newFakeProvider(t)
-	s := newOIDCServer(t, p, []domain.User{
-		{ID: 5, Username: "bob", Role: "admin", IsActive: true},
-		{ID: 7, Username: "Alice", Role: "authorized", IsActive: true},
-	})
+	p.groups = []string{"staff", "Zee-Admin"}
+	s := newOIDCServer(t, p)
 
 	token := fragmentValue(t, signIn(t, s, p, false), "oidc_token")
 	require.NotEmpty(t, token)
@@ -156,31 +148,28 @@ func TestOIDC_SignInMapsUsername(t *testing.T) {
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) { return s.sessionKey, nil })
 	require.NoError(t, err)
-	assert.Equal(t, "7", claims["uid"])
-	assert.Equal(t, "Alice", claims["username"])
-	assert.True(t, s.validSession(t.Context(), token))
+	assert.Equal(t, "oidc:pocket-123", claims["sub"])
+	assert.Equal(t, "alice", claims["username"])
+	assert.True(t, s.validSession(token))
 }
 
 func TestOIDC_Rejections(t *testing.T) {
 	tests := []struct {
-		name     string
-		users    []domain.User
-		username string
-		groups   []string
-		allowed  []string
-		tamper   bool
+		name    string
+		groups  []string
+		allowed []string
+		tamper  bool
 	}{
-		{"no matching username", []domain.User{{ID: 7, Username: "bob", Role: "admin", IsActive: true}}, "alice", nil, nil, false},
-		{"plain user role", []domain.User{{ID: 7, Username: "alice", Role: "user", IsActive: true}}, "alice", nil, nil, false},
-		{"expired user", []domain.User{{ID: 7, Username: "alice", Role: "admin", IsActive: false}}, "alice", nil, nil, false},
-		{"outside allowed groups", []domain.User{{ID: 7, Username: "alice", Role: "admin", IsActive: true}}, "alice", []string{"staff"}, []string{"zee-admin"}, false},
-		{"state mismatch", []domain.User{{ID: 7, Username: "alice", Role: "admin", IsActive: true}}, "alice", nil, nil, true},
+		{"no groups claim", nil, []string{"zee-admin"}, false},
+		{"outside allowed groups", []string{"staff"}, []string{"zee-admin"}, false},
+		{"allowed groups not configured", []string{"zee-admin"}, nil, false},
+		{"state mismatch", []string{"zee-admin"}, []string{"zee-admin"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newFakeProvider(t)
-			p.username, p.groups = tt.username, tt.groups
-			s := newOIDCServer(t, p, tt.users)
+			p.groups = tt.groups
+			s := newOIDCServer(t, p)
 			s.Service.Config.OIDCAllowedGroups = tt.allowed
 
 			location := signIn(t, s, p, tt.tamper)
@@ -188,16 +177,6 @@ func TestOIDC_Rejections(t *testing.T) {
 			assert.NotEmpty(t, fragmentValue(t, location, "oidc_error"))
 		})
 	}
-}
-
-func TestOIDC_AllowedGroupAndOwner(t *testing.T) {
-	p := newFakeProvider(t)
-	p.groups = []string{"Zee-Admin"}
-	// The owner is allowed by OWNER_ID even if the stored role differs.
-	s := newOIDCServer(t, p, []domain.User{{ID: 1, Username: "alice", Role: "user", IsActive: true}})
-	s.Service.Config.OIDCAllowedGroups = []string{"zee-admin"}
-
-	assert.NotEmpty(t, fragmentValue(t, signIn(t, s, p, false), "oidc_token"))
 }
 
 func TestOIDC_DisabledAndConfig(t *testing.T) {

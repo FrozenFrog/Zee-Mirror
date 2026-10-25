@@ -376,6 +376,8 @@ func (c *Config) Validate() error {
 	}
 	if !c.OIDCEnabled() {
 		slog.Warn("OIDC_ISSUER not set: nobody can sign in to the web dashboard")
+	} else if len(c.OIDCAllowedGroups) == 0 {
+		slog.Warn("OIDC_ALLOWED_GROUPS not set: nobody can sign in to the web dashboard")
 	}
 	if c.UseWebhook && c.WebhookSecret == "" {
 		return fmt.Errorf("WEBHOOK_SECRET must be set when USE_WEBHOOK=true (webhook endpoint is unauthenticated without it)")

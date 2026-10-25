@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -41,9 +40,9 @@ func (s *Server) issueDashboardToken(claims jwt.MapClaims) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.sessionKey)
 }
 
-// validSession checks a session JWT and re-checks its user, so a role change,
-// expiry or deletion takes effect without waiting for the token to expire.
-func (s *Server) validSession(ctx context.Context, tokenStr string) bool {
+// validSession checks a session JWT. Group membership was checked at sign-in,
+// so removing someone from the group takes effect when their session expires.
+func (s *Server) validSession(tokenStr string) bool {
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(_ *jwt.Token) (interface{}, error) {
 		return s.sessionKey, nil
@@ -51,13 +50,8 @@ func (s *Server) validSession(ctx context.Context, tokenStr string) bool {
 	if err != nil || !token.Valid {
 		return false
 	}
-	uidStr, _ := claims["uid"].(string)
-	uid, err := strconv.ParseInt(uidStr, 10, 64)
-	if err != nil {
-		return false
-	}
-	u, err := s.Service.DB.GetByID(ctx, uid)
-	return err == nil && s.canUseDashboard(u)
+	sub, _ := claims["sub"].(string)
+	return strings.HasPrefix(sub, oidcSubjectPrefix)
 }
 
 // authorizeToken accepts a dashboard session or an active user's personal API key.
@@ -65,7 +59,7 @@ func (s *Server) authorizeToken(ctx context.Context, tokenStr string) bool {
 	if tokenStr == "" {
 		return false
 	}
-	if s.validSession(ctx, tokenStr) {
+	if s.validSession(tokenStr) {
 		return true
 	}
 	u, err := s.Service.DB.GetUserByAPIKey(ctx, tokenStr)

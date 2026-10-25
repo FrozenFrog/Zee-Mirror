@@ -6,17 +6,12 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"zee-mirror/internal/domain"
-	"zee-mirror/internal/service"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
@@ -24,26 +19,20 @@ import (
 )
 
 // Dashboard sign-in through an OpenID Connect provider such as Pocket-ID,
-// using the authorization code flow with PKCE. The provider's
-// preferred_username is matched against the Telegram username in the users
-// table; a match with a dashboard role gets the regular dashboard JWT, so the
-// rest of the API needs no changes.
+// using the authorization code flow with PKCE. Access is decided by the
+// provider alone: an account in one of OIDC_ALLOWED_GROUPS gets the dashboard
+// JWT. Bot users and their Telegram usernames play no part.
 
 const (
-	oidcStateCookie  = "zee_oidc_state"
-	oidcCookiePath   = "/api/auth/oidc"
-	oidcLoginTTL     = 10 * time.Minute
-	maxPendingLogins = 256
+	oidcStateCookie = "zee_oidc_state"
+	oidcCookiePath  = "/api/auth/oidc"
+	oidcLoginTTL    = 10 * time.Minute
+	// oidcSubjectPrefix marks the sub claim of dashboard sessions.
+	oidcSubjectPrefix = "oidc:"
+	maxPendingLogins  = 256
 )
 
 var oidcHTTPClient = &http.Client{Timeout: 15 * time.Second}
-
-// dashboardRoles are the roles allowed to sign in through OIDC.
-var dashboardRoles = map[string]bool{
-	service.RoleOwner:      true,
-	service.RoleAdmin:      true,
-	service.RoleAuthorized: true,
-}
 
 type pendingLogin struct {
 	verifier string
@@ -213,64 +202,32 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(cfg.OIDCAllowedGroups) == 0 {
+		slog.Error("OIDC login refused: OIDC_ALLOWED_GROUPS is not set", "username", claims.PreferredUsername)
+		oidcFail(w, r, "Chưa cấu hình nhóm được phép (OIDC_ALLOWED_GROUPS)")
+		return
+	}
 	if !inAllowedGroups(claims.Groups, cfg.OIDCAllowedGroups) {
 		slog.Warn("OIDC login outside allowed groups", "username", claims.PreferredUsername, "groups", claims.Groups)
 		oidcFail(w, r, "Tài khoản không thuộc nhóm được phép")
 		return
 	}
-	user, err := s.userByUsername(r.Context(), claims.PreferredUsername)
-	if err != nil {
-		slog.Warn("OIDC login without a matching bot user", "username", claims.PreferredUsername, "error", err)
-		oidcFail(w, r, "Không có người dùng bot nào có username \""+claims.PreferredUsername+"\" và quyền vào dashboard")
-		return
-	}
 
 	signed, err := s.issueDashboardToken(jwt.MapClaims{
-		"sub":      "oidc:" + idToken.Subject,
-		"uid":      strconv.FormatInt(user.ID, 10),
-		"username": user.Username,
+		"sub":      oidcSubjectPrefix + idToken.Subject,
+		"username": claims.PreferredUsername,
 	})
 	if err != nil {
 		oidcFail(w, r, "Không tạo được phiên đăng nhập")
 		return
 	}
-	slog.Info("Dashboard OIDC login", "username", user.Username, "uid", user.ID, "ip", getClientIP(r))
+	slog.Info("Dashboard OIDC login", "username", claims.PreferredUsername, "sub", idToken.Subject, "ip", getClientIP(r))
 	// A fragment never reaches the server or its logs; the dashboard moves
 	// it into storage and drops it from the URL.
 	http.Redirect(w, r, "/#oidc_token="+url.QueryEscape(signed), http.StatusFound)
 }
 
-// userByUsername finds the bot user whose Telegram username matches the
-// provider's username (case-insensitive, leading "@" ignored) and who may use
-// the dashboard.
-func (s *Server) userByUsername(ctx context.Context, username string) (*domain.User, error) {
-	username = strings.TrimPrefix(strings.TrimSpace(username), "@")
-	if username == "" {
-		return nil, errors.New("provider sent no preferred_username")
-	}
-	users, err := s.Service.DB.GetAll(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for i := range users {
-		if strings.EqualFold(strings.TrimPrefix(users[i].Username, "@"), username) {
-			if !s.canUseDashboard(&users[i]) {
-				return nil, errors.New("user has no dashboard role or is expired")
-			}
-			return &users[i], nil
-		}
-	}
-	return nil, domain.ErrNotFound
-}
-
-func (s *Server) canUseDashboard(u *domain.User) bool {
-	return u.IsActive && (u.ID == s.Service.Config.OwnerID || dashboardRoles[u.Role])
-}
-
 func inAllowedGroups(groups, allowed []string) bool {
-	if len(allowed) == 0 {
-		return true
-	}
 	for _, g := range groups {
 		for _, a := range allowed {
 			if strings.EqualFold(g, a) {

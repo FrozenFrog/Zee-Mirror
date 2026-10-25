@@ -233,6 +233,7 @@ RCLONE_DEST=gdrive:/Zee-Mirror          # Default upload destination
 WEB_DASHBOARD_URL=https://your-domain   # Your server's public IP/domain
 OIDC_ISSUER=https://pocketid.example.com  # Dashboard sign-in (OpenID Connect)
 OIDC_CLIENT_ID=your_client_id
+OIDC_ALLOWED_GROUPS=zee-admin           # Provider group allowed to sign in
 ```
 
 > 📝 See the [Full Configuration Reference](#%EF%B8%8F-configuration-reference) for all available variables.
@@ -364,7 +365,7 @@ win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environ
 | `OIDC_CLIENT_ID` | — | OIDC client ID |
 | `OIDC_CLIENT_SECRET` | — | OIDC client secret. Leave empty for a public client (PKCE only) |
 | `OIDC_REDIRECT_URL` | `<WEB_DASHBOARD_URL>/api/auth/oidc/callback` | Callback URL registered at the provider |
-| `OIDC_ALLOWED_GROUPS` | — | Comma-separated provider groups allowed to sign in. Empty = any group |
+| `OIDC_ALLOWED_GROUPS` | — | Comma-separated provider groups allowed to sign in. Required: empty = nobody can sign in |
 | `OIDC_PROVIDER_NAME` | `Pocket-ID` | Name shown on the login button |
 
 </details>
@@ -707,7 +708,7 @@ All media commands use **ffmpeg** under the hood. Reply to a video/audio message
 | | |
 |---|---|
 | **URL** | `http://your-server-ip:DASHBOARD_PORT` (default port `80`) |
-| **Login** | OpenID Connect (e.g. Pocket-ID), authorization code flow with PKCE. The provider's `preferred_username` must match the Telegram username of a bot user with the `owner`, `admin` or `authorized` role. Sessions last 24 hours and are signed with a key derived from `ENCRYPTION_KEY` |
+| **Login** | OpenID Connect (e.g. Pocket-ID), authorization code flow with PKCE. Any provider account in one of `OIDC_ALLOWED_GROUPS` may sign in; bot users are not involved. Sessions last 24 hours and are signed with a key derived from `ENCRYPTION_KEY` |
 
 <br>
 
