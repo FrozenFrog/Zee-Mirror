@@ -635,7 +635,7 @@ func (r *RcloneUploader) generateDirectLink(ctx context.Context, task *domain.Ta
 		return
 	}
 
-	slog.Warn("Failed to get direct link", "fileName", task.FileName, "error", linkErr)
+	slog.Warn("Failed to get direct link", "fileName", task.FileName, "error", utils.RcloneError(linkErr))
 
 	if !isDirUpload {
 		slog.Debug("Skipping directory fallback for file", "fileName", task.FileName)
@@ -689,7 +689,7 @@ func (r *RcloneUploader) generateDirectoryLink(ctx context.Context, task *domain
 		baseURL := strings.TrimSpace(string(linkOutputParent))
 		task.RemoteURL = baseURL + "#folders/" + task.FileName
 	} else {
-		slog.Warn("Failed to get parent directory link", "fileName", task.FileName, "error", linkErrParent)
+		slog.Warn("Failed to get parent directory link", "fileName", task.FileName, "error", utils.RcloneError(linkErrParent))
 		task.RemoteURL = "https://drive.google.com/drive/search?q=\"" + task.FileName + "\" in parents"
 	}
 }

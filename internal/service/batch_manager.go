@@ -572,6 +572,8 @@ func (s *BotService) uploadBatchResults(batch *BatchTask) error {
 	linkOutput, linkErr := linkCmd.Output()
 	if linkErr == nil {
 		batch.RemoteURL = strings.TrimSpace(string(linkOutput))
+	} else {
+		slog.Warn("Failed to get batch link", "batchID", batch.ID, "error", utils.RcloneError(linkErr))
 	}
 
 	slog.Info("Batch upload completed", "batchID", batch.ID, "url", batch.RemoteURL)
