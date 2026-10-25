@@ -90,7 +90,7 @@ func HandleSpeed(s *service.BotService, message *tgbotapi.Message) {
 }
 
 func HandleSystem(s *service.BotService, message *tgbotapi.Message) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -103,7 +103,7 @@ func HandleSystem(s *service.BotService, message *tgbotapi.Message) {
 }
 
 func HandleHealth(s *service.BotService, message *tgbotapi.Message) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 

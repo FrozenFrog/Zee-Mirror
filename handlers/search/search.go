@@ -81,7 +81,7 @@ func cleanupSearchSessions() {
 }
 
 func HandleSearch(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 

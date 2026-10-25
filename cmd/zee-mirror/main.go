@@ -12,6 +12,7 @@ import (
 	"zee-mirror/internal/api"
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/database"
+	"zee-mirror/internal/forum"
 	"zee-mirror/internal/metrics"
 	"zee-mirror/internal/router"
 	"zee-mirror/internal/secretfs"
@@ -76,7 +77,8 @@ func main() {
 
 	botAPI := startLocalBotAPI(cfg)
 
-	bots, err := service.InitBots(cfg.BotTokens, cfg.TelegramAPI)
+	topics := forum.New(cfg.AuthorizedChats)
+	bots, err := service.InitBots(cfg.BotTokens, cfg.TelegramAPI, topics)
 	if err != nil || len(bots) == 0 {
 		slog.Error("Failed to initialize any bot instances", "error", err)
 		os.Exit(1)
@@ -98,6 +100,7 @@ func main() {
 
 	botSvc := service.NewBotService(primaryBot, cfg, db, db.DB)
 	botSvc.Secrets = secrets
+	botSvc.Topics = topics
 	go search.StartSearchSessionCleanup(botSvc.TaskManager.ShutdownChan)
 
 	sighup := make(chan os.Signal, 1)

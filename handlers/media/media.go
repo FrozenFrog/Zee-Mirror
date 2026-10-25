@@ -26,7 +26,7 @@ func GetSuccessMessage(title, content string) string {
 }
 
 func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -92,7 +92,7 @@ func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args s
 }
 
 func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -179,7 +179,7 @@ func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args 
 }
 
 func HandleGenerateThumbnail(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -255,7 +255,7 @@ func HandleGenerateThumbnail(s *service.BotService, message *tgbotapi.Message, a
 }
 
 func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -330,7 +330,7 @@ func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args 
 }
 
 func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -413,7 +413,7 @@ func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args 
 }
 
 func HandleMediaInfo(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -497,7 +497,7 @@ func HandleMediaMirrorCallback(s *service.BotService, cb *tgbotapi.CallbackQuery
 }
 
 func HandleScreenshots(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -562,7 +562,7 @@ func HandleScreenshots(s *service.BotService, message *tgbotapi.Message, args st
 }
 
 func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -638,7 +638,7 @@ func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string
 }
 
 func HandleRescale(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 

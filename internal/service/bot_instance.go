@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"zee-mirror/internal/forum"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -15,11 +17,15 @@ type BotInstance struct {
 	Alias string
 }
 
-func InitBots(tokens []string, telegramAPI string) ([]*BotInstance, error) {
+// InitBots creates one client per token. topics may be nil.
+func InitBots(tokens []string, telegramAPI string, topics *forum.Topics) ([]*BotInstance, error) {
 	var instances []*BotInstance
 
-	httpClient := &http.Client{
+	var httpClient tgbotapi.HTTPClient = &http.Client{
 		Timeout: 90 * time.Second,
+	}
+	if topics != nil {
+		httpClient = topics.Client(httpClient)
 	}
 
 	for i, token := range tokens {

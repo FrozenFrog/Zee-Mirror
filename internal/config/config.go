@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode"
 	"zee-mirror/internal/crypto"
 	"zee-mirror/pkg/utils"
 
@@ -53,6 +54,7 @@ type Config struct {
 	RcloneDestFallbacks      []string
 	BotTokens                []string
 	AuthorizedUsers          []int64
+	AuthorizedChats          []AuthorizedChat
 	MaxRetries               int
 	AutoCleanupDays          int
 	DefaultMaxDailyTasks     int
@@ -68,6 +70,34 @@ type Config struct {
 	LocalBotAPI              bool
 }
 
+// AuthorizedChat is one AUTHORIZED_CHATS entry. TopicID 0 means the whole
+// chat, where the bot must be addressed with @username.
+type AuthorizedChat struct {
+	ID      int64
+	TopicID int
+}
+
+// ParseAuthorizedChats parses "chatID" and "chatID:topicID" entries separated
+// by commas or spaces, e.g. "-1003205657826 -1003205657826:6231".
+func ParseAuthorizedChats(raw string) []AuthorizedChat {
+	var chats []AuthorizedChat
+	for _, entry := range strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+		chatStr, topicStr, hasTopic := strings.Cut(entry, ":")
+		id, err := strconv.ParseInt(chatStr, 10, 64)
+		if err != nil {
+			continue
+		}
+		chat := AuthorizedChat{ID: id}
+		if hasTopic {
+			if chat.TopicID, err = strconv.Atoi(topicStr); err != nil || chat.TopicID <= 0 {
+				continue
+			}
+		}
+		chats = append(chats, chat)
+	}
+	return chats
+}
+
 func LoadConfig() *Config {
 	src := newSource()
 	cfg := &Config{
@@ -78,7 +108,7 @@ func LoadConfig() *Config {
 		ConfigDir:                src.strOr("CONFIG_DIR", "/app/config"),
 		MaxConcurrentDownloads:   src.int("MAX_CONCURRENT_DOWNLOADS", 3),
 		DashboardToken:           src.strOr("WEB_DASHBOARD_TOKEN", "zee-mirror-secret"),
-		DashboardPort:            src.int("DASHBOARD_PORT_INTERNAL", 8080),
+		DashboardPort:            src.int("DASHBOARD_PORT_INTERNAL", 5248),
 		LogLevel:                 src.strOr("LOG_LEVEL", "info"),
 		LogFormat:                src.strOr("LOG_FORMAT", "text"),
 		AppEnv:                   src.strOr("APP_ENV", ""),
@@ -132,6 +162,8 @@ func LoadConfig() *Config {
 			}
 		}
 	}
+
+	cfg.AuthorizedChats = ParseAuthorizedChats(src.str("AUTHORIZED_CHATS"))
 
 	if botTokens := src.str("BOT_TOKENS"); botTokens != "" {
 		for _, t := range strings.Split(botTokens, ",") {

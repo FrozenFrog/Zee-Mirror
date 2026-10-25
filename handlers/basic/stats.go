@@ -23,7 +23,7 @@ type UserStats = domain.UserStats
 type DailyStats = domain.DailyStats
 
 func HandleStats(s *service.BotService, message *tgbotapi.Message) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 

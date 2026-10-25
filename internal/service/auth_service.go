@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/errors"
+	"zee-mirror/internal/forum"
 	"zee-mirror/internal/repository"
 	"zee-mirror/pkg/utils"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // Authorizer is the single seam for access policy: bot commands, queue
@@ -133,6 +137,110 @@ func (s *AuthService) CheckQuota(userID int64) error {
 
 func (s *BotService) IsAuthorized(userID int64) bool {
 	return s.Auth.IsAuthorized(userID)
+}
+
+// Access is the verdict for an incoming update.
+type Access int
+
+const (
+	// AccessIgnore means the message isn't addressed to this bot.
+	AccessIgnore Access = iota
+	AccessDenied
+	AccessGranted
+)
+
+type chatScope int
+
+const (
+	scopeNone  chatScope = iota
+	scopeChat            // listed as "chat": the bot must be addressed with @username
+	scopeTopic           // listed as "chat:topic": every message is for the bot
+)
+
+func (s *BotService) chatScope(m *tgbotapi.Message) chatScope {
+	if m == nil {
+		return scopeNone
+	}
+	topic := forum.TopicOf(m)
+	scope := scopeNone
+	for _, c := range s.Config.AuthorizedChats {
+		if c.ID != m.Chat.ID {
+			continue
+		}
+		if c.TopicID == 0 {
+			scope = scopeChat
+		} else if c.TopicID == topic {
+			return scopeTopic
+		}
+	}
+	return scope
+}
+
+// AdmitMessage applies AUTHORIZED_CHATS to an incoming message. Everyone in a
+// listed chat may use the bot: directly inside a listed topic, and by
+// addressing it with @username anywhere else in the chat (the mention is
+// stripped from plain text so handlers see the bare input). Other chats fall
+// back to per-user authorization.
+func (s *BotService) AdmitMessage(m *tgbotapi.Message) Access {
+	s.Topics.Remember(m)
+
+	if cmd := m.CommandWithAt(); strings.Contains(cmd, "@") && !s.mentionsMe(cmd) {
+		return AccessIgnore
+	}
+
+	switch s.chatScope(m) {
+	case scopeTopic:
+		return AccessGranted
+	case scopeChat:
+		if !s.addressedToMe(m) {
+			return AccessIgnore
+		}
+		return AccessGranted
+	}
+
+	if (m.From != nil && s.IsAuthorized(m.From.ID)) || (m.IsCommand() && m.Command() == "start") {
+		return AccessGranted
+	}
+	return AccessDenied
+}
+
+// AdmitCallback reports whether a button press may be handled. Buttons need
+// no mention, so any member of a listed chat may press them.
+func (s *BotService) AdmitCallback(cb *tgbotapi.CallbackQuery) bool {
+	s.Topics.Remember(cb.Message)
+	return s.chatScope(cb.Message) != scopeNone || s.IsAuthorized(cb.From.ID)
+}
+
+// CanUse reports whether the sender of m may run regular (non-admin) commands.
+func (s *BotService) CanUse(m *tgbotapi.Message) bool {
+	return s.chatScope(m) != scopeNone || (m.From != nil && s.IsAuthorized(m.From.ID))
+}
+
+func (s *BotService) mentionsMe(text string) bool {
+	return strings.Contains(strings.ToLower(text), "@"+strings.ToLower(s.Bot.Self.UserName))
+}
+
+func (s *BotService) addressedToMe(m *tgbotapi.Message) bool {
+	if m.IsCommand() {
+		return strings.Contains(m.CommandWithAt(), "@")
+	}
+	if m.ReplyToMessage != nil && m.ReplyToMessage.From != nil && m.ReplyToMessage.From.ID == s.Bot.Self.ID {
+		return true
+	}
+	if m.Text != "" && s.mentionsMe(m.Text) {
+		m.Text = stripMention(m.Text, s.Bot.Self.UserName)
+		return true
+	}
+	if m.Caption != "" && s.mentionsMe(m.Caption) {
+		m.Caption = stripMention(m.Caption, s.Bot.Self.UserName)
+		return true
+	}
+	return false
+}
+
+func stripMention(text, username string) string {
+	i := strings.Index(strings.ToLower(text), "@"+strings.ToLower(username))
+	return strings.TrimSpace(text[:i] + text[i+len(username)+1:])
 }
 
 func (s *BotService) IsOwner(userID int64) bool {

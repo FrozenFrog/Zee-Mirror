@@ -357,7 +357,7 @@ win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environ
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DASHBOARD_PORT` | `80` | External port for the web dashboard (the port you access in your browser) |
-| `DASHBOARD_PORT_INTERNAL` | `8080` | Internal container listen port (typically unchanged) |
+| `DASHBOARD_PORT_INTERNAL` | `5248` | Internal container listen port (typically unchanged) |
 | `WEB_DASHBOARD_URL` | `http://localhost` | Public URL of the dashboard. Used for generating links in bot messages |
 | `WEB_DASHBOARD_TOKEN` | `zee-mirror-secret` | Password for dashboard login. **Change this for production!** |
 
@@ -384,6 +384,7 @@ win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environ
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AUTHORIZED_USERS` | — | Comma-separated list of Telegram User IDs allowed to use the bot (in addition to the owner) |
+| `AUTHORIZED_CHATS` | — | Groups whose members may use the bot, separated by commas or spaces. `chatID` covers the whole group, where the bot must be addressed (`/mirror@YourBot`); `chatID:topicID` covers a forum topic, where no mention is needed and the bot posts its messages |
 | `MAX_CONCURRENT_DOWNLOADS` | `3` | Maximum number of downloads running simultaneously. Increase for faster servers |
 | `STOP_DUPLICATE` | `false` | When `true`, prevents downloading the same URL if it's already being processed |
 | `DEFAULT_MAX_DAILY_TASKS` | `-1` | Maximum tasks per user per day. `-1` = unlimited |
@@ -764,7 +765,7 @@ No manual page refresh needed — everything updates automatically.
 
 ## 📡 REST API
 
-> The backend exposes a comprehensive RESTful API on port `:8080` (internal). All endpoints require `WEB_DASHBOARD_TOKEN` authentication.
+> The backend exposes a comprehensive RESTful API on port `:5248` (internal). All endpoints require `WEB_DASHBOARD_TOKEN` authentication.
 
 <details open>
 <summary><b>📋 All API Endpoints</b></summary>
@@ -1174,7 +1175,7 @@ Three **GitHub Actions** workflows ensure code quality on every push and PR:
 <summary><b>🌐 Dashboard not loading</b></summary>
 
 1. Check `DASHBOARD_PORT` is not blocked by a firewall
-2. Verify port mapping: `docker ps` should show `0.0.0.0:80->8080/tcp`
+2. Verify port mapping: `docker ps` should show `0.0.0.0:80->5248/tcp`
 3. Try accessing directly: `curl http://localhost:DASHBOARD_PORT/api/health`
 4. Check browser console for any CORS or auth errors
 </details>

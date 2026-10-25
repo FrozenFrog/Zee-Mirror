@@ -21,7 +21,7 @@ const (
 )
 
 func HandleDriveList(s *service.BotService, message *tgbotapi.Message, args string, editMessageID int) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 

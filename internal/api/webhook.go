@@ -61,9 +61,10 @@ func (s *Server) processWebhookUpdate(update tgbotapi.Update) {
 	}
 
 	if update.Message != nil {
-		isStart := update.Message.IsCommand() && update.Message.Command() == "start"
-
-		if !s.Service.IsAuthorized(update.Message.From.ID) && !isStart {
+		switch s.Service.AdmitMessage(update.Message) {
+		case service.AccessIgnore:
+			return
+		case service.AccessDenied:
 			slog.Warn("Unauthorized access attempt (webhook)",
 				"userID", update.Message.From.ID,
 				"username", update.Message.From.UserName,
@@ -83,7 +84,7 @@ func (s *Server) processWebhookUpdate(update tgbotapi.Update) {
 		data := update.CallbackQuery.Data
 		isHelp := strings.HasPrefix(data, "help:")
 
-		if !s.Service.IsAuthorized(update.CallbackQuery.From.ID) && !isHelp {
+		if !s.Service.AdmitCallback(update.CallbackQuery) && !isHelp {
 			slog.Warn("Unauthorized callback attempt (webhook)",
 				"userID", update.CallbackQuery.From.ID,
 				"username", update.CallbackQuery.From.UserName,

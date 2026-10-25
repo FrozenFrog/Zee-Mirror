@@ -10,6 +10,7 @@ import (
 	"time"
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/domain"
+	"zee-mirror/internal/forum"
 	"zee-mirror/internal/repository"
 	"zee-mirror/internal/secretfs"
 	"zee-mirror/pkg/utils"
@@ -34,6 +35,7 @@ type BotService struct {
 	Notifications  *NotificationService
 	RcloneUploader *uploader.RcloneUploader
 	Secrets        *secretfs.Store
+	Topics         *forum.Topics
 	SQLDB          *sql.DB
 	pathCacheClean chan struct{}
 	PathCache      sync.Map

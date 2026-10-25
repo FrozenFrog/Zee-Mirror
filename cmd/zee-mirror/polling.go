@@ -36,9 +36,10 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, botSvc
 				return
 			}
 			if update.Message != nil {
-				isStart := update.Message.IsCommand() && update.Message.Command() == "start"
-
-				if !botSvc.IsAuthorized(update.Message.From.ID) && !isStart {
+				switch botSvc.AdmitMessage(update.Message) {
+				case service.AccessIgnore:
+					continue
+				case service.AccessDenied:
 					slog.Warn("Unauthorized access attempt", "userID", update.Message.From.ID, "username", update.Message.From.UserName, "text", update.Message.Text)
 
 					msg := tgbotapi.NewMessage(update.Message.Chat.ID, service.GetErrorMessage("ACCESS DENIED", "Anda belum terautentikasi untuk menggunakan bot ini.\nSilakan hubungi Owner untuk mendapatkan akses."))
@@ -59,7 +60,7 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, botSvc
 				data := update.CallbackQuery.Data
 				isHelp := strings.HasPrefix(data, "help:")
 
-				if !botSvc.IsAuthorized(update.CallbackQuery.From.ID) && !isHelp {
+				if !botSvc.AdmitCallback(update.CallbackQuery) && !isHelp {
 					slog.Warn("Unauthorized callback attempt", "userID", update.CallbackQuery.From.ID, "username", update.CallbackQuery.From.UserName, "data", data)
 
 					cb := tgbotapi.NewCallback(update.CallbackQuery.ID, "🚫 Access Denied")
