@@ -16,7 +16,7 @@ import (
 )
 
 func HandleDriveMkdir(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 	if args == "" {
@@ -61,7 +61,7 @@ func HandleDriveDelete(s *service.BotService, message *tgbotapi.Message, args st
 }
 
 func HandleDriveMove(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -91,7 +91,7 @@ func HandleDriveMove(s *service.BotService, message *tgbotapi.Message, args stri
 }
 
 func HandleDriveShare(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 
@@ -160,7 +160,7 @@ func HandleDriveShare(s *service.BotService, message *tgbotapi.Message, args str
 }
 
 func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args string) {
-	if !s.IsAuthorized(message.From.ID) {
+	if !s.CanUse(message) {
 		return
 	}
 	if args == "" {

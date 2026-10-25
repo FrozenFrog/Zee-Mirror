@@ -119,7 +119,7 @@ func (rl *UserRateLimiter) Persist() {
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO rate_limits (user_id, tokens, last_fetch, updated_at)
-		VALUES (?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT(user_id) DO UPDATE SET
 			tokens = excluded.tokens,
 			last_fetch = excluded.last_fetch,

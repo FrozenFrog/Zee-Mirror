@@ -1,8 +1,13 @@
 package config
 
 import (
+	"context"
+	"encoding/hex"
+	"slices"
 	"strings"
 	"testing"
+
+	"zee-mirror/internal/crypto"
 )
 
 func TestValidate_MissingBotTokens(t *testing.T) {
@@ -175,5 +180,57 @@ func TestValidate_WebhookRequiresSecret(t *testing.T) {
 	cfg.WebhookSecret = "s3cret"
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("unexpected error with secret set: %v", err)
+	}
+}
+
+func TestUseSettingsLayersDatabaseUnderEnvironment(t *testing.T) {
+	keyHex := strings.Repeat("ab", 32)
+	key, _ := hex.DecodeString(keyHex)
+	enc, err := crypto.Encrypt([]byte("123:abc"), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("ENCRYPTION_KEY", keyHex)
+	t.Setenv("BOT_TOKEN", "")
+	t.Setenv("OWNER_ID", "") // empty env must not hide the database value
+	t.Setenv("RCLONE_DEST", "env:/dest")
+	t.Cleanup(func() {
+		dbSettings.Store(nil)
+		settingsSource.Store(nil)
+	})
+
+	cfg, err := UseSettings(context.Background(), func(context.Context) (map[string]string, error) {
+		return map[string]string{
+			"BOT_TOKEN":   "enc:" + enc,
+			"OWNER_ID":    "42",
+			"RCLONE_DEST": "db:/dest",
+			"MAX_RETRIES": "7",
+			"cookies":     "not a config key",
+		}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.BotToken != "123:abc" || !slices.Equal(cfg.BotTokens, []string{"123:abc"}) {
+		t.Errorf("encrypted BOT_TOKEN not decrypted: %q %v", cfg.BotToken, cfg.BotTokens)
+	}
+	if cfg.OwnerID != 42 {
+		t.Errorf("OwnerID = %d, want 42 from database", cfg.OwnerID)
+	}
+	if cfg.RcloneDest != "env:/dest" {
+		t.Errorf("RcloneDest = %q, environment should win", cfg.RcloneDest)
+	}
+	if cfg.MaxRetries != 7 {
+		t.Errorf("MaxRetries = %d, want 7 from database", cfg.MaxRetries)
+	}
+}
+
+func TestEncryptedValueWithoutKeyIsDropped(t *testing.T) {
+	t.Setenv("ENCRYPTION_KEY", "")
+	t.Setenv("BOT_TOKEN", "enc:AAAA")
+	if got := LoadConfig().BotToken; got != "" {
+		t.Errorf("BotToken = %q, want empty when the key is missing", got)
 	}
 }

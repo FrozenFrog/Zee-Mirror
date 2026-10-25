@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -37,21 +38,24 @@ func (s *BotService) HandleSettings(message *tgbotapi.Message) {
 	msg.ParseMode = MarkdownV2
 	msg.ReplyMarkup = keyboard
 	sentMsg, err := s.Bot.Send(msg)
-	if err == nil {
-		s.AutoDeleteMessage(message.Chat.ID, sentMsg.MessageID, 60*time.Second)
+	if err != nil {
+		slog.Error("Failed to send settings menu", "error", err)
+		return
 	}
+	s.AutoDeleteMessage(message.Chat.ID, sentMsg.MessageID, 60*time.Second)
 }
 
 func (s *BotService) HandleLanguage(message *tgbotapi.Message) {
 	lang := s.GetUserLanguage(message.From.ID)
 	text := i18n.T(lang, "settings_select_language")
-	keyboard := s.getSettingsKeyboard(message.From.ID)
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = MarkdownV2
-	msg.ReplyMarkup = keyboard
+	msg.ReplyMarkup = languageKeyboard()
 	msg.ReplyParameters.MessageID = message.MessageID
-	_, _ = s.Bot.Send(msg)
+	if _, err := s.Bot.Send(msg); err != nil {
+		slog.Error("Failed to send language menu", "error", err)
+	}
 }
 
 func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, parts []string) {
@@ -210,6 +214,44 @@ func (s *BotService) formatSettingsMessage(userID int64) string {
 	)
 }
 
-func (s *BotService) getSettingsKeyboard(_ int64) tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
+// Callback data is "settings:<action>", handled by HandleSettingsCallback.
+func (s *BotService) getSettingsKeyboard(userID int64) tgbotapi.InlineKeyboardMarkup {
+	lang := s.GetUserLanguage(userID)
+
+	s.Settings.Mu.RLock()
+	autoDelete := "❌ " + i18n.T(lang, "settings_auto_delete")
+	if s.Settings.AutoDeleteMessages {
+		autoDelete = "✅ " + i18n.T(lang, "settings_auto_delete")
+	}
+	s.Settings.Mu.RUnlock()
+
+	rows := [][]tgbotapi.InlineKeyboardButton{
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(autoDelete, "settings:auto_delete"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📥 "+i18n.T(lang, "settings_set_mirror"), "settings:default_mirror"),
+			tgbotapi.NewInlineKeyboardButtonData("📤 "+i18n.T(lang, "settings_set_leech"), "settings:default_leech"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📺 720p", "settings:quality_720"),
+			tgbotapi.NewInlineKeyboardButtonData("📺 1080p", "settings:quality_1080"),
+			tgbotapi.NewInlineKeyboardButtonData("📺 4K", "settings:quality_2160"),
+		),
+	}
+	rows = append(rows, languageKeyboard().InlineKeyboard...)
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func languageKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🇺🇸 English", "settings:lang_en"),
+			tgbotapi.NewInlineKeyboardButtonData("🇮🇩 Indonesia", "settings:lang_id"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🇯🇵 日本語", "settings:lang_ja"),
+			tgbotapi.NewInlineKeyboardButtonData("🇨🇳 简体中文", "settings:lang_zh"),
+		),
+	)
 }

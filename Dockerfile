@@ -90,11 +90,11 @@ USER botuser
 ENV HOME="/home/botuser" \
     PATH="/usr/local/bin:/usr/bin:/bin:/home/botuser/.local/bin"
 
-EXPOSE 8080
+EXPOSE 5248
 
 VOLUME ["/app/downloads", "/app/config", "/var/lib/telegram-bot-api"]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/api/health || exit 1
+    CMD curl -f http://localhost:5248/api/health || exit 1
 
 CMD ["/app/zee-mirror"]
