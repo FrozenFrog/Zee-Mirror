@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Local Bot API server, built on the same Alpine release as the runtime image
 # so its libstdc++/openssl links match. The bot starts it itself with the
 # api_id/api_hash stored in the database.
-FROM alpine:3.20 AS botapi-builder
+FROM alpine:3.22 AS botapi-builder
 ARG TELEGRAM_BOT_API_REF=master
 RUN apk add --no-cache alpine-sdk linux-headers git zlib-dev openssl-dev gperf cmake
 RUN git clone --recursive --shallow-submodules --depth 1 --branch "${TELEGRAM_BOT_API_REF}" \
@@ -32,7 +32,7 @@ RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/usr/local .. &
     strip /usr/local/bin/telegram-bot-api
 
 
-FROM alpine:3.20
+FROM alpine:3.22
 LABEL maintainer="Zee-Mirror Bot"
 LABEL description="Telegram Mirror/Leech Bot"
 
@@ -43,7 +43,7 @@ RUN apk add --no-cache \
     ffmpeg \
     python3 \
     py3-pip \
-    p7zip \
+    7zip \
     curl \
     unzip \
     nodejs \
@@ -62,7 +62,9 @@ RUN apk add --no-cache \
 # gcc/musl-dev/python3-dev dipasang sebagai .build-deps sementara (untuk wheel builds),
 # lalu dihapus via apk del agar runtime image tetap ramping.
 # Menggunakan --no-cache-dir dan memastikan download versi terbaru setiap build
-# yt-dlp[default] bundles yt-dlp-ejs, the YouTube JS challenge solver run with node.
+# yt-dlp[default] bundles yt-dlp-ejs, the YouTube JS challenge solver run with
+# node. yt-dlp needs node >= 22 (Alpine 3.21+); with an older node it has no JS
+# runtime and YouTube fails with "Requested format is not available".
 # Cache bust for yt-dlp: 2026-10-26
 
 
