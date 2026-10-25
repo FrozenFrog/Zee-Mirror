@@ -208,14 +208,25 @@ cd Zee-Mirror
 cp .env.example .env
 ```
 
-Open `.env` in your editor and fill in the **required** values:
+Docker Compose only passes two variables to the container:
+
+```env
+DATABASE_URL=postgres://user:pass@host:5432/zee-mirror?sslmode=disable
+ENCRYPTION_KEY=                         # openssl rand -hex 32 (for enc: values)
+```
+
+Every other setting is read from the `settings` table of that database: one row
+per variable, with `key` = the variable name (`BOT_TOKEN`, `OWNER_ID`, `APP_ID`,
+`APP_HASH`, `RCLONE_DEST`, ...). Values prefixed with `enc:` are decrypted with
+`ENCRYPTION_KEY`. A non-empty environment variable still overrides the database
+value, which is handy for local development with `.env`:
 
 ```env
 # ─── REQUIRED ──────────────────────────────────────────
 BOT_TOKEN=your_bot_token_here           # From @BotFather
 OWNER_ID=your_telegram_user_id          # Your numeric Telegram ID
-TELEGRAM_API_ID=your_api_id             # From my.telegram.org
-TELEGRAM_API_HASH=your_api_hash         # From my.telegram.org
+APP_ID=your_api_id                      # From my.telegram.org
+APP_HASH=your_api_hash                  # From my.telegram.org
 
 # ─── RECOMMENDED ───────────────────────────────────────
 RCLONE_DEST=gdrive:/Zee-Mirror          # Default upload destination
@@ -321,7 +332,9 @@ The binary reads configuration from `.env` in the current directory. Make sure `
 
 ## ⚙️ Configuration Reference
 
-All configuration is managed through environment variables in the `.env` file.
+Each variable below can be set in the environment (`.env`) or stored as a row in
+the database `settings` table (key = variable name). Non-empty environment values
+win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environment.
 
 <details open>
 <summary><b>🔴 Required Settings</b></summary>
@@ -466,14 +479,13 @@ Log output is written to both **stdout** and the file `config/zee-mirror.log` si
 <summary><b>🐳 Docker Compose Services</b></summary>
 <br>
 
-The `docker-compose.yml` defines two services:
+The `docker-compose.yml` defines a single `zee-mirror` service, configured only
+through `DATABASE_URL` (+ `ENCRYPTION_KEY`). PostgreSQL is external.
 
-| Service | Image | Purpose |
-|---------|-------|---------|
-| `telegram-bot-api` | `aiogram/telegram-bot-api` | Self-hosted Telegram Bot API server. Enables file downloads >2GB and faster local file handling |
-| `zee-mirror` | Built from `Dockerfile` | The main bot application. Depends on `telegram-bot-api` |
-
-Both services share a Docker network (`zee-network`) and a named volume (`downloads`) for file storage.
+The image bundles the self-hosted Telegram Bot API server (`telegram-bot-api`,
+built from source). The bot starts it on `127.0.0.1:8081` with `APP_ID`/`APP_HASH`
+from the database, enabling files >20MB. Set `LOCAL_BOT_API=false` or an external
+`TELEGRAM_API` to skip it. Its data lives in the `telegram-data` volume.
 
 **Container security:**
 - `no-new-privileges` security option enabled
@@ -895,7 +907,7 @@ Zee-Mirror/
 ├── config/                            # Runtime directory (Docker volume): rclone.conf,
 │                                      # zee-mirror.db, zee-mirror.log
 ├── Dockerfile                         # Multi-stage build bundling aria2, yt-dlp, rclone, ffmpeg, 7zz
-├── docker-compose.yml                 # telegram-bot-api + zee-mirror services
+├── docker-compose.yml                 # zee-mirror service (config from DATABASE_URL)
 ├── Taskfile.yml                       # Dev task runner (build/test/lint/security)
 ├── .golangci.yml                      # GolangCI-Lint configuration
 └── go.mod                             # Go module definition (Go 1.26.6)

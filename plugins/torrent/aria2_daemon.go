@@ -17,13 +17,15 @@ import (
 type Aria2Daemon struct {
 	Cmd       *exec.Cmd
 	ConfigDir string
+	RPCSecret string
 }
 
 var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-func NewAria2Daemon(configDir string) *Aria2Daemon {
+func NewAria2Daemon(configDir, rpcSecret string) *Aria2Daemon {
 	return &Aria2Daemon{
 		ConfigDir: configDir,
+		RPCSecret: rpcSecret,
 	}
 }
 
@@ -43,12 +45,11 @@ func (d *Aria2Daemon) Start() error {
 		"--check-certificate=false",
 	}
 
-	secret := os.Getenv("ARIA2_RPC_SECRET")
-	if secret != "" {
-		args = append(args, "--rpc-secret="+secret)
+	if d.RPCSecret != "" {
+		args = append(args, "--rpc-secret="+d.RPCSecret)
 	}
 
-	// #nosec G702 -- args are internal constants plus optional env secret; no user input, no shell
+	// #nosec G702 -- args are internal constants plus optional configured secret; no user input, no shell
 	d.Cmd = execCommand(context.Background(), "aria2c", args...)
 	stdoutPipe, err := d.Cmd.StdoutPipe()
 	if err != nil {

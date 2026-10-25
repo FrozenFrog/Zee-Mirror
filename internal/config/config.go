@@ -1,13 +1,16 @@
 package config
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 	"zee-mirror/internal/crypto"
 	"zee-mirror/pkg/utils"
 
@@ -42,10 +45,10 @@ type Config struct {
 	IndexURL                 string
 	TelegramAPI              string
 	DashboardURL             string
-	encryptionKeyHex         string
 	RcloneDriveChunkSize     string
 	RcloneCheckers           string
 	DBDriver                 string
+	TimeZone                 string
 	EncryptionKey            []byte
 	RcloneDestFallbacks      []string
 	BotTokens                []string
@@ -62,75 +65,66 @@ type Config struct {
 	SmartAutoOrganization    bool
 	StopDuplicate            bool
 	UseWebhook               bool
+	LocalBotAPI              bool
 }
 
 func LoadConfig() *Config {
+	src := newSource()
 	cfg := &Config{
-		BotToken:                 os.Getenv("BOT_TOKEN"),
-		TelegramAPI:              os.Getenv("TELEGRAM_API"),
-		RcloneDest:               os.Getenv("RCLONE_DEST"),
-		DownloadDir:              getEnv("DOWNLOAD_DIR", "/app/downloads"),
-		ConfigDir:                getEnv("CONFIG_DIR", "/app/config"),
-		MaxConcurrentDownloads:   getEnvInt("MAX_CONCURRENT_DOWNLOADS", 3),
-		DashboardToken:           getEnv("WEB_DASHBOARD_TOKEN", "zee-mirror-secret"),
-		DashboardPort:            getEnvInt("DASHBOARD_PORT_INTERNAL", 8080),
-		LogLevel:                 getEnv("LOG_LEVEL", "info"),
-		LogFormat:                getEnv("LOG_FORMAT", "text"),
-		AppEnv:                   getEnv("APP_ENV", ""),
-		SentryDSN:                os.Getenv("SENTRY_DSN"),
-		SmartAutoOrganization:    getEnvBool("SMART_AUTO_ORGANIZATION", false),
-		IndexURL:                 os.Getenv("INDEX_URL"),
-		DashboardURL:             getEnv("WEB_DASHBOARD_URL", "127.0.0.1"),
-		DefaultMaxDailyTasks:     getEnvInt("DEFAULT_MAX_DAILY_TASKS", -1),
-		DefaultMaxDailyBandwidth: utils.ParseBytesString(getEnv("DEFAULT_MAX_DAILY_BANDWIDTH", "-1")),
-		StopDuplicate:            getEnvBool("STOP_DUPLICATE", false),
-		MaxRetries:               getEnvInt("MAX_RETRIES", 3),
-		VikingUserHash:           os.Getenv("VIKING_USER_HASH"),
-		AppID:                    getEnvInt("APP_ID", 0),
-		AppHash:                  os.Getenv("APP_HASH"),
-		UserSessionString:        os.Getenv("USER_SESSION_STRING"),
-		Aria2RPCURL:              getEnv("ARIA2_RPC_URL", "http://localhost:6800/jsonrpc"),
-		Aria2RPCSecret:           os.Getenv("ARIA2_RPC_SECRET"),
-		WebhookURL:               os.Getenv("WEBHOOK_URL"),
-		WebhookSecret:            getEnv("WEBHOOK_SECRET", ""),
-		UseWebhook:               getEnvBool("USE_WEBHOOK", false),
-		RcloneTransfers:          getEnv("RCLONE_TRANSFERS", "10"),
-		RcloneCheckers:           getEnv("RCLONE_CHECKERS", "20"),
-		RcloneDriveChunkSize:     getEnv("RCLONE_DRIVE_CHUNK_SIZE", "256M"),
-		RcloneBufferSize:         getEnv("RCLONE_BUFFER_SIZE", "128M"),
-		RcloneDestFallbacks:      splitCSV(os.Getenv("RCLONE_DEST_FALLBACKS")),
-		RclonePacerMinSleep:      getEnv("RCLONE_PACER_MIN_SLEEP", "10ms"),
-		RclonePacerBurst:         getEnv("RCLONE_PACER_BURST", "200"),
-		RcloneLogLevel:           getEnv("RCLONE_LOG_LEVEL", "NOTICE"),
-		AutoCleanupDays:          getEnvInt("AUTO_CLEANUP_DAYS", 30),
-		DBDriver:                 getEnv("DB_DRIVER", "postgres"),
-		DatabaseURL:              os.Getenv("DATABASE_URL"),
-		SecretsDir:               getEnv("SECRETS_DIR", "/dev/shm"),
-		SecretsSeedDir:           os.Getenv("SECRETS_SEED_DIR"),
-		TGGetFileTimeout:         getEnvInt("TG_GETFILE_TIMEOUT", 600),
-		encryptionKeyHex:         os.Getenv("ENCRYPTION_KEY"),
+		BotToken:                 src.str("BOT_TOKEN"),
+		TelegramAPI:              src.str("TELEGRAM_API"),
+		RcloneDest:               src.str("RCLONE_DEST"),
+		DownloadDir:              src.strOr("DOWNLOAD_DIR", "/app/downloads"),
+		ConfigDir:                src.strOr("CONFIG_DIR", "/app/config"),
+		MaxConcurrentDownloads:   src.int("MAX_CONCURRENT_DOWNLOADS", 3),
+		DashboardToken:           src.strOr("WEB_DASHBOARD_TOKEN", "zee-mirror-secret"),
+		DashboardPort:            src.int("DASHBOARD_PORT_INTERNAL", 8080),
+		LogLevel:                 src.strOr("LOG_LEVEL", "info"),
+		LogFormat:                src.strOr("LOG_FORMAT", "text"),
+		AppEnv:                   src.strOr("APP_ENV", ""),
+		SentryDSN:                src.str("SENTRY_DSN"),
+		SmartAutoOrganization:    src.bool("SMART_AUTO_ORGANIZATION", false),
+		IndexURL:                 src.str("INDEX_URL"),
+		DashboardURL:             src.strOr("WEB_DASHBOARD_URL", "127.0.0.1"),
+		DefaultMaxDailyTasks:     src.int("DEFAULT_MAX_DAILY_TASKS", -1),
+		DefaultMaxDailyBandwidth: utils.ParseBytesString(src.strOr("DEFAULT_MAX_DAILY_BANDWIDTH", "-1")),
+		StopDuplicate:            src.bool("STOP_DUPLICATE", false),
+		MaxRetries:               src.int("MAX_RETRIES", 3),
+		VikingUserHash:           src.str("VIKING_USER_HASH"),
+		AppID:                    src.int("APP_ID", 0),
+		AppHash:                  src.str("APP_HASH"),
+		UserSessionString:        src.str("USER_SESSION_STRING"),
+		Aria2RPCURL:              src.strOr("ARIA2_RPC_URL", "http://localhost:6800/jsonrpc"),
+		Aria2RPCSecret:           src.str("ARIA2_RPC_SECRET"),
+		WebhookURL:               src.str("WEBHOOK_URL"),
+		WebhookSecret:            src.strOr("WEBHOOK_SECRET", ""),
+		UseWebhook:               src.bool("USE_WEBHOOK", false),
+		RcloneTransfers:          src.strOr("RCLONE_TRANSFERS", "10"),
+		RcloneCheckers:           src.strOr("RCLONE_CHECKERS", "20"),
+		RcloneDriveChunkSize:     src.strOr("RCLONE_DRIVE_CHUNK_SIZE", "256M"),
+		RcloneBufferSize:         src.strOr("RCLONE_BUFFER_SIZE", "128M"),
+		RcloneDestFallbacks:      splitCSV(src.str("RCLONE_DEST_FALLBACKS")),
+		RclonePacerMinSleep:      src.strOr("RCLONE_PACER_MIN_SLEEP", "10ms"),
+		RclonePacerBurst:         src.strOr("RCLONE_PACER_BURST", "200"),
+		RcloneLogLevel:           src.strOr("RCLONE_LOG_LEVEL", "NOTICE"),
+		AutoCleanupDays:          src.int("AUTO_CLEANUP_DAYS", 30),
+		DBDriver:                 src.strOr("DB_DRIVER", "postgres"),
+		DatabaseURL:              src.str("DATABASE_URL"),
+		SecretsDir:               src.strOr("SECRETS_DIR", "/dev/shm"),
+		SecretsSeedDir:           src.str("SECRETS_SEED_DIR"),
+		TGGetFileTimeout:         src.int("TG_GETFILE_TIMEOUT", 600),
+		TimeZone:                 src.str("TZ"),
+		LocalBotAPI:              src.bool("LOCAL_BOT_API", true),
+		EncryptionKey:            src.key,
 	}
 
-	if keyHex := cfg.encryptionKeyHex; keyHex != "" {
-		key, err := hex.DecodeString(keyHex)
-		if err == nil && len(key) == 32 {
-			cfg.EncryptionKey = key
-			cfg.UserSessionString = decryptConfigValue(cfg.UserSessionString, key)
-			cfg.BotToken = decryptConfigValue(cfg.BotToken, key)
-			cfg.DashboardToken = decryptConfigValue(cfg.DashboardToken, key)
-			slog.Info("Encryption key loaded, sensitive values decrypted")
-		} else {
-			slog.Warn("Invalid ENCRYPTION_KEY: must be 32-byte hex", "length", len(key))
-		}
-	}
-
-	if ownerIDStr := os.Getenv("OWNER_ID"); ownerIDStr != "" {
+	if ownerIDStr := src.str("OWNER_ID"); ownerIDStr != "" {
 		if id, err := strconv.ParseInt(ownerIDStr, 10, 64); err == nil {
 			cfg.OwnerID = id
 		}
 	}
 
-	if authUsers := os.Getenv("AUTHORIZED_USERS"); authUsers != "" {
+	if authUsers := src.str("AUTHORIZED_USERS"); authUsers != "" {
 		for _, idStr := range strings.Split(authUsers, ",") {
 			idStr = strings.TrimSpace(idStr)
 			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
@@ -139,11 +133,11 @@ func LoadConfig() *Config {
 		}
 	}
 
-	if botTokens := os.Getenv("BOT_TOKENS"); botTokens != "" {
+	if botTokens := src.str("BOT_TOKENS"); botTokens != "" {
 		for _, t := range strings.Split(botTokens, ",") {
 			t = strings.TrimSpace(t)
 			if t != "" {
-				cfg.BotTokens = append(cfg.BotTokens, decryptConfigValue(t, cfg.EncryptionKey))
+				cfg.BotTokens = append(cfg.BotTokens, src.decrypt("BOT_TOKENS", t))
 			}
 		}
 	} else if cfg.BotToken != "" {
@@ -155,17 +149,63 @@ func LoadConfig() *Config {
 
 var currentConfig atomic.Value
 
+// SettingsSource returns config values stored in the database, keyed by the
+// same names as the environment variables (BOT_TOKEN, OWNER_ID, ...).
+type SettingsSource func(ctx context.Context) (map[string]string, error)
+
+var (
+	dbSettings     atomic.Pointer[map[string]string]
+	settingsSource atomic.Pointer[SettingsSource]
+	settingKeyRe   = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+)
+
 func init() {
 	_ = godotenv.Load()
 	currentConfig.Store(LoadConfig())
+}
+
+// UseSettings layers database-stored values under the environment: a
+// non-empty environment variable still wins. The source is kept so Reload
+// picks up later database changes.
+func UseSettings(ctx context.Context, src SettingsSource) (*Config, error) {
+	if err := loadSettings(ctx, src); err != nil {
+		return nil, err
+	}
+	settingsSource.Store(&src)
+	cfg := LoadConfig()
+	currentConfig.Store(cfg)
+	return cfg, nil
+}
+
+func loadSettings(ctx context.Context, src SettingsSource) error {
+	all, err := src(ctx)
+	if err != nil {
+		return fmt.Errorf("load settings from database: %w", err)
+	}
+	vals := make(map[string]string, len(all))
+	for k, v := range all {
+		if settingKeyRe.MatchString(k) {
+			vals[k] = v
+		}
+	}
+	dbSettings.Store(&vals)
+	return nil
 }
 
 func Reload() *Config {
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
 		slog.Warn("Failed to load .env file", "error", err)
 	}
+	if src := settingsSource.Load(); src != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := loadSettings(ctx, *src)
+		cancel()
+		if err != nil {
+			slog.Warn("Failed to reload settings from database, using previous values", "error", err)
+		}
+	}
 	newCfg := LoadConfig()
-	if newCfg.BotToken == "" {
+	if newCfg.BotToken == "" && len(newCfg.BotTokens) == 0 {
 		slog.Error("Reloaded config has empty BOT_TOKEN, keeping previous config")
 		return currentConfig.Load().(*Config)
 	}
@@ -178,19 +218,82 @@ func Reload() *Config {
 	return newCfg
 }
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
+// source resolves a config key: non-empty environment variable first, then
+// the database settings, then the fallback. "enc:" values are decrypted.
+type source struct {
+	settings map[string]string
+	key      []byte
+}
+
+func newSource() source {
+	var src source
+	if m := dbSettings.Load(); m != nil {
+		src.settings = *m
+	}
+	// The key itself only comes from the environment: storing it next to
+	// the data it protects would defeat the purpose.
+	if keyHex := os.Getenv("ENCRYPTION_KEY"); keyHex != "" {
+		key, err := hex.DecodeString(keyHex)
+		if err == nil && len(key) == 32 {
+			src.key = key
+		} else {
+			slog.Warn("Invalid ENCRYPTION_KEY: must be 32-byte hex", "length", len(key))
+		}
+	}
+	return src
+}
+
+func (s source) lookup(name string) (string, bool) {
+	if v := os.Getenv(name); v != "" {
+		return s.decrypt(name, v), true
+	}
+	if v, ok := s.settings[name]; ok && v != "" {
+		return s.decrypt(name, v), true
+	}
+	return "", false
+}
+
+func (s source) str(name string) string {
+	v, _ := s.lookup(name)
+	return v
+}
+
+func (s source) strOr(name, fallback string) string {
+	if v, ok := s.lookup(name); ok {
+		return v
 	}
 	return fallback
 }
 
-func getEnvInt(key string, fallback int) int {
-	str := getEnv(key, "")
-	if n, err := strconv.Atoi(str); err == nil {
+func (s source) int(name string, fallback int) int {
+	if n, err := strconv.Atoi(s.str(name)); err == nil {
 		return n
 	}
 	return fallback
+}
+
+func (s source) bool(name string, fallback bool) bool {
+	b, err := strconv.ParseBool(s.str(name))
+	if err != nil {
+		return fallback
+	}
+	return b
+}
+
+func (s source) decrypt(name, val string) string {
+	if !strings.HasPrefix(val, "enc:") {
+		return val
+	}
+	if s.key == nil {
+		slog.Error("Config value is encrypted but ENCRYPTION_KEY is not set", "key", name)
+		return ""
+	}
+	decoded, err := crypto.Decrypt(strings.TrimPrefix(val, "enc:"), s.key)
+	if err != nil {
+		slog.Error("Failed to decrypt config value", "key", name, "error", err)
+		return ""
+	}
+	return string(decoded)
 }
 
 func splitCSV(v string) []string {
@@ -205,30 +308,6 @@ func splitCSV(v string) []string {
 		}
 	}
 	return out
-}
-
-func getEnvBool(key string, fallback bool) bool {
-	str := getEnv(key, "")
-	if str == "" {
-		return fallback
-	}
-	b, err := strconv.ParseBool(str)
-	if err != nil {
-		return fallback
-	}
-	return b
-}
-
-func decryptConfigValue(val string, key []byte) string {
-	if !strings.HasPrefix(val, "enc:") {
-		return val
-	}
-	decoded, err := crypto.Decrypt(strings.TrimPrefix(val, "enc:"), key)
-	if err != nil {
-		slog.Warn("Failed to decrypt config value", "error", err)
-		return val
-	}
-	return string(decoded)
 }
 
 func (c *Config) Validate() error {

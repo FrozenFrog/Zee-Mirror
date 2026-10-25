@@ -1,12 +1,15 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+	"zee-mirror/internal/botapi"
 	"zee-mirror/internal/config"
 
 	"github.com/getsentry/sentry-go"
@@ -70,7 +73,7 @@ func initSentry(cfg *config.Config) {
 
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:              cfg.SentryDSN,
-		Environment:      getEnvOrDefault("APP_ENV", "production"),
+		Environment:      cmp.Or(cfg.AppEnv, "production"),
 		Release:          getEnvOrDefault("APP_RELEASE", "unknown"),
 		TracesSampleRate: 0.2,
 	}); err != nil {
@@ -86,4 +89,41 @@ func getEnvOrDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// applyTimeZone honours a TZ stored in the database. A TZ from the
+// environment has already been applied by the Go runtime.
+func applyTimeZone(name string) {
+	if name == "" || os.Getenv("TZ") != "" {
+		return
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		slog.Warn("Invalid TZ setting, keeping system time zone", "tz", name, "error", err)
+		return
+	}
+	time.Local = loc
+	_ = os.Setenv("TZ", name) // child processes (aria2, rclone, yt-dlp)
+	slog.Info("Time zone set", "tz", name)
+}
+
+// startLocalBotAPI runs the bundled telegram-bot-api when no external
+// TELEGRAM_API is configured, falling back to api.telegram.org.
+func startLocalBotAPI(cfg *config.Config) *botapi.Server {
+	if cfg.TelegramAPI != "" || !cfg.LocalBotAPI {
+		return nil
+	}
+	if !botapi.Available() {
+		slog.Info("telegram-bot-api not installed, using api.telegram.org")
+		return nil
+	}
+	srv, err := botapi.Start(cfg.AppID, cfg.AppHash, botapi.DataDir)
+	if err != nil {
+		slog.Warn("Local Bot API server unavailable, using api.telegram.org", "error", err)
+		return nil
+	}
+	// Set it in the environment too, so config reloads keep using it.
+	_ = os.Setenv("TELEGRAM_API", botapi.Endpoint)
+	cfg.TelegramAPI = botapi.Endpoint
+	return srv
 }

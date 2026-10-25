@@ -33,24 +33,33 @@ import (
 )
 
 func main() {
+	// Only DB_DRIVER, DATABASE_URL and ENCRYPTION_KEY have to come from the
+	// environment; everything else may live in the settings table.
 	cfg := config.LoadConfig()
+
+	db, err := database.NewDB(cfg.DBDriver, cfg.ConfigDir, cfg.DatabaseURL, "migrations")
+	if err != nil {
+		slog.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
+	}
+
+	cfg, err = config.UseSettings(context.Background(), db.AllSettings)
+	if err != nil {
+		slog.Error("Failed to load configuration from database", "error", err)
+		os.Exit(1)
+	}
 
 	if err := os.MkdirAll(cfg.ConfigDir, 0750); err != nil {
 		slog.Error("Failed to create config directory", "dir", cfg.ConfigDir, "error", err)
 	}
 	setupLogger(cfg)
 	initSentry(cfg)
+	applyTimeZone(cfg.TimeZone)
 
 	slog.Info("Starting Zee-Mirror Bot...")
 
 	if err := cfg.Validate(); err != nil {
 		slog.Error("Invalid configuration", "error", err)
-		os.Exit(1)
-	}
-
-	db, err := database.NewDB(cfg.DBDriver, cfg.ConfigDir, cfg.DatabaseURL, "migrations")
-	if err != nil {
-		slog.Error("Failed to initialize database", "error", err)
 		os.Exit(1)
 	}
 
@@ -64,6 +73,8 @@ func main() {
 		slog.Error("Failed to load rclone config and cookies into RAM", "error", err)
 		os.Exit(1)
 	}
+
+	botAPI := startLocalBotAPI(cfg)
 
 	bots, err := service.InitBots(cfg.BotTokens, cfg.TelegramAPI)
 	if err != nil || len(bots) == 0 {
@@ -79,7 +90,7 @@ func main() {
 		slog.Warn("Userbot failed to start", "error", err)
 	}
 
-	aria2Daemon := torrent.NewAria2Daemon(cfg.ConfigDir)
+	aria2Daemon := torrent.NewAria2Daemon(cfg.ConfigDir, cfg.Aria2RPCSecret)
 	if err := aria2Daemon.Start(); err != nil {
 		slog.Error("Failed to start aria2 daemon", "error", err)
 	}
@@ -185,6 +196,7 @@ func main() {
 	botSvc.Shutdown()
 	ub.Stop()
 	aria2Daemon.Stop()
+	botAPI.Stop()
 	secrets.Close()
 
 	sentry.Flush(5 * time.Second)

@@ -18,3 +18,22 @@ func (db *DB) Set(ctx context.Context, key, value string) error {
 	`, key, value, time.Now())
 	return err
 }
+
+// AllSettings returns every row of the settings table.
+func (db *DB) AllSettings(ctx context.Context) (map[string]string, error) {
+	rows, err := db.QueryContext(ctx, "SELECT key, COALESCE(value, '') FROM settings")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[string]string)
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		out[key] = value
+	}
+	return out, rows.Err()
+}
