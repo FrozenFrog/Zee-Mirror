@@ -13,7 +13,6 @@ import (
 	"zee-mirror/plugins/torrent"
 
 	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 )
@@ -52,25 +51,33 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// systemInfo samples CPU over one second, so it blocks for that long. Disk
+// usage is measured on the download directory's filesystem.
+func (s *Server) systemInfo() map[string]interface{} {
+	info := map[string]interface{}{
+		"cpu":    0.0,
+		"ram":    0.0,
+		"disk":   s.Service.GetDiskUsage(),
+		"uptime": uint64(0),
+		"os":     "",
+		"arch":   "",
+	}
+	if c, err := cpu.Percent(time.Second, false); err == nil && len(c) > 0 {
+		info["cpu"] = c[0]
+	}
+	if v, err := mem.VirtualMemory(); err == nil {
+		info["ram"] = v.UsedPercent
+	}
+	if h, err := host.Info(); err == nil {
+		info["uptime"] = h.Uptime
+		info["os"] = h.OS
+		info["arch"] = h.KernelArch
+	}
+	return info
+}
+
 func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
-	v, _ := mem.VirtualMemory()
-	c, _ := cpu.Percent(time.Second, false)
-	d, _ := disk.Usage("/")
-	h, _ := host.Info()
-
-	cpuUsage := 0.0
-	if len(c) > 0 {
-		cpuUsage = c[0]
-	}
-
-	sysInfo := map[string]interface{}{
-		"cpu":    cpuUsage,
-		"ram":    v.UsedPercent,
-		"disk":   d.UsedPercent,
-		"uptime": h.Uptime,
-		"os":     h.OS,
-		"arch":   h.KernelArch,
-	}
+	sysInfo := s.systemInfo()
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(sysInfo); err != nil {
 		slog.Error("Failed to encode system response", "error", err)

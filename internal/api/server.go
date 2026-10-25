@@ -20,10 +20,6 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/mem"
 )
 
 type Server struct {
@@ -164,20 +160,7 @@ func (s *Server) broadcastLoop() {
 			taskSnapshots = append(taskSnapshots, t.GetSnapshot())
 		}
 
-		v, _ := mem.VirtualMemory()
-		c, _ := cpu.Percent(time.Second, false)
-		d, _ := disk.Usage("/")
-		h, _ := host.Info()
-		cpuUsage := 0.0
-		if len(c) > 0 {
-			cpuUsage = c[0]
-		}
-		sysInfo := map[string]interface{}{
-			"cpu":    cpuUsage,
-			"ram":    v.UsedPercent,
-			"disk":   d.UsedPercent,
-			"uptime": h.Uptime,
-		}
+		sysInfo := s.systemInfo()
 
 		update := map[string]interface{}{
 			"type": "update",

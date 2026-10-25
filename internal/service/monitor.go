@@ -11,6 +11,10 @@ import (
 	"time"
 
 	"zee-mirror/pkg/utils"
+
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type SystemStats struct {
@@ -21,6 +25,7 @@ type SystemStats struct {
 	MemoryTotal uint64
 	MemoryUsed  uint64
 	MemoryFree  uint64
+	MemoryBot   uint64
 	DiskTotal   uint64
 	DiskUsed    uint64
 	DiskFree    uint64
@@ -39,10 +44,16 @@ func (s *BotService) GetSystemStats() SystemStats {
 		ActiveTasks: len(s.TaskManager.GetActiveTasks()),
 	}
 
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	stats.MemoryUsed = m.Alloc
-	stats.MemoryTotal = m.Sys
+	if v, err := mem.VirtualMemory(); err == nil {
+		stats.MemoryTotal = v.Total
+		stats.MemoryUsed = v.Used
+		stats.MemoryFree = v.Available
+	}
+	if p, err := process.NewProcess(int32(os.Getpid())); err == nil {
+		if info, err := p.MemoryInfo(); err == nil {
+			stats.MemoryBot = info.RSS
+		}
+	}
 
 	diskTotal, diskUsed, diskFree := s.GetDiskStats(s.Config.DownloadDir)
 	stats.DiskTotal = diskTotal
@@ -57,19 +68,31 @@ func (s *BotService) GetSystemStats() SystemStats {
 	return stats
 }
 
+// GetDiskStats reports the filesystem holding path, falling back to the root
+// filesystem when path does not exist yet.
 func (s *BotService) GetDiskStats(path string) (total, used, free uint64) {
-	info, err := os.Stat(path)
+	u, err := disk.Usage(path)
 	if err != nil {
-		return 0, 0, 0
+		if u, err = disk.Usage("/"); err != nil {
+			return 0, 0, 0
+		}
 	}
-	_ = info
-	usage := s.getDiskUsageOS()
+	return u.Total, u.Used, u.Free
+}
 
-	total = 100 * 1024 * 1024 * 1024
-	used = uint64(usage * float64(total) / 100)
-	free = total - used
+func (s *BotService) getDiskUsageOS() float64 {
+	total, used, _ := s.GetDiskStats(s.Config.DownloadDir)
+	if total == 0 {
+		return 0
+	}
+	return float64(used) / float64(total) * 100
+}
 
-	return
+func percent(part, total uint64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(part) / float64(total) * 100
 }
 
 func (s *BotService) FormatSystemStats(stats SystemStats) string {
@@ -85,13 +108,15 @@ func (s *BotService) FormatSystemStats(stats SystemStats) string {
 	fmt.Fprintf(&content, "• Trong hàng đợi: `%d`\n\n", stats.QueuedTasks)
 
 	content.WriteString("💾 *BỘ NHỚ*\n")
-	memBar := createUsageBar(float64(stats.MemoryUsed)/float64(stats.MemoryTotal)*100, 12)
+	memBar := createUsageBar(percent(stats.MemoryUsed, stats.MemoryTotal), 12)
 	fmt.Fprintf(&content, "• Đã dùng: `%s / %s`\n",
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryUsed)),
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryTotal)))
+	fmt.Fprintf(&content, "• Bot đang dùng: `%s`\n",
+		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryBot)))
 	fmt.Fprintf(&content, "%s\n\n", utils.EscapeMarkdownV2(memBar))
 
-	content.WriteString("💿 *Ổ ĐĨA*\n")
+	content.WriteString("💿 *Ổ ĐĨA \\(thư mục tải\\)*\n")
 	diskBar := createUsageBar(stats.DiskUsage, 12)
 	fmt.Fprintf(&content, "• Đã dùng: `%s / %s`\n",
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.DiskUsed)),
@@ -292,11 +317,11 @@ func (s *BotService) checkResourceAlerts() {
 		s.Notifications.AlertDiskUsage(diskUsage, s.Config.DownloadDir)
 	}
 
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	memUsage := float64(m.Alloc) / float64(m.Sys) * 100
-
-	if memUsage > 90 && s.Notifications != nil {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return
+	}
+	if memUsage := v.UsedPercent; memUsage > 90 && s.Notifications != nil {
 		s.Notifications.AlertSystemHealth(0, memUsage)
 	}
 }
