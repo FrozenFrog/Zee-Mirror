@@ -25,7 +25,6 @@ type Config struct {
 	RcloneDest               string
 	DownloadDir              string
 	ConfigDir                string
-	DashboardToken           string
 	LogLevel                 string
 	LogFormat                string
 	AppEnv                   string
@@ -46,6 +45,12 @@ type Config struct {
 	IndexURL                 string
 	TelegramAPI              string
 	DashboardURL             string
+	OIDCIssuer               string
+	OIDCClientID             string
+	OIDCClientSecret         string
+	OIDCRedirectURL          string
+	OIDCProviderName         string
+	OIDCAllowedGroups        []string
 	RcloneDriveChunkSize     string
 	RcloneCheckers           string
 	DBDriver                 string
@@ -107,7 +112,6 @@ func LoadConfig() *Config {
 		DownloadDir:              src.strOr("DOWNLOAD_DIR", "/app/downloads"),
 		ConfigDir:                src.strOr("CONFIG_DIR", "/app/config"),
 		MaxConcurrentDownloads:   src.int("MAX_CONCURRENT_DOWNLOADS", 3),
-		DashboardToken:           src.strOr("WEB_DASHBOARD_TOKEN", "zee-mirror-secret"),
 		DashboardPort:            src.int("DASHBOARD_PORT_INTERNAL", 5248),
 		LogLevel:                 src.strOr("LOG_LEVEL", "info"),
 		LogFormat:                src.strOr("LOG_FORMAT", "text"),
@@ -164,6 +168,16 @@ func LoadConfig() *Config {
 	}
 
 	cfg.AuthorizedChats = ParseAuthorizedChats(src.str("AUTHORIZED_CHATS"))
+
+	cfg.OIDCIssuer = strings.TrimRight(src.str("OIDC_ISSUER"), "/")
+	cfg.OIDCClientID = src.str("OIDC_CLIENT_ID")
+	cfg.OIDCClientSecret = src.str("OIDC_CLIENT_SECRET")
+	cfg.OIDCRedirectURL = src.str("OIDC_REDIRECT_URL")
+	if cfg.OIDCRedirectURL == "" && strings.HasPrefix(cfg.DashboardURL, "http") {
+		cfg.OIDCRedirectURL = strings.TrimRight(cfg.DashboardURL, "/") + OIDCCallbackPath
+	}
+	cfg.OIDCProviderName = src.strOr("OIDC_PROVIDER_NAME", "Pocket-ID")
+	cfg.OIDCAllowedGroups = splitCSV(src.str("OIDC_ALLOWED_GROUPS"))
 
 	if botTokens := src.str("BOT_TOKENS"); botTokens != "" {
 		for _, t := range strings.Split(botTokens, ",") {
@@ -342,6 +356,14 @@ func splitCSV(v string) []string {
 	return out
 }
 
+// OIDCCallbackPath is where the OIDC provider redirects back to.
+const OIDCCallbackPath = "/api/auth/oidc/callback"
+
+// OIDCEnabled reports whether dashboard sign-in goes through OIDC_ISSUER.
+func (c *Config) OIDCEnabled() bool {
+	return c.OIDCIssuer != ""
+}
+
 func (c *Config) Validate() error {
 	if len(c.BotTokens) == 0 {
 		return fmt.Errorf("BOT_TOKEN or BOT_TOKENS must be set")
@@ -349,9 +371,11 @@ func (c *Config) Validate() error {
 	if c.OwnerID == 0 {
 		return fmt.Errorf("OWNER_ID must be set")
 	}
-	if strings.EqualFold(c.AppEnv, "production") &&
-		(c.DashboardToken == "" || c.DashboardToken == "zee-mirror-secret") {
-		return fmt.Errorf("WEB_DASHBOARD_TOKEN must be set to a secure value when APP_ENV=production (empty or default token is not allowed)")
+	if c.OIDCEnabled() && (c.OIDCClientID == "" || c.OIDCRedirectURL == "") {
+		return fmt.Errorf("OIDC_ISSUER needs OIDC_CLIENT_ID and OIDC_REDIRECT_URL (or an http(s) WEB_DASHBOARD_URL)")
+	}
+	if !c.OIDCEnabled() {
+		slog.Warn("OIDC_ISSUER not set: nobody can sign in to the web dashboard")
 	}
 	if c.UseWebhook && c.WebhookSecret == "" {
 		return fmt.Errorf("WEBHOOK_SECRET must be set when USE_WEBHOOK=true (webhook endpoint is unauthenticated without it)")

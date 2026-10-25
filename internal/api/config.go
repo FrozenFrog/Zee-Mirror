@@ -59,7 +59,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		sensitiveKeys := map[string]bool{
 			"BOT_TOKEN": true, "OWNER_ID": true, "TELEGRAM_API_HASH": true,
 			"TELEGRAM_API_ID": true, "USER_SESSION_STRING": true, "APP_HASH": true,
-			"VIKING_USER_HASH": true, "WEB_DASHBOARD_TOKEN": true,
+			"VIKING_USER_HASH": true, "OIDC_CLIENT_SECRET": true,
 		}
 		lines := strings.Split(string(data), "\n")
 		for i, line := range lines {

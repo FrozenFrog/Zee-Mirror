@@ -6,6 +6,8 @@ require github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/coreos/go-oidc/v3 v3.21.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.20.1
@@ -20,6 +22,8 @@ require (
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.6
 	github.com/wcharczuk/go-chart/v2 v2.1.2
+	golang.org/x/oauth2 v0.37.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.46.0
 	golang.org/x/time v0.16.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -37,12 +41,12 @@ require (
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.19.0 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-faster/errors v0.8.0 // indirect
 	github.com/go-faster/jx v1.2.0 // indirect
 	github.com/go-faster/xor v1.0.0 // indirect
 	github.com/go-faster/yaml v0.4.6 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.23.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.6 // indirect
@@ -97,7 +101,6 @@ require (
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

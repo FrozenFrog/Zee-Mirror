@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"zee-mirror/internal/config"
 	"zee-mirror/internal/metrics"
 	"zee-mirror/internal/router"
 	"zee-mirror/internal/service"
@@ -30,14 +31,17 @@ type Server struct {
 	Hub        *Hub
 	Router     *router.Router
 	httpServer *http.Server
+	sso        oidcAuth
+	sessionKey []byte
 	Port       int
 }
 
 func NewServer(service *service.BotService, port int) *Server {
 	return &Server{
-		Service: service,
-		Port:    port,
-		Hub:     NewHub(),
+		Service:    service,
+		Port:       port,
+		Hub:        NewHub(),
+		sessionKey: newSessionKey(service.Config.EncryptionKey),
 	}
 }
 
@@ -51,7 +55,9 @@ func (s *Server) Start() {
 	auth := s.requireAuth
 
 	mux.HandleFunc("/api/stats", auth(s.handleStats))
-	mux.HandleFunc("/api/login", s.handleLogin)
+	mux.HandleFunc("/api/auth/config", s.handleAuthConfig)
+	mux.HandleFunc("/api/auth/oidc/login", s.handleOIDCLogin)
+	mux.HandleFunc(config.OIDCCallbackPath, s.handleOIDCCallback)
 	mux.HandleFunc("/api/audit-logs", auth(s.handleAuditLogs))
 	mux.HandleFunc("/api/health", s.handleHealth)
 	mux.Handle("/metrics", promhttp.Handler())

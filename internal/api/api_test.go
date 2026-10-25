@@ -18,12 +18,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func newTestServer(t *testing.T, token string) *Server {
+func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	cfg := &config.Config{
-		DashboardToken: token,
-		DashboardURL:   "http://localhost:8080",
-		DownloadDir:    t.TempDir(),
+		DashboardURL:  "http://localhost:8080",
+		DownloadDir:   t.TempDir(),
+		EncryptionKey: []byte("0123456789abcdef0123456789abcdef"),
 	}
 	bot, _ := tgbotapi.NewBotAPI("fake:token")
 	mockRepo := new(mocks.MockRepository)
@@ -141,7 +141,7 @@ func TestCORS_WildcardWhenNoURL(t *testing.T) {
 }
 
 func TestPathTraversal_ExplorerBlocked(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("GET", "/api/explorer?path=../../etc", nil)
 	req.Header.Set("X-API-Key", "secret123")
@@ -155,7 +155,7 @@ func TestPathTraversal_ExplorerBlocked(t *testing.T) {
 }
 
 func TestPathTraversal_ExplorerValid(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("GET", "/api/explorer?path=subdir", nil)
 	req.Header.Set("X-API-Key", "secret123")
@@ -169,11 +169,11 @@ func TestPathTraversal_ExplorerValid(t *testing.T) {
 }
 
 func TestConfigEndpoint_RedactsSecrets(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	tmpDir := t.TempDir()
 	envPath := filepath.Join(tmpDir, ".env")
-	envContent := "BOT_TOKEN=abc123secret\nOWNER_ID=12345\nWEB_DASHBOARD_TOKEN=zee343212\nLOG_LEVEL=info\n"
+	envContent := "BOT_TOKEN=abc123secret\nOWNER_ID=12345\nOIDC_CLIENT_SECRET=zee343212\nLOG_LEVEL=info\n"
 	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestConfigEndpoint_RedactsSecrets(t *testing.T) {
 		t.Error("BOT_TOKEN should be redacted")
 	}
 	if strings.Contains(body, "zee343212") {
-		t.Error("WEB_DASHBOARD_TOKEN should be redacted")
+		t.Error("OIDC_CLIENT_SECRET should be redacted")
 	}
 	if !strings.Contains(body, "***REDACTED***") {
 		t.Error("response should contain REDACTED markers")
@@ -208,7 +208,7 @@ func TestConfigEndpoint_RedactsSecrets(t *testing.T) {
 }
 
 func TestWebhook_SecretRequired(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	s.Service.Config.WebhookSecret = "webhooksecret"
 
 	req := httptest.NewRequest("POST", "/api/telegram/webhook", strings.NewReader(`{}`))
@@ -223,7 +223,7 @@ func TestWebhook_SecretRequired(t *testing.T) {
 }
 
 func TestWebhook_WrongSecret(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	s.Service.Config.WebhookSecret = "webhooksecret"
 
 	req := httptest.NewRequest("POST", "/api/telegram/webhook", strings.NewReader(`{}`))
@@ -239,7 +239,7 @@ func TestWebhook_WrongSecret(t *testing.T) {
 }
 
 func TestWebhook_CorrectSecret(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	s.Service.Config.WebhookSecret = "webhooksecret"
 
 	req := httptest.NewRequest("POST", "/api/telegram/webhook", strings.NewReader(`{"update_id":1}`))
@@ -280,7 +280,7 @@ func TestSecurityHeaders(t *testing.T) {
 }
 
 func TestPathTraversal_UploadBlocked(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	body := "--boundary\r\nContent-Disposition: form-data; name=\"path\"\r\n\r\n../../etc\r\n--boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--boundary--\r\n"
 	req := httptest.NewRequest("POST", "/api/explorer/upload", strings.NewReader(body))
@@ -314,7 +314,7 @@ func TestHealthEndpoint_NoAuth(t *testing.T) {
 }
 
 func TestServer_Structure(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	if s.Service == nil {
 		t.Error("Service should not be nil")
@@ -328,7 +328,7 @@ func TestServer_Structure(t *testing.T) {
 }
 
 func TestWebSocket_NoToken(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("GET", "/api/ws", nil)
 	rec := httptest.NewRecorder()
@@ -341,7 +341,7 @@ func TestWebSocket_NoToken(t *testing.T) {
 }
 
 func TestWebSocket_WrongToken(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	repo := s.Service.DB.(*mocks.MockRepository)
 	repo.On("GetUserByAPIKey", mock.Anything, "wrong").Return((*domain.User)(nil), domain.ErrNotFound)
 
@@ -356,7 +356,7 @@ func TestWebSocket_WrongToken(t *testing.T) {
 }
 
 func TestTorrentEndpoint_Unauthenticated(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("GET", "/api/torrent/session", nil)
 	rec := httptest.NewRecorder()
@@ -364,7 +364,7 @@ func TestTorrentEndpoint_Unauthenticated(t *testing.T) {
 	authFn := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			apiKey := r.Header.Get("X-API-Key")
-			if apiKey != s.Service.Config.DashboardToken {
+			if apiKey != "secret123" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
@@ -381,7 +381,7 @@ func TestTorrentEndpoint_Unauthenticated(t *testing.T) {
 }
 
 func TestAria2NotInitialized(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	s.Service.TaskManager.Aria2Engine = nil
 
 	req := httptest.NewRequest("GET", "/api/health", nil)
@@ -407,7 +407,7 @@ func TestAria2NotInitialized(t *testing.T) {
 }
 
 func TestConfigEndpoint_MethodNotAllowed(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("DELETE", "/api/config", nil)
 	req.Header.Set("X-API-Key", "secret123")
@@ -421,7 +421,7 @@ func TestConfigEndpoint_MethodNotAllowed(t *testing.T) {
 }
 
 func TestExplorer_DeleteRootBlocked(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("DELETE", "/api/explorer?path=/", nil)
 	req.Header.Set("X-API-Key", "secret123")
@@ -435,7 +435,7 @@ func TestExplorer_DeleteRootBlocked(t *testing.T) {
 }
 
 func TestExplorer_DeleteEmptyPathBlocked(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("DELETE", "/api/explorer?path=", nil)
 	req.Header.Set("X-API-Key", "secret123")
@@ -449,7 +449,7 @@ func TestExplorer_DeleteEmptyPathBlocked(t *testing.T) {
 }
 
 func TestExplorer_DeleteDotBlocked(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("DELETE", "/api/explorer?path=.", nil)
 	req.Header.Set("X-API-Key", "secret123")

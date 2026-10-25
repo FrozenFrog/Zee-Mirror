@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,63 +16,6 @@ import (
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/repository/mocks"
 )
-
-func TestJWTKey_Deterministic(t *testing.T) {
-	assert.Equal(t, jwtKey("abc"), jwtKey("abc"))
-	assert.NotEqual(t, jwtKey("abc"), jwtKey("xyz"))
-	assert.Len(t, jwtKey("abc"), 32)
-}
-
-func TestHandleLogin_MethodNotAllowed(t *testing.T) {
-	s := newTestServer(t, "secret123")
-
-	req := httptest.NewRequest("GET", "/api/login", nil)
-	rec := httptest.NewRecorder()
-
-	s.handleLogin(rec, req)
-
-	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
-}
-
-func TestHandleLogin_WrongKey(t *testing.T) {
-	s := newTestServer(t, "secret123")
-
-	req := httptest.NewRequest("POST", "/api/login", nil)
-	req.Header.Set("X-API-Key", "wrong")
-	rec := httptest.NewRecorder()
-
-	s.handleLogin(rec, req)
-
-	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.Contains(t, rec.Body.String(), "invalid api key")
-}
-
-func TestHandleLogin_Success(t *testing.T) {
-	s := newTestServer(t, "secret123")
-
-	req := httptest.NewRequest("POST", "/api/login", nil)
-	req.Header.Set("X-API-Key", "secret123")
-	rec := httptest.NewRecorder()
-
-	s.handleLogin(rec, req)
-
-	assert.Equal(t, http.StatusOK, rec.Code)
-
-	var resp map[string]interface{}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	signed, _ := resp["token"].(string)
-	assert.NotEmpty(t, signed)
-	assert.InDelta(t, float64(86400), resp["expiresIn"], 0.001)
-
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(signed, claims, func(*jwt.Token) (interface{}, error) {
-		return jwtKey("secret123"), nil
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "dashboard", claims["sub"])
-}
 
 func TestGetClientIP(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
@@ -128,7 +70,7 @@ func TestShouldSkipFile(t *testing.T) {
 }
 
 func TestResolveFileStatus_BasicEntries(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	tmp := t.TempDir()
 
 	if err := os.MkdirAll(filepath.Join(tmp, "sub"), 0o755); err != nil {
@@ -164,7 +106,7 @@ func TestResolveFileStatus_BasicEntries(t *testing.T) {
 }
 
 func TestResolveFileStatus_FinishedTask(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	repo := s.Service.DB.(*mocks.MockRepository)
 	repo.On("GetTaskByID", mock.Anything, "abcd1234").Return(&domain.TaskRecord{FileName: "done.zip"}, nil)
 
@@ -184,7 +126,7 @@ func TestResolveFileStatus_FinishedTask(t *testing.T) {
 }
 
 func TestResolveFileStatus_OrphanDir(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	repo := s.Service.DB.(*mocks.MockRepository)
 	repo.On("GetTaskByID", mock.Anything, "batch_9").Return(nil, nil)
 
@@ -207,7 +149,7 @@ func TestResolveFileStatus_OrphanDir(t *testing.T) {
 }
 
 func TestHandleStats(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	repo := s.Service.DB.(*mocks.MockRepository)
 	repo.On("GetBotStats", mock.Anything).Return(map[string]interface{}{"total_tasks": 3}, nil)
 	repo.On("GetCount", mock.Anything).Return(7, nil)
@@ -223,7 +165,7 @@ func TestHandleStats(t *testing.T) {
 }
 
 func TestHandleTasks_BadRequests(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 
 	req := httptest.NewRequest("POST", "/api/tasks", strings.NewReader("{invalid"))
 	rec := httptest.NewRecorder()
@@ -237,38 +179,59 @@ func TestHandleTasks_BadRequests(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "URL is required")
 }
 
-func TestRequireAuth_RejectsUnexpectedAlg(t *testing.T) {
-	s := newTestServer(t, "secret123")
+func TestRequireAuth_Session(t *testing.T) {
+	s := newTestServer(t)
+	repo := s.Service.DB.(*mocks.MockRepository)
+	repo.On("GetUserByAPIKey", mock.Anything, mock.Anything).Return((*domain.User)(nil), domain.ErrNotFound).Maybe()
+	repo.On("GetByID", mock.Anything, int64(7)).Return(&domain.User{ID: 7, Role: "admin", IsActive: true}, nil)
+	repo.On("GetByID", mock.Anything, int64(8)).Return(&domain.User{ID: 8, Role: "user", IsActive: true}, nil)
+	repo.On("GetByID", mock.Anything, int64(9)).Return(&domain.User{ID: 9, Role: "admin", IsActive: false}, nil)
 	handler := s.requireAuth(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{"sub": "dashboard"})
-	signed, err := tok.SignedString(jwtKey("secret123"))
-	assert.NoError(t, err)
-
-	req := httptest.NewRequest("GET", "/api/stats", nil)
-	req.Header.Set("Authorization", "Bearer "+signed)
-	rec := httptest.NewRecorder()
-	handler(rec, req)
-	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-
-	req = httptest.NewRequest("GET", "/api/stats", nil)
-	req.Header.Set("Authorization", "Bearer "+mustHS256(t, "secret123"))
-	rec = httptest.NewRecorder()
-	handler(rec, req)
-	assert.Equal(t, http.StatusOK, rec.Code)
+	session := func(uid string, method jwt.SigningMethod, key []byte, ttl time.Duration) string {
+		claims := jwt.MapClaims{"uid": uid, "exp": time.Now().Add(ttl).Unix()}
+		signed, err := jwt.NewWithClaims(method, claims).SignedString(key)
+		assert.NoError(t, err)
+		return signed
+	}
+	tests := []struct {
+		name  string
+		token string
+		want  int
+	}{
+		{"admin", session("7", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusOK},
+		{"plain user role", session("8", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
+		{"expired user", session("9", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
+		{"expired token", session("7", jwt.SigningMethodHS256, s.sessionKey, -time.Hour), http.StatusUnauthorized},
+		{"wrong key", session("7", jwt.SigningMethodHS256, []byte("other"), time.Hour), http.StatusUnauthorized},
+		{"unexpected alg", session("7", jwt.SigningMethodHS512, s.sessionKey, time.Hour), http.StatusUnauthorized},
+		{"no uid", session("", jwt.SigningMethodHS256, s.sessionKey, time.Hour), http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		for _, header := range []string{"Authorization", "X-API-Key"} {
+			req := httptest.NewRequest("GET", "/api/stats", nil)
+			if header == "Authorization" {
+				req.Header.Set(header, "Bearer "+tt.token)
+			} else {
+				req.Header.Set(header, tt.token)
+			}
+			rec := httptest.NewRecorder()
+			handler(rec, req)
+			assert.Equal(t, tt.want, rec.Code, "%s via %s", tt.name, header)
+		}
+	}
 }
 
-func mustHS256(t *testing.T, secret string) string {
-	t.Helper()
-	claims := jwt.MapClaims{"sub": "dashboard", "exp": time.Now().Add(time.Hour).Unix()}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := tok.SignedString(jwtKey(secret))
-	assert.NoError(t, err)
-	return signed
+func TestNewSessionKey(t *testing.T) {
+	a := newSessionKey([]byte("key-a"))
+	assert.Equal(t, a, newSessionKey([]byte("key-a")), "derived key must survive restarts")
+	assert.NotEqual(t, a, newSessionKey([]byte("key-b")))
+	assert.Len(t, newSessionKey(nil), 32)
+	assert.NotEqual(t, newSessionKey(nil), newSessionKey(nil))
 }
 
 func TestRequireAuth_PerUserAPIKey(t *testing.T) {
-	s := newTestServer(t, "secret123")
+	s := newTestServer(t)
 	repo := s.Service.DB.(*mocks.MockRepository)
 	repo.On("GetUserByAPIKey", mock.Anything, "userkey").Return(&domain.User{ID: 7, IsActive: true}, nil)
 	repo.On("GetUserByAPIKey", mock.Anything, "bannedkey").Return(&domain.User{ID: 8, IsActive: false}, nil)

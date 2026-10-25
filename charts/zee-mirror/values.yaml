@@ -20,7 +20,13 @@ ingress:
 config:
   botToken: ""
   ownerID: ""
-  dashboardToken: zee-mirror-secret
+  # Web dashboard sign-in through OpenID Connect (e.g. Pocket-ID).
+  oidc:
+    issuer: ""
+    clientID: ""
+    clientSecret: ""
+    redirectURL: ""     # default: <WEB_DASHBOARD_URL>/api/auth/oidc/callback
+    allowedGroups: ""   # comma separated, empty = any group
   logLevel: info
   logFormat: json
   rcloneDest: "gdrive:/Zee-Mirror"

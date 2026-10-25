@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
-import api from './api'
+import api, { consumeAuthRedirect } from './api'
 import DashboardLayout from './layouts/DashboardLayout'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
@@ -104,6 +104,9 @@ const TasksPage = ({
     </div>
   )
 }
+
+// Runs once, before the token is read from storage below.
+const authError = consumeAuthRedirect()
 
 const App = () => {
   const [apiToken, setApiToken] = useState<string>(localStorage.getItem('api_token') || '')
@@ -234,7 +237,7 @@ const App = () => {
   const router = createBrowserRouter([
     {
       path: '/login',
-      element: !loginError ? <Navigate to="/" /> : <Login setApiToken={setApiToken} setLoginError={setLoginError} />,
+      element: !loginError ? <Navigate to="/" /> : <Login authError={authError} />,
     },
     {
       path: '/torrent-select/:id',

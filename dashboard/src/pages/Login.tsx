@@ -1,13 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Bot, Activity, ShieldCheck, Lock } from 'lucide-react'
+import api from '../api'
 
 interface LoginScreenProps {
-    setApiToken: (token: string) => void
-    setLoginError: (error: boolean) => void
+    authError: string | null
 }
 
-const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
-    const [authStep, setAuthStep] = useState<'welcome' | 'password'>('welcome')
+interface AuthConfig {
+    oidc: boolean
+    providerName: string
+}
+
+const Login: React.FC<LoginScreenProps> = ({ authError }) => {
+    const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
+
+    useEffect(() => {
+        api.get<AuthConfig>('/api/auth/config')
+            .then((res) => setAuthConfig(res.data))
+            .catch(() => setAuthConfig({ oidc: false, providerName: '' }))
+    }, [])
 
     return (
         <div className="min-h-screen w-full bg-white dark:bg-[#050505] flex flex-col md:flex-row font-sans overflow-hidden">
@@ -80,87 +91,49 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-40" />
 
                 <div className="w-full max-w-sm relative z-10 -mt-12">
-                    {authStep === 'welcome' ? (
-                        <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                            <div className="space-y-8 text-center md:text-left">
-                                <div className="flex items-center justify-center md:justify-start space-x-4">
-                                    <div className="h-[2px] w-12 bg-primary rounded-full shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
-                                    <span className="text-[11px] font-black text-primary uppercase tracking-[0.8em]">
-                                        Đăng nhập hệ thống
-                                    </span>
-                                </div>
-                                <h3 className="text-8xl font-[1000] text-slate-900 dark:text-white tracking-[-0.08em] leading-none">
-                                    Xin chào.
-                                </h3>
-                                <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[280px] mx-auto md:mx-0">
-                                    Hệ thống sẵn sàng. Hãy xác minh danh tính để kết nối.
-                                </p>
+                    <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        <div className="space-y-8 text-center md:text-left">
+                            <div className="flex items-center justify-center md:justify-start space-x-4">
+                                <div className="h-[2px] w-12 bg-primary rounded-full shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
+                                <span className="text-[11px] font-black text-primary uppercase tracking-[0.8em]">
+                                    Đăng nhập hệ thống
+                                </span>
                             </div>
-                            <button
-                                onClick={() => setAuthStep('password')}
-                                className="w-full p-10 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.5em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group"
+                            <h3 className="text-8xl font-[1000] text-slate-900 dark:text-white tracking-[-0.08em] leading-none">
+                                Xin chào.
+                            </h3>
+                            <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[320px] mx-auto md:mx-0">
+                                {authConfig && !authConfig.oidc
+                                    ? 'Chưa cấu hình đăng nhập. Hãy đặt OIDC_ISSUER và OIDC_CLIENT_ID trong env của bot.'
+                                    : 'Hãy xác minh danh tính để kết nối.'}
+                            </p>
+                        </div>
+                        {authError && (
+                            <div
+                                role="alert"
+                                className="p-6 rounded-3xl bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-sm leading-relaxed"
                             >
-                                <span>Đăng nhập</span>
-                                <ArrowRight
-                                    size={28}
-                                    className="ml-6 group-hover:translate-x-3 transition-transform"
-                                />
-                            </button>
+                                {authError}
+                            </div>
+                        )}
+                        <button
+                            disabled={!authConfig?.oidc}
+                            onClick={() => window.location.assign('/api/auth/oidc/login')}
+                            className="w-full p-10 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.3em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                            <span>Đăng nhập bằng {authConfig?.providerName || 'OIDC'}</span>
+                            <ArrowRight
+                                size={28}
+                                className="ml-6 group-hover:translate-x-3 transition-transform"
+                            />
+                        </button>
+                        <div className="flex items-center justify-center space-x-4 text-slate-300 dark:text-zinc-700">
+                            <Lock size={16} />
+                            <p className="text-[10px] font-black uppercase tracking-[0.6em] italic">
+                                Xác thực qua OpenID Connect
+                            </p>
                         </div>
-                    ) : (
-                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                            <div className="mb-16 flex justify-center md:justify-start">
-                                <button
-                                    onClick={() => setAuthStep('welcome')}
-                                    className="p-5 bg-slate-100 dark:bg-white/5 rounded-3xl text-slate-400 dark:text-zinc-600 hover:text-primary transition-all flex items-center group shadow-sm"
-                                >
-                                    <ArrowRight
-                                        size={20}
-                                        className="rotate-180 group-hover:-translate-x-2 transition-transform"
-                                    />
-                                </button>
-                            </div>
-                            <div className="space-y-8 text-center md:text-left">
-                                <div className="flex items-center justify-center md:justify-start space-x-4">
-                                    <div className="h-[2px] w-12 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
-                                    <span className="text-[11px] font-black text-red-500 uppercase tracking-[0.8em]">
-                                        Bảo mật cấp 5
-                                    </span>
-                                </div>
-                                <h3 className="text-7xl font-[1000] tracking-[-0.06em] leading-none text-slate-900 dark:text-white">
-                                    Khóa bí mật
-                                </h3>
-                                <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[320px] mx-auto md:mx-0">
-                                    Hệ thống yêu cầu Token đồng bộ đã được mã hóa.
-                                </p>
-                            </div>
-                            <div className="space-y-8">
-                                <div className="relative group">
-                                    <input
-                                        type="password"
-                                        placeholder="NHẬP TOKEN"
-                                        autoFocus
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 p-12 rounded-[3.5rem] text-center font-black outline-none focus:ring-[16px] ring-primary/10 transition-all text-2xl tracking-[0.2em] text-slate-950 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-900 group-hover:bg-white dark:group-hover:bg-white/10"
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                const val = (e.target as HTMLInputElement).value
-                                                localStorage.setItem('api_token', val)
-                                                setApiToken(val)
-                                                setLoginError(false)
-                                                window.location.reload()
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                <div className="flex items-center justify-center space-x-4 text-slate-300 dark:text-zinc-700">
-                                    <Lock size={16} className="animate-pulse" />
-                                    <p className="text-[10px] font-black uppercase tracking-[0.6em] italic">
-                                        Kết nối đã được mã hóa
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    </div>
                 </div>
 
                 <div className="absolute bottom-12 flex items-center space-x-6 opacity-30">

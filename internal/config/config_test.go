@@ -95,73 +95,54 @@ func TestValidate_MultipleBotTokens(t *testing.T) {
 	}
 }
 
-func TestValidate_ProductionDefaultDashboardToken(t *testing.T) {
-	cfg := &Config{
-		BotTokens:      []string{"token1"},
-		OwnerID:        12345,
-		AppEnv:         "production",
-		DashboardToken: "zee-mirror-secret",
+func TestValidate_OIDC(t *testing.T) {
+	base := Config{BotTokens: []string{"token1"}, OwnerID: 12345}
+	tests := []struct {
+		name    string
+		mutate  func(c *Config)
+		wantErr bool
+	}{
+		{"disabled", func(*Config) {}, false},
+		{"complete", func(c *Config) {
+			c.OIDCIssuer, c.OIDCClientID, c.OIDCRedirectURL = "https://id.example", "client", "https://bot.example/cb"
+		}, false},
+		{"missing client id", func(c *Config) {
+			c.OIDCIssuer, c.OIDCRedirectURL = "https://id.example", "https://bot.example/cb"
+		}, true},
+		{"missing redirect", func(c *Config) {
+			c.OIDCIssuer, c.OIDCClientID = "https://id.example", "client"
+		}, true},
 	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("expected error for default WEB_DASHBOARD_TOKEN in production")
-	}
-}
-
-func TestValidate_ProductionEmptyDashboardToken(t *testing.T) {
-	cfg := &Config{
-		BotTokens:      []string{"token1"},
-		OwnerID:        12345,
-		AppEnv:         "production",
-		DashboardToken: "",
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("expected error for empty WEB_DASHBOARD_TOKEN in production")
-	}
-}
-
-func TestValidate_ProductionCustomDashboardToken(t *testing.T) {
-	cfg := &Config{
-		BotTokens:      []string{"token1"},
-		OwnerID:        12345,
-		AppEnv:         "production",
-		DashboardToken: "my-super-secret-token",
-	}
-
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("custom token should be valid in production: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := base
+			tt.mutate(&cfg)
+			if err := cfg.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
-func TestValidate_UnsetAppEnvDefaultTokenAllowed(t *testing.T) {
-	cfg := &Config{
-		BotTokens:      []string{"token1"},
-		OwnerID:        12345,
-		AppEnv:         "",
-		DashboardToken: "zee-mirror-secret",
-	}
+func TestLoadConfig_OIDCFromEnv(t *testing.T) {
+	t.Setenv("OIDC_ISSUER", "https://pocketid.example/")
+	t.Setenv("OIDC_CLIENT_ID", "zee")
+	t.Setenv("OIDC_ALLOWED_GROUPS", "zee-admin, ops")
+	t.Setenv("OIDC_REDIRECT_URL", "")
+	t.Setenv("WEB_DASHBOARD_URL", "https://bot.example/")
 
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("default token should still work when APP_ENV is unset (backward compat): %v", err)
+	cfg := LoadConfig()
+	if cfg.OIDCIssuer != "https://pocketid.example" {
+		t.Errorf("OIDCIssuer = %q", cfg.OIDCIssuer)
 	}
-}
-
-func TestValidate_DevelopmentDefaultTokenAllowed(t *testing.T) {
-	cfg := &Config{
-		BotTokens:      []string{"token1"},
-		OwnerID:        12345,
-		AppEnv:         "development",
-		DashboardToken: "zee-mirror-secret",
+	if cfg.OIDCRedirectURL != "https://bot.example"+OIDCCallbackPath {
+		t.Errorf("OIDCRedirectURL = %q", cfg.OIDCRedirectURL)
 	}
-
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("default token should be allowed outside production: %v", err)
+	if len(cfg.OIDCAllowedGroups) != 2 || cfg.OIDCAllowedGroups[1] != "ops" {
+		t.Errorf("OIDCAllowedGroups = %v", cfg.OIDCAllowedGroups)
+	}
+	if cfg.OIDCProviderName != "Pocket-ID" {
+		t.Errorf("OIDCProviderName = %q", cfg.OIDCProviderName)
 	}
 }
 

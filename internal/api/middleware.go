@@ -92,7 +92,7 @@ func (rl *apiRateLimiter) Cleanup() {
 var globalRateLimiter = newAPIRateLimiter(60, time.Minute)
 
 var auditExcluded = map[string]bool{
-	"/api/health": true, "/api/login": true, "/api/ws": true, "/metrics": true,
+	"/api/health": true, "/api/auth/config": true, "/api/ws": true, "/metrics": true,
 }
 
 func getClientIP(r *http.Request) string {

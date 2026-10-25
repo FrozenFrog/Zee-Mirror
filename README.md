@@ -230,8 +230,9 @@ APP_HASH=your_api_hash                  # From my.telegram.org
 
 # ─── RECOMMENDED ───────────────────────────────────────
 RCLONE_DEST=gdrive:/Zee-Mirror          # Default upload destination
-WEB_DASHBOARD_TOKEN=your_secure_pass    # Dashboard login password
-WEB_DASHBOARD_URL=http://your-ip        # Your server's public IP/domain
+WEB_DASHBOARD_URL=https://your-domain   # Your server's public IP/domain
+OIDC_ISSUER=https://pocketid.example.com  # Dashboard sign-in (OpenID Connect)
+OIDC_CLIENT_ID=your_client_id
 ```
 
 > 📝 See the [Full Configuration Reference](#%EF%B8%8F-configuration-reference) for all available variables.
@@ -359,7 +360,12 @@ win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environ
 | `DASHBOARD_PORT` | `80` | External port for the web dashboard (the port you access in your browser) |
 | `DASHBOARD_PORT_INTERNAL` | `5248` | Internal container listen port (typically unchanged) |
 | `WEB_DASHBOARD_URL` | `http://localhost` | Public URL of the dashboard. Used for generating links in bot messages |
-| `WEB_DASHBOARD_TOKEN` | `zee-mirror-secret` | Password for dashboard login. **Change this for production!** |
+| `OIDC_ISSUER` | — | OpenID Connect issuer used to sign in to the dashboard (e.g. Pocket-ID). The dashboard has no other login |
+| `OIDC_CLIENT_ID` | — | OIDC client ID |
+| `OIDC_CLIENT_SECRET` | — | OIDC client secret. Leave empty for a public client (PKCE only) |
+| `OIDC_REDIRECT_URL` | `<WEB_DASHBOARD_URL>/api/auth/oidc/callback` | Callback URL registered at the provider |
+| `OIDC_ALLOWED_GROUPS` | — | Comma-separated provider groups allowed to sign in. Empty = any group |
+| `OIDC_PROVIDER_NAME` | `Pocket-ID` | Name shown on the login button |
 
 </details>
 
@@ -414,7 +420,7 @@ Log output is written to both **stdout** and the file `config/zee-mirror.log` si
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APP_ENV` | — | Environment: `development`, `staging`, or `production`. When set to `production`, the bot **refuses to start** if `WEB_DASHBOARD_TOKEN` is empty or still the default value (`zee-mirror-secret`) — a security guard against deploying with known credentials |
+| `APP_ENV` | — | Environment: `development`, `staging`, or `production`. Forwarded to Sentry |
 | `APP_RELEASE` | — | Release version tag, forwarded to Sentry for release tracking |
 | `SENTRY_DSN` | — | Sentry DSN for error tracking and crash reporting. Leave empty to disable |
 
@@ -701,7 +707,7 @@ All media commands use **ffmpeg** under the hood. Reply to a video/audio message
 | | |
 |---|---|
 | **URL** | `http://your-server-ip:DASHBOARD_PORT` (default port `80`) |
-| **Login** | Use the `WEB_DASHBOARD_TOKEN` value from your `.env` file |
+| **Login** | OpenID Connect (e.g. Pocket-ID), authorization code flow with PKCE. The provider's `preferred_username` must match the Telegram username of a bot user with the `owner`, `admin` or `authorized` role. Sessions last 24 hours and are signed with a key derived from `ENCRYPTION_KEY` |
 
 <br>
 
@@ -765,7 +771,7 @@ No manual page refresh needed — everything updates automatically.
 
 ## 📡 REST API
 
-> The backend exposes a comprehensive RESTful API on port `:5248` (internal). All endpoints require `WEB_DASHBOARD_TOKEN` authentication.
+> The backend exposes a comprehensive RESTful API on port `:5248` (internal). All endpoints require a dashboard session (from the OIDC sign-in) or a user's personal API key, sent as `X-API-Key` or `Authorization: Bearer`.
 
 <details open>
 <summary><b>📋 All API Endpoints</b></summary>

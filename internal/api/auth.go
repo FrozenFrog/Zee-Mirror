@@ -2,40 +2,70 @@ package api
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func jwtKey(secret string) []byte {
-	h := sha256.Sum256([]byte(secret))
-	return h[:]
-}
+// Web dashboard sessions are HS256 JWTs issued after an OIDC sign-in
+// (oidc.go). API clients can instead send a user's personal API key.
 
-// validDashboardToken accepts the raw dashboard token or a JWT signed with it,
-// so REST and websocket share one auth seam.
-func (s *Server) validDashboardToken(tokenStr string) bool {
-	if subtle.ConstantTimeCompare([]byte(tokenStr), []byte(s.Service.Config.DashboardToken)) == 1 {
-		return true
+const dashboardTokenTTL = 24 * time.Hour
+
+// newSessionKey derives the JWT signing key from ENCRYPTION_KEY so sessions
+// survive restarts. Without it a random key is used and every restart signs
+// everyone out.
+func newSessionKey(encryptionKey []byte) []byte {
+	if len(encryptionKey) > 0 {
+		mac := hmac.New(sha256.New, encryptionKey)
+		mac.Write([]byte("zee-mirror dashboard session"))
+		return mac.Sum(nil)
 	}
-	token, err := jwt.Parse(tokenStr, func(_ *jwt.Token) (interface{}, error) {
-		return jwtKey(s.Service.Config.DashboardToken), nil
-	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
-	return err == nil && token.Valid
+	slog.Warn("ENCRYPTION_KEY not set: dashboard sessions end when the bot restarts")
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	return key
 }
 
-// authorizeToken accepts dashboard tokens/JWT or an active user's personal API key.
+func (s *Server) issueDashboardToken(claims jwt.MapClaims) (string, error) {
+	now := time.Now()
+	claims["iat"] = now.Unix()
+	claims["exp"] = now.Add(dashboardTokenTTL).Unix()
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.sessionKey)
+}
+
+// validSession checks a session JWT and re-checks its user, so a role change,
+// expiry or deletion takes effect without waiting for the token to expire.
+func (s *Server) validSession(ctx context.Context, tokenStr string) bool {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(_ *jwt.Token) (interface{}, error) {
+		return s.sessionKey, nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
+	if err != nil || !token.Valid {
+		return false
+	}
+	uidStr, _ := claims["uid"].(string)
+	uid, err := strconv.ParseInt(uidStr, 10, 64)
+	if err != nil {
+		return false
+	}
+	u, err := s.Service.DB.GetByID(ctx, uid)
+	return err == nil && s.canUseDashboard(u)
+}
+
+// authorizeToken accepts a dashboard session or an active user's personal API key.
 func (s *Server) authorizeToken(ctx context.Context, tokenStr string) bool {
 	if tokenStr == "" {
 		return false
 	}
-	if s.validDashboardToken(tokenStr) {
+	if s.validSession(ctx, tokenStr) {
 		return true
 	}
 	u, err := s.Service.DB.GetUserByAPIKey(ctx, tokenStr)
@@ -44,17 +74,8 @@ func (s *Server) authorizeToken(ctx context.Context, tokenStr string) bool {
 
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if tokenStr := r.Header.Get("Authorization"); strings.HasPrefix(tokenStr, "Bearer ") {
-			token, err := jwt.Parse(strings.TrimPrefix(tokenStr, "Bearer "), func(_ *jwt.Token) (interface{}, error) {
-				return jwtKey(s.Service.Config.DashboardToken), nil
-			}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
-			if err == nil && token.Valid {
-				next(w, r)
-				return
-			}
-		}
-
-		if s.authorizeToken(r.Context(), r.Header.Get("X-API-Key")) {
+		bearer, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if s.authorizeToken(r.Context(), bearer) || s.authorizeToken(r.Context(), r.Header.Get("X-API-Key")) {
 			next(w, r)
 			return
 		}
@@ -63,40 +84,4 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"error":"Unauthorized"}`))
 	}
-}
-
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
-		return
-	}
-
-	apiKey := r.Header.Get("X-API-Key")
-	if subtle.ConstantTimeCompare([]byte(apiKey), []byte(s.Service.Config.DashboardToken)) != 1 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":"invalid api key"}`))
-		return
-	}
-
-	now := time.Now()
-	claims := jwt.MapClaims{
-		"sub": "dashboard",
-		"iat": now.Unix(),
-		"exp": now.Add(24 * time.Hour).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(jwtKey(s.Service.Config.DashboardToken))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error":"failed to generate token"}`))
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"token":     signed,
-		"expiresIn": 86400,
-	})
-	slog.Info("Dashboard login", "ip", getClientIP(r))
 }
