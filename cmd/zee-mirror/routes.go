@@ -510,6 +510,12 @@ func setupCallbackRoutes(r *router.Router) {
 		}
 		s.HandleRefreshStatusCallback(cb)
 	})
+	r.RegisterCallback("status_overview", func(s *service.BotService, cb *tgbotapi.CallbackQuery) {
+		if !ensureCallbackMessage(s, cb, "status_overview") {
+			return
+		}
+		s.HandleStatusOverviewCallback(cb)
+	})
 
 	searchHandler := func(s *service.BotService, cb *tgbotapi.CallbackQuery) {
 		if !ensureCallbackMessage(s, cb, "search") {

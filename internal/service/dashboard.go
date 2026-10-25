@@ -14,6 +14,8 @@ import (
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 var lastStatusText = make(map[int64]string)
@@ -127,10 +129,17 @@ func (s *BotService) UpdateSharedDashboardNonBlocking(chatID int64, forceNew boo
 	tm.LastTasksCount[chatID] = totalTasks
 	tm.Mu.Unlock()
 
+	totalPages := calculateTotalPages(totalTasks)
+	if page >= totalPages {
+		page = totalPages - 1
+		tm.Mu.Lock()
+		tm.StatusPages[chatID] = page
+		tm.Mu.Unlock()
+	}
+
 	lang := s.GetUserLanguage(chatID)
 	text := s.buildStatusDashboardText(lang, tasks, batches, page)
-	totalPages := (totalTasks + 4) / 5
-	keyboard := buildNavigationKeyboard(page, totalPages)
+	keyboard := buildStatusKeyboard(page, totalPages)
 
 	s.TaskManager.StatusMu.Unlock()
 
@@ -228,14 +237,102 @@ func (s *BotService) buildStatusDashboardText(lang string, tasks []*Task, batche
 		text += fmt.Sprintf("<i>Tổng: %d task đang chạy</i>", visibleTasksCount)
 	}
 
-	return text
+	return text + "\n\n" + s.statusFooter()
 }
 
-func buildNavigationKeyboard(_, _ int) tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.InlineKeyboardMarkup{}
+// statusFooter is the MLTB-style footer of the status message: host CPU and
+// RAM load, free space on the download disk and bot uptime.
+func (s *BotService) statusFooter() string {
+	cpuUsage := 0.0
+	// An interval of 0 measures CPU time since the previous call, so the
+	// dashboard refresh never blocks on sampling.
+	if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 {
+		cpuUsage = c[0]
+	}
+	ramUsage := 0.0
+	if v, err := mem.VirtualMemory(); err == nil {
+		ramUsage = v.UsedPercent
+	}
+	_, _, free := s.GetDiskStats(s.Config.DownloadDir)
+
+	return fmt.Sprintf("<b>CPU:</b> %.1f%% | <b>FREE:</b> %s\n<b>RAM:</b> %.1f%% | <b>UPTIME:</b> %s",
+		cpuUsage,
+		html.EscapeString(utils.FormatBytesUint64(free)),
+		ramUsage,
+		compactDuration(time.Since(botStartTime)))
 }
 
-func (s *BotService) sendStatusMessage(chatID int64, text string, _ tgbotapi.InlineKeyboardMarkup, forceNew bool) {
+// compactDuration formats d like "1d8h56m23s", leaving out zero units.
+func compactDuration(d time.Duration) string {
+	secs := int64(d.Seconds())
+	units := []struct {
+		suffix string
+		size   int64
+	}{{"d", 86400}, {"h", 3600}, {"m", 60}, {"s", 1}}
+
+	var b strings.Builder
+	for _, u := range units {
+		if n := secs / u.size; n > 0 {
+			fmt.Fprintf(&b, "%d%s", n, u.suffix)
+			secs %= u.size
+		}
+	}
+	if b.Len() == 0 {
+		return "0s"
+	}
+	return b.String()
+}
+
+func buildStatusKeyboard(page, totalPages int) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	if totalPages > 1 {
+		prev := (page - 1 + totalPages) % totalPages
+		next := (page + 1) % totalPages
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⬅️", fmt.Sprintf("dashboard:page:%d", prev)),
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%d/%d", page+1, totalPages), "refresh_status"),
+			tgbotapi.NewInlineKeyboardButtonData("➡️", fmt.Sprintf("dashboard:page:%d", next)),
+		))
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("📜", "status_overview"),
+		tgbotapi.NewInlineKeyboardButtonData("♻️", "refresh_status"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// HandleStatusOverviewCallback answers the 📜 button with an alert that
+// counts the active tasks per state and sums their speeds.
+func (s *BotService) HandleStatusOverviewCallback(callback *tgbotapi.CallbackQuery) {
+	counts := make(map[TaskStatus]int)
+	var dlSpeed, ulSpeed int64
+	tasks := s.TaskManager.GetActiveTasks()
+	for _, t := range tasks {
+		snapshot := t.GetSnapshot()
+		counts[snapshot.Status]++
+		switch snapshot.Status {
+		case StatusDownloading:
+			dlSpeed += snapshot.Speed
+		case StatusUploading:
+			ulSpeed += snapshot.Speed
+		}
+	}
+
+	text := fmt.Sprintf("📊 Tổng: %d task\n\n"+
+		"Tải xuống: %d | Tải lên: %d\n"+
+		"Hàng đợi: %d | Đang lấy: %d\n"+
+		"Giải nén: %d | Nén: %d\n\n"+
+		"⬇️ %s | ⬆️ %s",
+		len(tasks),
+		counts[StatusDownloading], counts[StatusUploading],
+		counts[StatusQueued], counts[StatusFetching],
+		counts[StatusExtracting], counts[StatusZipping],
+		utils.FormatSpeed(dlSpeed), utils.FormatSpeed(ulSpeed))
+
+	_, _ = s.Bot.Request(tgbotapi.NewCallbackWithAlert(callback.ID, text))
+}
+
+func (s *BotService) sendStatusMessage(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup, forceNew bool) {
 	sendMsgMu.Lock()
 	defer sendMsgMu.Unlock()
 
@@ -273,6 +370,7 @@ func (s *BotService) sendStatusMessage(chatID int64, text string, _ tgbotapi.Inl
 		slog.Debug("Editing dashboard message", "chatID", chatID, "msgID", lastMsgID, "text", text)
 		editMsg := tgbotapi.NewEditMessageText(chatID, lastMsgID, text)
 		editMsg.ParseMode = "HTML"
+		editMsg.ReplyMarkup = &keyboard
 		_, sendErr := s.Bot.Send(editMsg)
 		if sendErr == nil {
 			lastStatusText[chatID] = text
@@ -287,6 +385,7 @@ func (s *BotService) sendStatusMessage(chatID int64, text string, _ tgbotapi.Inl
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = keyboard
 	sentMsg, err := s.Bot.Send(msg)
 	if err != nil {
 		logText := text
