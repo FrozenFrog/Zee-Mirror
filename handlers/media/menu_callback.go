@@ -9,7 +9,7 @@ import (
 
 func HandleMediaMenuCallback(s *service.BotService, cb *tgbotapi.CallbackQuery, parts []string) {
 	if len(parts) < 2 {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "Unknown media action"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "Thao tác media không xác định"))
 		return
 	}
 
@@ -27,7 +27,7 @@ func HandleMediaMenuCallback(s *service.BotService, cb *tgbotapi.CallbackQuery, 
 
 	helpAction, ok := actionMap[parts[1]]
 	if !ok {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "Unknown media action"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "Thao tác media không xác định"))
 		return
 	}
 

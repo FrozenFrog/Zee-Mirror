@@ -185,7 +185,7 @@ func (s *BotService) buildStatusDashboardText(lang string, tasks []*Task, batche
 	}
 
 	if start >= totalTasks {
-		return GetErrorMessage("PAGING ERROR", i18n.T(lang, "paging_error"))
+		return GetErrorMessage("LỖI PHÂN TRANG", i18n.T(lang, "paging_error"))
 	}
 
 	visibleItems := allTasks[start:end]
@@ -198,8 +198,8 @@ func (s *BotService) buildStatusDashboardText(lang string, tasks []*Task, batche
 			emoji := utils.StatusEmoji(string(batch.Status))
 			batchID := html.EscapeString(batch.ID)
 			text += fmt.Sprintf("📦 <b>Batch:</b> <code>%s</code> • %s <b>%s</b>\n"+
-				"📈 <b>Progres:</b> <code>%.1f%%</code> (%d/%d)\n"+
-				"🚫 <b>Cancel:</b> /cancel_%s\n\n",
+				"📈 <b>Tiến độ:</b> <code>%.1f%%</code> (%d/%d)\n"+
+				"🚫 <b>Hủy:</b> /cancel_%s\n\n",
 				batchID,
 				emoji,
 				html.EscapeString(utils.FormatStatus(string(batch.Status))),
@@ -219,13 +219,13 @@ func (s *BotService) buildStatusDashboardText(lang string, tasks []*Task, batche
 	totalPages := calculateTotalPages(totalTasks)
 	text += CompactSeparator + "\n"
 	if totalPages > 1 {
-		text += fmt.Sprintf("📄 <b>Halaman:</b> %d/%d • ", page+1, totalPages)
+		text += fmt.Sprintf("📄 <b>Trang:</b> %d/%d • ", page+1, totalPages)
 	}
 
 	if len(batches) > 0 {
-		text += fmt.Sprintf("<i>Active: %d batches, %d regular tasks</i>", len(batches), visibleTasksCount)
+		text += fmt.Sprintf("<i>Đang chạy: %d batch, %d task thường</i>", len(batches), visibleTasksCount)
 	} else {
-		text += fmt.Sprintf("<i>Total: %d task aktif</i>", visibleTasksCount)
+		text += fmt.Sprintf("<i>Tổng: %d task đang chạy</i>", visibleTasksCount)
 	}
 
 	return text
@@ -307,7 +307,7 @@ func (s *BotService) sendStatusMessage(chatID int64, text string, _ tgbotapi.Inl
 
 func (s *BotService) HandleCancel(message *tgbotapi.Message, args string) {
 	if args == "" {
-		s.reply(message, GetErrorMessage("CANCEL ERROR", "Gunakan: /cancel <TaskID>\n\nLihat daftar task dengan /status"))
+		s.reply(message, GetErrorMessage("LỖI HỦY", "Cách dùng: /cancel <TaskID>\n\nXem danh sách task bằng /status"))
 		return
 	}
 
@@ -315,7 +315,7 @@ func (s *BotService) HandleCancel(message *tgbotapi.Message, args string) {
 
 	if s.TaskManager.CancelTask(taskID) {
 		lang := s.GetUserLanguage(message.From.ID)
-		s.reply(message, GetSuccessMessage("TASK CANCELLED", fmt.Sprintf(i18n.T(lang, "task_cancelled"), taskID)))
+		s.reply(message, GetSuccessMessage("ĐÃ HỦY TASK", fmt.Sprintf(i18n.T(lang, "task_cancelled"), taskID)))
 		s.UpdateSharedDashboard(message.Chat.ID, false)
 		return
 	}
@@ -323,7 +323,7 @@ func (s *BotService) HandleCancel(message *tgbotapi.Message, args string) {
 	task := s.TaskManager.GetTaskByGID(taskID)
 	if task != nil {
 		if s.TaskManager.CancelTask(task.ID) {
-			s.reply(message, fmt.Sprintf("✅ *Task `%s` dibatalkan*", task.ID))
+			s.reply(message, fmt.Sprintf("✅ *Đã hủy task `%s`*", task.ID))
 			return
 		}
 	}
@@ -344,26 +344,26 @@ func (s *BotService) HandleCancel(message *tgbotapi.Message, args string) {
 	if foundBatch {
 		lang := s.GetUserLanguage(message.From.ID)
 		targetBatch.Cancel()
-		s.reply(message, GetSuccessMessage("BATCH CANCELLED", fmt.Sprintf(i18n.T(lang, "batch_cancelled"), taskID)))
+		s.reply(message, GetSuccessMessage("ĐÃ HỦY BATCH", fmt.Sprintf(i18n.T(lang, "batch_cancelled"), taskID)))
 		s.UpdateSharedDashboard(message.Chat.ID, false)
 		return
 	}
 
 	if s.BatchManager.CancelSubTask(taskID) {
 		lang := s.GetUserLanguage(message.From.ID)
-		s.reply(message, GetSuccessMessage("SUB-TASK CANCELLED", fmt.Sprintf(i18n.T(lang, "sub_task_cancelled"), taskID)))
+		s.reply(message, GetSuccessMessage("ĐÃ HỦY TASK CON", fmt.Sprintf(i18n.T(lang, "sub_task_cancelled"), taskID)))
 		s.UpdateSharedDashboard(message.Chat.ID, false)
 		return
 	}
 
 	lang := s.GetUserLanguage(message.From.ID)
-	s.reply(message, GetErrorMessage("NOT FOUND", fmt.Sprintf(i18n.T(lang, "task_not_found"), utils.EscapeMarkdownV2(taskID))))
+	s.reply(message, GetErrorMessage("KHÔNG TÌM THẤY", fmt.Sprintf(i18n.T(lang, "task_not_found"), utils.EscapeMarkdownV2(taskID))))
 }
 
 func (s *BotService) HandleCancelAll(message *tgbotapi.Message) {
 	if !s.IsAdmin(message.From.ID) {
 		lang := s.GetUserLanguage(message.From.ID)
-		msg := tgbotapi.NewMessage(message.Chat.ID, GetErrorMessage("PERMISSION DENIED", i18n.T(lang, "admin_only")))
+		msg := tgbotapi.NewMessage(message.Chat.ID, GetErrorMessage("KHÔNG CÓ QUYỀN", i18n.T(lang, "admin_only")))
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
@@ -388,7 +388,7 @@ func (s *BotService) HandleCancelAll(message *tgbotapi.Message) {
 	}
 
 	lang := s.GetUserLanguage(message.From.ID)
-	msg := tgbotapi.NewMessage(message.Chat.ID, GetSuccessMessage("CANCEL ALL", fmt.Sprintf(i18n.T(lang, "all_tasks_cancelled"), count)))
+	msg := tgbotapi.NewMessage(message.Chat.ID, GetSuccessMessage("HỦY TẤT CẢ", fmt.Sprintf(i18n.T(lang, "all_tasks_cancelled"), count)))
 	msg.ParseMode = MarkdownV2
 	_, _ = s.Bot.Send(msg)
 	s.UpdateSharedDashboard(message.Chat.ID, false)
@@ -409,11 +409,11 @@ func (s *BotService) HandleCancelCallback(callback *tgbotapi.CallbackQuery, task
 	}
 
 	if success {
-		callbackConfig := tgbotapi.NewCallback(callback.ID, fmt.Sprintf("✅ Task %s dibatalkan", taskID))
+		callbackConfig := tgbotapi.NewCallback(callback.ID, fmt.Sprintf("✅ Đã hủy task %s", taskID))
 		_, _ = s.Bot.Request(callbackConfig)
 		s.UpdateSharedDashboard(callback.Message.Chat.ID, false)
 	} else {
-		callbackConfig := tgbotapi.NewCallback(callback.ID, "❌ Gagal membatalkan task")
+		callbackConfig := tgbotapi.NewCallback(callback.ID, "❌ Không hủy được task")
 		_, _ = s.Bot.Request(callbackConfig)
 	}
 }

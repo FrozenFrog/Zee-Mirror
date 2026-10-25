@@ -12,7 +12,7 @@ import (
 
 func HandleTorrent(s *service.BotService, message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 

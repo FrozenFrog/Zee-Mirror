@@ -38,7 +38,7 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	} else if _, err := exec.LookPath("megadl"); err == nil {
 		cmdName = "megadl"
 	} else {
-		return fmt.Errorf("mega-get atau megadl tidak ditemukan di server. Silakan install MEGAcmd atau megatools di Dockerfile")
+		return fmt.Errorf("không tìm thấy mega-get hoặc megadl trên server. Vui lòng cài MEGAcmd hoặc megatools trong Dockerfile")
 	}
 
 	args := []string{}
@@ -51,12 +51,12 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	cmd := execCommand(ctx, cmdName, args...)
 
 	onProgress(downloader.ProgressUpdate{
-		Message: "Mengunduh file dari Mega (Progress tidak tersedia di mode CLI)...",
+		Message: "Đang tải file từ Mega (không hiển thị được tiến độ ở chế độ CLI)...",
 	})
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("gagal mengunduh dari Mega: %v, output: %s", err, string(output))
+		return fmt.Errorf("tải xuống từ Mega thất bại: %v, output: %s", err, string(output))
 	}
 
 	task.Mu.Lock()

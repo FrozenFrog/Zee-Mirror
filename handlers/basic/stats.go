@@ -30,7 +30,7 @@ func HandleStats(s *service.BotService, message *tgbotapi.Message) {
 	ctx := context.Background()
 	stats, err := s.DB.GetBotStats(ctx)
 	if err != nil {
-		s.Reply(message, "❌ *Gagal mengambil statistik*")
+		s.Reply(message, "❌ *Không lấy được thống kê*")
 		return
 	}
 
@@ -73,7 +73,7 @@ func HandleStats(s *service.BotService, message *tgbotapi.Message) {
 		if err != nil {
 			slog.Error("Error sending stats message", "error", err, "userID", message.From.ID)
 			msg.ParseMode = ""
-			msg.Text = "❌ *Gagal memformat statistik (Markdown Error)*\n\nFallback: Manual Stats\nTotal Tasks: " + fmt.Sprint(getIntValue(stats, "total_tasks"))
+			msg.Text = "❌ Không định dạng được thống kê (lỗi Markdown)\n\nDự phòng: thống kê rút gọn\nTổng Task: " + fmt.Sprint(getIntValue(stats, "total_tasks"))
 			_, _ = s.Bot.Send(msg)
 		} else {
 			s.AutoDeleteMessage(message.Chat.ID, sentMsg.MessageID, 60*time.Second)
@@ -88,7 +88,7 @@ func GetStatsKeyboard() tgbotapi.InlineKeyboardMarkup {
 func FormatStatsMessage(stats map[string]interface{}, userStats *UserStats, dailyStats *DailyStats, userDailyStats *DailyStats) string {
 	var text strings.Builder
 
-	text.WriteString("📊 *STATISTIK DASHBOARD*\n")
+	text.WriteString("📊 *THỐNG KÊ DASHBOARD*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	totalTasks := getIntValue(stats, "total_tasks")
@@ -96,32 +96,32 @@ func FormatStatsMessage(stats map[string]interface{}, userStats *UserStats, dail
 	failedTasks := getIntValue(stats, "failed_tasks")
 	totalBandwidth := getInt64Value(stats, "total_bandwidth")
 
-	text.WriteString("🌐 *GLOBAL STATS*\n")
-	fmt.Fprintf(&text, "📥 Total Tasks: `%d`\n", totalTasks)
-	fmt.Fprintf(&text, "✅ Completed: `%d`\n", completedTasks)
-	fmt.Fprintf(&text, "❌ Failed: `%d`\n", failedTasks)
-	fmt.Fprintf(&text, "📊 Success Rate: `%.1f%%`\n", calculateSuccessRate(completedTasks, totalTasks))
-	fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(totalBandwidth)))
+	text.WriteString("🌐 *THỐNG KÊ TOÀN CỤC*\n")
+	fmt.Fprintf(&text, "📥 Tổng Task: `%d`\n", totalTasks)
+	fmt.Fprintf(&text, "✅ Hoàn thành: `%d`\n", completedTasks)
+	fmt.Fprintf(&text, "❌ Thất bại: `%d`\n", failedTasks)
+	fmt.Fprintf(&text, "📊 Tỷ lệ thành công: `%.1f%%`\n", calculateSuccessRate(completedTasks, totalTasks))
+	fmt.Fprintf(&text, "📈 Băng thông: `%s`\n\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(totalBandwidth)))
 
 	if dailyStats != nil {
-		text.WriteString("📅 *HARI INI \\(GLOBAL\\)*\n")
-		fmt.Fprintf(&text, "📥 Tasks: `%d`\n", dailyStats.TotalTasks)
-		fmt.Fprintf(&text, "✅ Completed: `%d`\n", dailyStats.CompletedTasks)
-		fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(dailyStats.TotalBandwidth)))
+		text.WriteString("📅 *HÔM NAY \\(TOÀN CỤC\\)*\n")
+		fmt.Fprintf(&text, "📥 Task: `%d`\n", dailyStats.TotalTasks)
+		fmt.Fprintf(&text, "✅ Hoàn thành: `%d`\n", dailyStats.CompletedTasks)
+		fmt.Fprintf(&text, "📈 Băng thông: `%s`\n\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(dailyStats.TotalBandwidth)))
 	}
 
 	if userDailyStats != nil && userDailyStats.TotalTasks > 0 {
-		text.WriteString("👤 *MY TODAY*\n")
-		fmt.Fprintf(&text, "📥 Tasks: `%d`\n", userDailyStats.TotalTasks)
-		fmt.Fprintf(&text, "📊 Bandwidth: `%s`\n\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(userDailyStats.TotalBandwidth)))
+		text.WriteString("👤 *HÔM NAY CỦA TÔI*\n")
+		fmt.Fprintf(&text, "📥 Task: `%d`\n", userDailyStats.TotalTasks)
+		fmt.Fprintf(&text, "📊 Băng thông: `%s`\n\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(userDailyStats.TotalBandwidth)))
 	}
 
 	if userStats != nil {
-		text.WriteString("👤 *MY ALL\\-TIME STATS*\n")
-		fmt.Fprintf(&text, "📥 Total Tasks: `%d`\n", userStats.TotalDownloads)
-		fmt.Fprintf(&text, "📊 Bandwidth: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(userStats.TotalBandwidth)))
+		text.WriteString("👤 *TỔNG THỐNG KÊ CỦA TÔI*\n")
+		fmt.Fprintf(&text, "📥 Tổng Task: `%d`\n", userStats.TotalDownloads)
+		fmt.Fprintf(&text, "📊 Băng thông: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(userStats.TotalBandwidth)))
 		if !userStats.LastActive.IsZero() {
-			fmt.Fprintf(&text, "🕐 Active: `%s`\n", utils.EscapeMarkdownV2Code(userStats.LastActive.Format("15:04")))
+			fmt.Fprintf(&text, "🕐 Hoạt động: `%s`\n", utils.EscapeMarkdownV2Code(userStats.LastActive.Format("15:04")))
 		}
 	}
 
@@ -131,26 +131,26 @@ func FormatStatsMessage(stats map[string]interface{}, userStats *UserStats, dail
 
 func formatUserStatsDetailed(stats *UserStats) string {
 	if stats == nil {
-		return "📭 *Belum ada statistik untuk Anda*"
+		return "📭 *Bạn chưa có thống kê nào*"
 	}
 
 	var text strings.Builder
-	text.WriteString("👤 *USER STATISTICS*\n")
+	text.WriteString("👤 *THỐNG KÊ NGƯỜI DÙNG*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
-	text.WriteString("🆔 *USER INFO*\n")
-	fmt.Fprintf(&text, "👤 Name: @%s\n", utils.EscapeMarkdownV2(stats.Username))
+	text.WriteString("🆔 *THÔNG TIN NGƯỜI DÙNG*\n")
+	fmt.Fprintf(&text, "👤 Tên: @%s\n", utils.EscapeMarkdownV2(stats.Username))
 	fmt.Fprintf(&text, "🆔 ID: `%d`\n", stats.UserID)
 	if !stats.LastActive.IsZero() {
-		fmt.Fprintf(&text, "🕐 Last Active: `%s`\n", utils.EscapeMarkdownV2Code(stats.LastActive.Format("02 Jan 15:04")))
+		fmt.Fprintf(&text, "🕐 Hoạt động gần nhất: `%s`\n", utils.EscapeMarkdownV2Code(stats.LastActive.Format("02 Jan 15:04")))
 	}
 	text.WriteString("\n")
 
-	text.WriteString("📊 *ACTIVITY*\n")
-	fmt.Fprintf(&text, "📥 Total Tasks: `%d`\n", stats.TotalDownloads)
-	fmt.Fprintf(&text, "✅ Success: `%d`\n", stats.SuccessfulTasks)
-	fmt.Fprintf(&text, "❌ Failed: `%d`\n", stats.FailedTasks)
-	fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(stats.TotalBandwidth)))
+	text.WriteString("📊 *HOẠT ĐỘNG*\n")
+	fmt.Fprintf(&text, "📥 Tổng Task: `%d`\n", stats.TotalDownloads)
+	fmt.Fprintf(&text, "✅ Thành công: `%d`\n", stats.SuccessfulTasks)
+	fmt.Fprintf(&text, "❌ Thất bại: `%d`\n", stats.FailedTasks)
+	fmt.Fprintf(&text, "📈 Băng thông: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(stats.TotalBandwidth)))
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")
 	return text.String()
@@ -158,34 +158,34 @@ func formatUserStatsDetailed(stats *UserStats) string {
 
 func formatDailyStatsDetailed(stats *DailyStats, title string, userStats *DailyStats) string {
 	if stats == nil {
-		return "📭 *Belum ada statistik*"
+		return "📭 *Chưa có thống kê*"
 	}
 
 	var text strings.Builder
-	fmt.Fprintf(&text, "📅 *STATISTIK %s*\n", strings.ToUpper(utils.EscapeMarkdownV2(title)))
+	fmt.Fprintf(&text, "📅 *THỐNG KÊ %s*\n", strings.ToUpper(utils.EscapeMarkdownV2(title)))
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	fmt.Fprintf(&text, "📆 *%s*\n\n", stats.Date.Format("02 Jan 2006"))
 
-	text.WriteString("🌐 *GLOBAL ACTIVITY*\n")
-	fmt.Fprintf(&text, "📥 Total Tasks: `%d`\n", stats.TotalTasks)
-	fmt.Fprintf(&text, "✅ Completed: `%d`\n", stats.CompletedTasks)
-	fmt.Fprintf(&text, "❌ Failed: `%d`\n", stats.FailedTasks)
-	fmt.Fprintf(&text, "📊 Success Rate: `%.1f%%`\n", calculateSuccessRate(stats.CompletedTasks, stats.TotalTasks))
-	fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(stats.TotalBandwidth)))
+	text.WriteString("🌐 *HOẠT ĐỘNG TOÀN CỤC*\n")
+	fmt.Fprintf(&text, "📥 Tổng Task: `%d`\n", stats.TotalTasks)
+	fmt.Fprintf(&text, "✅ Hoàn thành: `%d`\n", stats.CompletedTasks)
+	fmt.Fprintf(&text, "❌ Thất bại: `%d`\n", stats.FailedTasks)
+	fmt.Fprintf(&text, "📊 Tỷ lệ thành công: `%.1f%%`\n", calculateSuccessRate(stats.CompletedTasks, stats.TotalTasks))
+	fmt.Fprintf(&text, "📈 Băng thông: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(stats.TotalBandwidth)))
 	if stats.AverageSpeed > 0 {
-		fmt.Fprintf(&text, "⚡ Avg Speed: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatSpeed(stats.AverageSpeed)))
+		fmt.Fprintf(&text, "⚡ Tốc độ TB: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatSpeed(stats.AverageSpeed)))
 	}
 	if stats.PeakConcurrent > 0 {
-		fmt.Fprintf(&text, "🔥 Peak Concurrent: `%d`\n", stats.PeakConcurrent)
+		fmt.Fprintf(&text, "🔥 Đồng thời cao nhất: `%d`\n", stats.PeakConcurrent)
 	}
 
 	if userStats != nil {
-		text.WriteString("\n👤 *YOUR ACTIVITY TODAY*\n")
-		fmt.Fprintf(&text, "📥 Total Tasks: `%d`\n", userStats.TotalTasks)
-		fmt.Fprintf(&text, "✅ Success: `%d`\n", userStats.CompletedTasks)
-		fmt.Fprintf(&text, "❌ Failed: `%d`\n", userStats.FailedTasks)
-		fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(userStats.TotalBandwidth)))
+		text.WriteString("\n👤 *HOẠT ĐỘNG CỦA BẠN HÔM NAY*\n")
+		fmt.Fprintf(&text, "📥 Tổng Task: `%d`\n", userStats.TotalTasks)
+		fmt.Fprintf(&text, "✅ Thành công: `%d`\n", userStats.CompletedTasks)
+		fmt.Fprintf(&text, "❌ Thất bại: `%d`\n", userStats.FailedTasks)
+		fmt.Fprintf(&text, "📈 Băng thông: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(userStats.TotalBandwidth)))
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")
@@ -194,7 +194,7 @@ func formatDailyStatsDetailed(stats *DailyStats, title string, userStats *DailyS
 
 func formatWeeklyStats(stats []DailyStats) string {
 	var text strings.Builder
-	text.WriteString("📈 *STATISTIK MINGGUAN*\n")
+	text.WriteString("📈 *THỐNG KÊ TUẦN*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	totalTasks := 0
@@ -203,7 +203,7 @@ func formatWeeklyStats(stats []DailyStats) string {
 
 	var totalBandwidth int64
 
-	text.WriteString("🗓️ *LAST 7 DAYS*\n")
+	text.WriteString("🗓️ *7 NGÀY QUA*\n")
 
 	for _, day := range stats {
 		totalTasks += day.TotalTasks
@@ -216,16 +216,16 @@ func formatWeeklyStats(stats []DailyStats) string {
 			icon = "▪️"
 		}
 
-		fmt.Fprintf(&text, "%s `%s` : %d tasks\n",
+		fmt.Fprintf(&text, "%s `%s` : %d Task\n",
 			icon,
 			day.Date.Format("02/01"),
 			day.TotalTasks)
 	}
 
-	text.WriteString("\n📊 *SUMMARY*\n")
-	fmt.Fprintf(&text, "📥 Total: `%d` tasks\n", totalTasks)
-	fmt.Fprintf(&text, "✅ Completed: `%d`\n", totalCompleted)
-	fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(totalBandwidth)))
+	text.WriteString("\n📊 *TỔNG KẾT*\n")
+	fmt.Fprintf(&text, "📥 Tổng: `%d` Task\n", totalTasks)
+	fmt.Fprintf(&text, "✅ Hoàn thành: `%d`\n", totalCompleted)
+	fmt.Fprintf(&text, "📈 Băng thông: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(totalBandwidth)))
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")
 	return text.String()
@@ -233,7 +233,7 @@ func formatWeeklyStats(stats []DailyStats) string {
 
 func formatMonthlyStats(stats []DailyStats) string {
 	var text strings.Builder
-	text.WriteString("📉 *STATISTIK BULANAN*\n")
+	text.WriteString("📉 *THỐNG KÊ THÁNG*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	totalTasks := 0
@@ -267,20 +267,20 @@ func formatMonthlyStats(stats []DailyStats) string {
 		weekStats[week] = ws
 	}
 
-	text.WriteString("📅 *WEEKLY BREAK*\n")
+	text.WriteString("📅 *THEO TUẦN*\n")
 
 	for _, week := range weeks {
 		ws := weekStats[week]
-		fmt.Fprintf(&text, "Week %d: `%d` tasks\n└ `%s`\n",
+		fmt.Fprintf(&text, "Tuần %d: `%d` Task\n└ `%s`\n",
 			week,
 			ws.tasks,
 			utils.EscapeMarkdownV2Code(utils.FormatBytes(ws.bandwidth)))
 	}
 
-	text.WriteString("\n📊 *SUMMARY*\n")
-	fmt.Fprintf(&text, "📥 Total: `%d` tasks\n", totalTasks)
-	fmt.Fprintf(&text, "✅ Completed: `%d`\n", totalCompleted)
-	fmt.Fprintf(&text, "📈 Bandwidth: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(totalBandwidth)))
+	text.WriteString("\n📊 *TỔNG KẾT*\n")
+	fmt.Fprintf(&text, "📥 Tổng: `%d` Task\n", totalTasks)
+	fmt.Fprintf(&text, "✅ Hoàn thành: `%d`\n", totalCompleted)
+	fmt.Fprintf(&text, "📈 Băng thông: `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(totalBandwidth)))
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")
 	return text.String()
@@ -300,7 +300,7 @@ func HandleStatsCallback(s *service.BotService, callback *tgbotapi.CallbackQuery
 	case "my":
 		userStats, err := s.DB.GetUserStats(ctx, callback.From.ID)
 		if err != nil {
-			text = "❌ *Gagal mengambil statistik Anda*"
+			text = "❌ *Không lấy được thống kê của bạn*"
 		} else {
 			text = formatUserStatsDetailed(userStats)
 		}
@@ -309,15 +309,15 @@ func HandleStatsCallback(s *service.BotService, callback *tgbotapi.CallbackQuery
 		dailyStats, err := s.DB.GetTodayStats(ctx)
 		userDailyStats, _ := s.DB.GetUserTodayStats(ctx, callback.From.ID)
 		if err != nil {
-			text = "❌ *Gagal mengambil statistik hari ini*"
+			text = "❌ *Không lấy được thống kê hôm nay*"
 		} else {
-			text = formatDailyStatsDetailed(dailyStats, "Hari Ini", userDailyStats)
+			text = formatDailyStatsDetailed(dailyStats, "Hôm nay", userDailyStats)
 		}
 
 	case "weekly":
 		weeklyStats, err := s.DB.GetWeeklyStats(ctx)
 		if err != nil {
-			text = "❌ *Gagal mengambil statistik mingguan*"
+			text = "❌ *Không lấy được thống kê tuần*"
 		} else {
 			text = formatWeeklyStats(weeklyStats)
 		}
@@ -325,7 +325,7 @@ func HandleStatsCallback(s *service.BotService, callback *tgbotapi.CallbackQuery
 	case "monthly":
 		monthlyStats, err := s.DB.GetMonthlyStats(ctx)
 		if err != nil {
-			text = "❌ *Gagal mengambil statistik bulanan*"
+			text = "❌ *Không lấy được thống kê tháng*"
 		} else {
 			text = formatMonthlyStats(monthlyStats)
 		}
@@ -336,12 +336,12 @@ func HandleStatsCallback(s *service.BotService, callback *tgbotapi.CallbackQuery
 		dailyStats, _ := s.DB.GetTodayStats(ctx)
 		userDailyStats, _ := s.DB.GetUserTodayStats(ctx, callback.From.ID)
 		text = FormatStatsMessage(stats, userStats, dailyStats, userDailyStats)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Statistics refreshed!"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã làm mới thống kê!"))
 
 	case CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Closed"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
 		return
 	}
 

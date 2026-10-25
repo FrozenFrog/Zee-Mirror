@@ -3,6 +3,7 @@ package router
 import (
 	"testing"
 
+	"zee-mirror/handlers/download"
 	"zee-mirror/internal/service"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -25,6 +26,21 @@ func TestRouter_HandleMessage(t *testing.T) {
 	r.HandleMessage(msg)
 	if !called {
 		t.Error("Command handler for 'testcmd' was not called")
+	}
+}
+
+func TestIsWizardPromptReply(t *testing.T) {
+	if !isWizardPromptReply(stripMarkdownV2(download.PromptMirrorURL)) {
+		t.Error("plain-text mirror URL prompt was not recognised")
+	}
+	if !isWizardPromptReply(stripMarkdownV2(download.PromptRename)) {
+		t.Error("plain-text rename prompt was not recognised")
+	}
+	if isWizardPromptReply("some unrelated bot message") {
+		t.Error("unrelated text was recognised as a wizard prompt")
+	}
+	if got := stripMarkdownV2("🔗 Gửi *URL* \\(http\\)\\."); got != "🔗 Gửi URL (http)." {
+		t.Errorf("stripMarkdownV2 = %q", got)
 	}
 }
 

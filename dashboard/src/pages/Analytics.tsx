@@ -23,7 +23,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           {label}
         </p>
         <p className="text-lg font-black text-primary">
-          {payload[0].value} <span className="text-[10px] uppercase">Tasks</span>
+          {payload[0].value} <span className="text-[10px] uppercase">Task</span>
         </p>
       </div>
     )
@@ -48,7 +48,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ token, isDarkMode }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="glass-card p-12 rounded-[4rem] shadow-2xl space-y-8">
           <div className="flex items-center justify-between px-2">
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white">Load Velocity</h3>
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white">Tốc độ xử lý</h3>
             <TrendingUp className="text-primary" size={28} />
           </div>
           <div className="h-[350px] w-full mt-8" style={{ minHeight: '350px' }}>
@@ -76,7 +76,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ token, isDarkMode }) => {
                       fontWeight: 900,
                     }}
                     tickFormatter={(str) =>
-                      new Date(str).toLocaleDateString('en-US', { weekday: 'short' })
+                      new Date(str).toLocaleDateString('vi-VN', { weekday: 'short' })
                     }
                   />
                   <YAxis hide />
@@ -96,7 +96,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ token, isDarkMode }) => {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
-                No Data Available
+                Không có dữ liệu
               </div>
             )}
           </div>
@@ -105,7 +105,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ token, isDarkMode }) => {
         <div className="glass-card p-12 rounded-[4rem] shadow-2xl space-y-8">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-3xl font-black text-slate-900 dark:text-white">
-              Distribution Ratio
+              Tỷ lệ phân bố
             </h3>
             <BarChart3 className="text-indigo-400" size={28} />
           </div>
@@ -145,7 +145,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ token, isDarkMode }) => {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
-                No Data Available
+                Không có dữ liệu
               </div>
             )}
           </div>
@@ -154,16 +154,16 @@ const Analytics: React.FC<AnalyticsProps> = ({ token, isDarkMode }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <AnalyticsStat
-          label="Peak Performance"
+          label="Hiệu suất đỉnh"
           value={Math.max(...analyticsData.map((d) => d.TotalTasks), 0)}
-          unit="Tasks/Day"
+          unit="Task/ngày"
         />
         <AnalyticsStat
-          label="Weekly Volume"
+          label="Khối lượng tuần"
           value={analyticsData.reduce((acc, curr) => acc + curr.TotalTasks, 0)}
-          unit="Aggregate"
+          unit="Tổng cộng"
         />
-        <AnalyticsStat label="Node Efficiency" value="98.4%" unit="Realtime" />
+        <AnalyticsStat label="Hiệu suất Node" value="98.4%" unit="Thời gian thực" />
       </div>
     </div>
   )

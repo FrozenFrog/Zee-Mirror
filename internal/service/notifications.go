@@ -45,14 +45,14 @@ func (n *NotificationService) SendAlert(alertType, title, message string) {
 		return
 	}
 
-	text := fmt.Sprintf(`🚨 *ALERT: %s*
+	text := fmt.Sprintf(`🚨 *CẢNH BÁO: %s*
 
 %s %s
 
-📝 *Details:*
+📝 *Chi tiết:*
 %s
 
-⏰ *Time:* %s`,
+⏰ *Thời gian:* %s`,
 		utils.EscapeMarkdownV2(title),
 		alertType,
 		utils.EscapeMarkdownV2(title),
@@ -72,8 +72,8 @@ func (n *NotificationService) AlertDiskUsage(usage float64, path string) {
 		return
 	}
 
-	message := fmt.Sprintf("Disk usage at %.1f%% on %s\n\nPlease free up some space to prevent download failures.", usage, path)
-	n.SendAlert("💾", "High Disk Usage", message)
+	message := fmt.Sprintf("Ổ đĩa đã dùng %.1f%% tại %s\n\nVui lòng giải phóng dung lượng để tránh tải xuống thất bại.", usage, path)
+	n.SendAlert("💾", "Ổ đĩa sắp đầy", message)
 }
 
 func (n *NotificationService) AlertSystemHealth(cpuUsage, memUsage float64) {
@@ -83,18 +83,18 @@ func (n *NotificationService) AlertSystemHealth(cpuUsage, memUsage float64) {
 		alerts = append(alerts, fmt.Sprintf("CPU: %.1f%%", cpuUsage))
 	}
 	if memUsage > 90 {
-		alerts = append(alerts, fmt.Sprintf("Memory: %.1f%%", memUsage))
+		alerts = append(alerts, fmt.Sprintf("Bộ nhớ: %.1f%%", memUsage))
 	}
 
 	if len(alerts) > 0 {
-		message := fmt.Sprintf("High resource usage detected:\n%s", strings.Join(alerts, "\n"))
-		n.SendAlert("🖥️", "System Health Warning", message)
+		message := fmt.Sprintf("Phát hiện mức sử dụng tài nguyên cao:\n%s", strings.Join(alerts, "\n"))
+		n.SendAlert("🖥️", "Cảnh báo tình trạng hệ thống", message)
 	}
 }
 
 func (s *BotService) HandleSetAlertChannel(message *tgbotapi.Message, args string) {
 	if message.From.ID != s.Config.OwnerID {
-		s.reply(message, "❌ *Akses Ditolak*\nHanya Owner yang bisa menggunakan perintah ini\\.")
+		s.reply(message, "❌ *Truy cập bị từ chối*\nChỉ Owner mới dùng được lệnh này\\.")
 		return
 	}
 
@@ -114,5 +114,5 @@ func (s *BotService) HandleSetAlertChannel(message *tgbotapi.Message, args strin
 	ctx := context.Background()
 	_ = s.DB.Set(ctx, "alert_channel_id", fmt.Sprintf("%d", channelID))
 
-	s.reply(message, fmt.Sprintf("✅ *Alert Channel Set*\n\nChannel ID: `%d`\n\nSemua alert akan dikirim ke channel ini\\.", channelID))
+	s.reply(message, fmt.Sprintf("✅ *Đã đặt kênh cảnh báo*\n\nChannel ID: `%d`\n\nMọi cảnh báo sẽ được gửi tới kênh này\\.", channelID))
 }

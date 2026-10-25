@@ -214,16 +214,16 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("failed to get stdout pipe: %v", err)}
+		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("không lấy được stdout pipe: %v", err)}
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("failed to get stderr pipe: %v", err)}
+		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("không lấy được stderr pipe: %v", err)}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("yt-dlp failed to start: %v", err)}
+		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("không khởi động được yt-dlp: %v", err)}
 	}
 
 	errorOutput := ""
@@ -263,13 +263,13 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	}
 
 	if task.Hardsub && task.SubtitleLangs != "" {
-		onProgress(downloader.ProgressUpdate{Message: "Burning subtitles..."})
+		onProgress(downloader.ProgressUpdate{Message: "Đang ghép phụ đề cứng..."})
 		if err := e.burnSubtitles(ctx, outputDir); err != nil {
 			slog.Error("Failed to burn subtitles", "error", err)
 
-			onProgress(downloader.ProgressUpdate{Error: "Hardsub failed: " + err.Error()})
+			onProgress(downloader.ProgressUpdate{Error: "Ghép phụ đề cứng thất bại: " + err.Error()})
 		} else {
-			onProgress(downloader.ProgressUpdate{Message: "Hardsubbing completed!"})
+			onProgress(downloader.ProgressUpdate{Message: "Đã ghép phụ đề cứng xong!"})
 		}
 	}
 
@@ -298,7 +298,7 @@ func (e *Engine) burnSubtitles(ctx context.Context, dir string) error {
 	}
 
 	if videoFile == "" || subFile == "" {
-		return fmt.Errorf("video or subtitle file not found for burning")
+		return fmt.Errorf("không tìm thấy file video hoặc phụ đề để ghép")
 	}
 
 	outputFile := strings.TrimSuffix(videoFile, filepath.Ext(videoFile)) + "_hardsub.mp4"
@@ -316,7 +316,7 @@ func (e *Engine) burnSubtitles(ctx context.Context, dir string) error {
 
 	cmd := execCommand(ctx, "ffmpeg", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("ffmpeg failed: %v, output: %s", err, string(out))
+		return fmt.Errorf("ffmpeg thất bại: %v, output: %s", err, string(out))
 	}
 
 	_ = os.Remove(videoFile)
@@ -422,26 +422,26 @@ func (e *Engine) parseProgress(stdout interface{}, onProgress func(downloader.Pr
 			title = strings.TrimSuffix(title, " has already been downloaded")
 			update.FileName = filepath.Base(strings.TrimSpace(title))
 		case strings.HasPrefix(line, "[ExtractAudio]"):
-			update.Message = "Extracting/Converting Audio..."
+			update.Message = "Đang tách/chuyển đổi audio..."
 			if strings.Contains(line, "Destination:") {
 				parts := strings.SplitN(line, "Destination:", 2)
 				update.FileName = filepath.Base(strings.TrimSpace(parts[1]))
 			}
 		case strings.HasPrefix(line, "[Merger]"):
-			update.Message = "Merging Video/Audio..."
+			update.Message = "Đang ghép video/audio..."
 			if strings.Contains(line, "Merging formats into") {
 				parts := strings.SplitN(line, "into", 2)
 				update.FileName = filepath.Base(strings.TrimSpace(parts[1]))
 				update.FileName = strings.Trim(update.FileName, "\"")
 			}
 		case strings.HasPrefix(line, "[VideoConvertor]"):
-			update.Message = "Converting Video Format..."
+			update.Message = "Đang chuyển đổi định dạng video..."
 			if strings.Contains(line, "Destination:") {
 				parts := strings.SplitN(line, "Destination:", 2)
 				update.FileName = filepath.Base(strings.TrimSpace(parts[1]))
 			}
 		case strings.HasPrefix(line, "[Metadata]"):
-			update.Message = "Adding Metadata..."
+			update.Message = "Đang thêm metadata..."
 		}
 
 		p := parser.ParseYTDLPLine(line)

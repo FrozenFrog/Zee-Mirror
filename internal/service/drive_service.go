@@ -40,12 +40,12 @@ func (s *BotService) ListDriveFiles(path string) ([]DriveFile, error) {
 func (s *BotService) FormatDriveFileList(path string, files []DriveFile) string {
 	var text strings.Builder
 
-	text.WriteString("📂 *FILE MANAGER \\- GDRIVE*\n")
+	text.WriteString("📂 *QUẢN LÝ FILE \\- GDRIVE*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&text, "📍 *PATH:* `%s`\n\n", utils.EscapeMarkdownV2Code(path))
+	fmt.Fprintf(&text, "📍 *ĐƯỜNG DẪN:* `%s`\n\n", utils.EscapeMarkdownV2Code(path))
 
 	if len(files) == 0 {
-		text.WriteString("📭 _Folder ini kosong_\n")
+		text.WriteString("📭 _Thư mục này trống_\n")
 	} else {
 		folderCount := 0
 		fileCount := 0
@@ -59,7 +59,7 @@ func (s *BotService) FormatDriveFileList(path string, files []DriveFile) string 
 		}
 
 		if len(folders) > 0 {
-			text.WriteString("📁 *FOLDERS*\n")
+			text.WriteString("📁 *THƯ MỤC*\n")
 			for _, f := range folders {
 				text.WriteString(f + "\n")
 			}
@@ -78,16 +78,16 @@ func (s *BotService) FormatDriveFileList(path string, files []DriveFile) string 
 		}
 
 		if len(fileList) > 0 {
-			text.WriteString("📄 *FILES*\n")
+			text.WriteString("📄 *FILE*\n")
 			for _, f := range fileList {
 				text.WriteString(f + "\n")
 			}
 			text.WriteString("\n")
 		}
 
-		text.WriteString("📊 *SUMMARY*\n")
-		fmt.Fprintf(&text, "📂 Folders: `%d`\n", folderCount)
-		fmt.Fprintf(&text, "📄 Files: `%d`\n", fileCount)
+		text.WriteString("📊 *TỔNG KẾT*\n")
+		fmt.Fprintf(&text, "📂 Thư mục: `%d`\n", folderCount)
+		fmt.Fprintf(&text, "📄 File: `%d`\n", fileCount)
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")

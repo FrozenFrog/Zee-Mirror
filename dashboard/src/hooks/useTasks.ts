@@ -20,17 +20,17 @@ const useTasks = (token: string) => {
   const cancelTask = async (id: string) => {
     if (
       await showConfirm(
-        'Cancel Task',
-        'Terminate this distribution process? This action cannot be reversed.',
+        'Hủy Task',
+        'Dừng tiến trình này? Thao tác này không thể hoàn tác.',
       )
     ) {
       try {
         await api.delete(`/api/tasks?id=${id}`)
-        showToast('Task terminated successfully', 'success')
+        showToast('Đã hủy Task thành công', 'success')
         fetchTasks()
       } catch (err) {
         console.error(err)
-        showToast('Failed to terminate task', 'error')
+        showToast('Không thể hủy Task', 'error')
       }
     }
   }

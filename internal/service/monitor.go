@@ -75,30 +75,30 @@ func (s *BotService) GetDiskStats(path string) (total, used, free uint64) {
 func (s *BotService) FormatSystemStats(stats SystemStats) string {
 	var content strings.Builder
 
-	content.WriteString("⏱️ *RUNTIME*\n")
-	fmt.Fprintf(&content, "• Uptime: `%s`\n", utils.EscapeMarkdownV2(formatUptime(stats.Uptime)))
-	fmt.Fprintf(&content, "• Started: `%s`\n", utils.EscapeMarkdownV2(stats.StartTime.Format("02 Jan 15:04")))
+	content.WriteString("⏱️ *THỜI GIAN CHẠY*\n")
+	fmt.Fprintf(&content, "• Thời gian hoạt động: `%s`\n", utils.EscapeMarkdownV2(formatUptime(stats.Uptime)))
+	fmt.Fprintf(&content, "• Khởi động lúc: `%s`\n", utils.EscapeMarkdownV2(stats.StartTime.Format("02 Jan 15:04")))
 	fmt.Fprintf(&content, "• Goroutines: `%d`\n\n", stats.GoRoutines)
 
-	content.WriteString("📥 *TASKS*\n")
-	fmt.Fprintf(&content, "• Active: `%d`\n", stats.ActiveTasks)
-	fmt.Fprintf(&content, "• Queued: `%d`\n\n", stats.QueuedTasks)
+	content.WriteString("📥 *TASK*\n")
+	fmt.Fprintf(&content, "• Đang chạy: `%d`\n", stats.ActiveTasks)
+	fmt.Fprintf(&content, "• Trong hàng đợi: `%d`\n\n", stats.QueuedTasks)
 
-	content.WriteString("💾 *MEMORY USAGE*\n")
+	content.WriteString("💾 *BỘ NHỚ*\n")
 	memBar := createUsageBar(float64(stats.MemoryUsed)/float64(stats.MemoryTotal)*100, 12)
-	fmt.Fprintf(&content, "• Used: `%s / %s`\n",
+	fmt.Fprintf(&content, "• Đã dùng: `%s / %s`\n",
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryUsed)),
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryTotal)))
 	fmt.Fprintf(&content, "%s\n\n", utils.EscapeMarkdownV2(memBar))
 
-	content.WriteString("💿 *DISK STORAGE*\n")
+	content.WriteString("💿 *Ổ ĐĨA*\n")
 	diskBar := createUsageBar(stats.DiskUsage, 12)
-	fmt.Fprintf(&content, "• Used: `%s / %s`\n",
+	fmt.Fprintf(&content, "• Đã dùng: `%s / %s`\n",
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.DiskUsed)),
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.DiskTotal)))
 	content.WriteString(utils.EscapeMarkdownV2(diskBar))
 
-	return ProfessionalMessage("SYSTEM RESOURCES", content.String())
+	return ProfessionalMessage("TÀI NGUYÊN HỆ THỐNG", content.String())
 }
 
 func formatUptime(d time.Duration) string {
@@ -150,11 +150,11 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 	aria2Check := HealthCheck{Name: "Aria2"}
 	if _, err := os.Stat("/usr/bin/aria2c"); err == nil {
 		aria2Check.Status = IconOK
-		aria2Check.Message = "Aria2 binary found"
+		aria2Check.Message = "Đã tìm thấy binary Aria2"
 		aria2Check.Healthy = true
 	} else {
 		aria2Check.Status = "⚠️ WARNING"
-		aria2Check.Message = "Aria2 binary not found"
+		aria2Check.Message = "Không tìm thấy binary Aria2"
 		aria2Check.Healthy = true
 	}
 	checks = append(checks, aria2Check)
@@ -162,29 +162,29 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 	rcloneCheck := HealthCheck{Name: "Rclone"}
 	if _, err := os.Stat(s.TaskManager.ConfigDir + "/rclone.conf"); err == nil {
 		rcloneCheck.Status = IconOK
-		rcloneCheck.Message = "Config file found"
+		rcloneCheck.Message = "Đã có file cấu hình"
 		rcloneCheck.Healthy = true
 	} else {
 		rcloneCheck.Status = IconError
-		rcloneCheck.Message = "Config file missing"
+		rcloneCheck.Message = "Thiếu file cấu hình"
 		rcloneCheck.Healthy = false
 	}
 	checks = append(checks, rcloneCheck)
 
-	diskCheck := HealthCheck{Name: "Disk Space"}
+	diskCheck := HealthCheck{Name: "Dung lượng đĩa"}
 	diskUsage := s.getDiskUsageOS()
 	switch {
 	case diskUsage < 85:
 		diskCheck.Status = IconOK
-		diskCheck.Message = fmt.Sprintf("%.1f%% used", diskUsage)
+		diskCheck.Message = fmt.Sprintf("Đã dùng %.1f%%", diskUsage)
 		diskCheck.Healthy = true
 	case diskUsage < 95:
 		diskCheck.Status = "⚠️ WARNING"
-		diskCheck.Message = fmt.Sprintf("%.1f%% used - Low space", diskUsage)
+		diskCheck.Message = fmt.Sprintf("Đã dùng %.1f%% - Sắp hết dung lượng", diskUsage)
 		diskCheck.Healthy = true
 	default:
 		diskCheck.Status = "❌ CRITICAL"
-		diskCheck.Message = fmt.Sprintf("%.1f%% used - Very low!", diskUsage)
+		diskCheck.Message = fmt.Sprintf("Đã dùng %.1f%% - Gần hết dung lượng!", diskUsage)
 		diskCheck.Healthy = false
 	}
 	checks = append(checks, diskCheck)
@@ -193,23 +193,23 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 	ctx := context.Background()
 	if err := s.DB.Ping(ctx); err == nil {
 		dbCheck.Status = IconOK
-		dbCheck.Message = "SQLite connection OK"
+		dbCheck.Message = "Kết nối database ổn định"
 		dbCheck.Healthy = true
 	} else {
 		dbCheck.Status = IconError
-		dbCheck.Message = "Database error"
+		dbCheck.Message = "Lỗi database"
 		dbCheck.Healthy = false
 	}
 	checks = append(checks, dbCheck)
 
-	dlCheck := HealthCheck{Name: "Download Dir"}
+	dlCheck := HealthCheck{Name: "Thư mục tải xuống"}
 	if info, err := os.Stat(s.Config.DownloadDir); err == nil && info.IsDir() {
 		dlCheck.Status = IconOK
-		dlCheck.Message = "Directory accessible"
+		dlCheck.Message = "Truy cập được thư mục"
 		dlCheck.Healthy = true
 	} else {
 		dlCheck.Status = IconError
-		dlCheck.Message = "Directory not accessible"
+		dlCheck.Message = "Không truy cập được thư mục"
 		dlCheck.Healthy = false
 	}
 	checks = append(checks, dlCheck)
@@ -228,12 +228,12 @@ func (s *BotService) FormatHealthCheck(checks []HealthCheck) string {
 		}
 	}
 
-	status := "🟢 *SYSTEMS NORMAL*"
+	status := "🟢 *HỆ THỐNG BÌNH THƯỜNG*"
 	if !allHealthy {
-		status = "🔴 *ISSUES DETECTED*"
+		status = "🔴 *PHÁT HIỆN SỰ CỐ*"
 	}
 
-	fmt.Fprintf(&content, "STATUS: %s\n%s\n\n", status, CompactSeparator)
+	fmt.Fprintf(&content, "TRẠNG THÁI: %s\n%s\n\n", status, CompactSeparator)
 
 	for _, c := range checks {
 		icon := "✅"
@@ -249,9 +249,9 @@ func (s *BotService) FormatHealthCheck(checks []HealthCheck) string {
 		fmt.Fprintf(&content, "└ _%s_\n", utils.EscapeMarkdownV2(c.Message))
 	}
 
-	fmt.Fprintf(&content, "\n%s\n🕐 Checked: `%s`", CompactSeparator, utils.EscapeMarkdownV2(time.Now().Format("15:04:05")))
+	fmt.Fprintf(&content, "\n%s\n🕐 Kiểm tra lúc: `%s`", CompactSeparator, utils.EscapeMarkdownV2(time.Now().Format("15:04:05")))
 
-	return ProfessionalMessage("HEALTH CHECK", content.String())
+	return ProfessionalMessage("KIỂM TRA HỆ THỐNG", content.String())
 }
 
 func (s *BotService) PerformDiskCleanup() {

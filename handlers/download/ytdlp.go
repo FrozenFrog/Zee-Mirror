@@ -19,7 +19,7 @@ import (
 
 func HandleYTDLP(s *service.BotService, message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 
@@ -48,7 +48,7 @@ func HandleYTDLP(s *service.BotService, message *tgbotapi.Message, args string) 
 
 func HandleYTDLPLeech(s *service.BotService, message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 
@@ -76,7 +76,7 @@ func HandleYTDLPLeech(s *service.BotService, message *tgbotapi.Message, args str
 
 func handleYTDLPGeneric(s *service.BotService, message *tgbotapi.Message, args string, taskType service.TaskType) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.Reply(message, GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 
@@ -204,7 +204,7 @@ func buildYTDLPKeyboard(_ []int, _ map[int]downloader.FormatInfo, _ string) tgbo
 
 func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
 	if len(parts) < 3 {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Sesi kadaluarsa"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên đã hết hạn"))
 		return
 	}
 
@@ -223,11 +223,11 @@ func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.Callb
 	s.TaskManager.Mu.Unlock()
 
 	if !exists {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Sesi tidak ditemukan"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không tìm thấy phiên"))
 		return
 	}
 
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Memulai download..."))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Bắt đầu tải xuống..."))
 
 	s.TaskManager.Mu.Lock()
 	s.TaskManager.LastStatusMsg[callback.Message.Chat.ID] = callback.Message.MessageID
@@ -240,7 +240,7 @@ func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.Callb
 	fileName := session.FileName
 
 	if err := s.CheckQuota(callback.From.ID); err != nil {
-		_, _ = s.Bot.Send(tgbotapi.NewMessage(callback.Message.Chat.ID, GetErrorMessage("QUOTA EXCEEDED", err.Error())))
+		_, _ = s.Bot.Send(tgbotapi.NewMessage(callback.Message.Chat.ID, GetErrorMessage("VƯỢT HẠN MỨC", err.Error())))
 		return
 	}
 
@@ -268,12 +268,12 @@ func handleYTDLPPlaylist(s *service.BotService, message *tgbotapi.Message, url, 
 	}
 
 	if len(metadata.Entries) == 0 {
-		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, "❌ *Error*\n\nPlaylist kosong atau tidak ditemukan video\\.")
+		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, "❌ *Lỗi*\n\nPlaylist trống hoặc không tìm thấy video nào\\.")
 		return
 	}
 
 	totalItems := len(metadata.Entries)
-	s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, fmt.Sprintf("✅ *Playlist Diterima*\n\n🏷️ *Judul:* %s\n📦 *Jumlah Item:* %d\n\nSedang memproses item playlist\\.\\.\\.", utils.EscapeMarkdownV2(metadata.Title), totalItems))
+	s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, fmt.Sprintf("✅ *Đã nhận Playlist*\n\n🏷️ *Tiêu đề:* %s\n📦 *Số mục:* %d\n\nĐang xử lý các mục trong Playlist\\.\\.\\.", utils.EscapeMarkdownV2(metadata.Title), totalItems))
 
 	go handlePlaylistDownload(s, message, metadata, name, zip, password, quality, subs, hardsub, taskType)
 }

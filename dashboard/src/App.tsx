@@ -17,6 +17,7 @@ import useTasks from './hooks/useTasks'
 import useSystemStats from './hooks/useSystemStats'
 import { usePopups } from './hooks/usePopups'
 import { Task } from './types'
+import { statusLabel } from './utils/format'
 import { Activity } from 'lucide-react'
 
 
@@ -52,7 +53,7 @@ const TasksPage = ({
         <div className="relative w-full md:w-96 group">
           <input
             type="text"
-            placeholder="Search tasks..."
+            placeholder="Tìm kiếm Task..."
             className="w-full bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-white/5 p-4 pl-12 rounded-2xl outline-none focus:ring-4 ring-primary/10 transition-all"
             onChange={(e) => {
               const term = e.target.value.toLowerCase()
@@ -73,7 +74,7 @@ const TasksPage = ({
                 : 'bg-white dark:bg-zinc-900/60 text-slate-400 border border-slate-200 dark:border-white/5 hover:bg-slate-50'
                 }`}
             >
-              {s}
+              {statusLabel(s)}
             </button>
           ))}
         </div>
@@ -96,7 +97,7 @@ const TasksPage = ({
             <Activity size={48} className="text-slate-400" />
           </div>
           <h4 className="text-xl font-black uppercase tracking-widest text-slate-400">
-            No matches found
+            Không tìm thấy kết quả phù hợp
           </h4>
         </div>
       )}
@@ -221,8 +222,8 @@ const App = () => {
   const onLogout = async () => {
     if (
       await showConfirm(
-        'Secure Disconnect',
-        'Are you sure you want to disconnect from the Cloud Engine? Active sessions will be terminated.',
+        'Đăng xuất',
+        'Bạn có chắc muốn đăng xuất khỏi hệ thống? Phiên làm việc hiện tại sẽ bị kết thúc.',
       )
     ) {
       localStorage.removeItem('api_token')

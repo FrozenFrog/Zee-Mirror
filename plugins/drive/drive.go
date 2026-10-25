@@ -49,7 +49,7 @@ func (e *Engine) CanHandle(url string) bool {
 func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir string, onProgress func(downloader.ProgressUpdate)) error {
 	driveID, isFolderHint := ExtractDriveID(task.URL)
 	if driveID == "" {
-		return fmt.Errorf("no Google Drive ID in URL: %s", task.URL)
+		return fmt.Errorf("không tìm thấy ID Google Drive trong URL: %s", task.URL)
 	}
 
 	configPath := filepath.Join(e.Config.ConfigDir, "rclone.conf")
@@ -86,7 +86,7 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	stderr, _ := cmd.StderrPipe()
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("rclone failed to start: %w", err)
+		return fmt.Errorf("không khởi động được rclone: %w", err)
 	}
 
 	scanner := bufio.NewScanner(stderr)
@@ -104,7 +104,7 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("rclone download failed: %w", err)
+		return fmt.Errorf("rclone tải xuống thất bại: %w", err)
 	}
 
 	return nil

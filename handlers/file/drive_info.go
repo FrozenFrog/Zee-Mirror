@@ -100,16 +100,16 @@ func generateIndexLink(s *service.BotService, targetPath string) string {
 
 func buildFileInfoMessage(relPath string, file service.DriveFile) string {
 	var text strings.Builder
-	fmt.Fprintf(&text, "%s *FILE INFORMATION*\n", getFileIcon(relPath))
+	fmt.Fprintf(&text, "%s *THÔNG TIN FILE*\n", getFileIcon(relPath))
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&text, "📄 *Name:* `%s`\n", utils.EscapeMarkdownV2(filepath.Base(relPath)))
+	fmt.Fprintf(&text, "📄 *Tên:* `%s`\n", utils.EscapeMarkdownV2(filepath.Base(relPath)))
 
 	if file.Name != "" {
-		fmt.Fprintf(&text, "📦 *Size:* `%s`\n", utils.EscapeMarkdownV2(utils.FormatBytes(file.Size)))
-		fmt.Fprintf(&text, "🕒 *Modified:* `%s`\n", utils.EscapeMarkdownV2(file.ModTime))
+		fmt.Fprintf(&text, "📦 *Dung lượng:* `%s`\n", utils.EscapeMarkdownV2(utils.FormatBytes(file.Size)))
+		fmt.Fprintf(&text, "🕒 *Sửa đổi:* `%s`\n", utils.EscapeMarkdownV2(file.ModTime))
 		fmt.Fprintf(&text, "🏷️ *MimeType:* `%s`\n", utils.EscapeMarkdownV2(file.MimeType))
 	} else {
-		text.WriteString("_Metadata limited atau rclone sedang sibuk_\n")
+		text.WriteString("_Metadata bị hạn chế hoặc Rclone đang bận_\n")
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")

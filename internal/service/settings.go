@@ -85,9 +85,9 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 		_ = s.DB.Set(ctx, "auto_delete_messages", fmt.Sprintf("%v", status))
 
 		if status {
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Auto Delete: ON"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Tự động xóa: BẬT"))
 		} else {
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Auto Delete: OFF"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Tự động xóa: TẮT"))
 		}
 
 	case "default_mirror":
@@ -95,35 +95,39 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 		s.Settings.DefaultMode = string(TypeMirror)
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "default_mode", string(TypeMirror))
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📥 Default: Mirror"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📥 Mặc định: Mirror"))
 
 	case "default_leech":
 		s.Settings.Mu.Lock()
 		s.Settings.DefaultMode = string(TypeLeech)
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "default_mode", string(TypeLeech))
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔗 Default: Leech"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔗 Mặc định: Leech"))
 
 	case "quality_720":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "720p"
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "ytdlp_quality", "720p")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Quality: 720p"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Chất lượng: 720p"))
 
 	case "quality_1080":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "1080p"
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "ytdlp_quality", "1080p")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Quality: 1080p"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Chất lượng: 1080p"))
 
 	case "quality_2160":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "2160p"
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "ytdlp_quality", "2160p")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Quality: 4K (2160p)"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Chất lượng: 4K (2160p)"))
+
+	case "lang_vi":
+		_ = s.DB.SetLanguage(ctx, callback.From.ID, "vi")
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🇻🇳 Ngôn ngữ: Tiếng Việt"))
 
 	case "lang_id":
 		_ = s.DB.SetLanguage(ctx, callback.From.ID, "id")
@@ -160,9 +164,9 @@ func (s *BotService) formatSettingsMessage(userID int64) string {
 
 	lang := s.GetUserLanguage(userID)
 
-	autoDeleteStatus := "❌ OFF"
+	autoDeleteStatus := "❌ TẮT"
 	if s.Settings.AutoDeleteMessages {
-		autoDeleteStatus = "✅ ON"
+		autoDeleteStatus = "✅ BẬT"
 	}
 
 	defaultModeEmoji := "📥"
@@ -170,9 +174,12 @@ func (s *BotService) formatSettingsMessage(userID int64) string {
 		defaultModeEmoji = "🔗"
 	}
 
-	langFlag := "🇮🇩"
-	langName := "Indonesia"
+	langFlag := "🇻🇳"
+	langName := "Tiếng Việt"
 	switch lang {
+	case "id":
+		langFlag = "🇮🇩"
+		langName = "Indonesia"
 	case "en":
 		langFlag = "🇺🇸"
 		langName = "English"
@@ -245,6 +252,9 @@ func (s *BotService) getSettingsKeyboard(userID int64) tgbotapi.InlineKeyboardMa
 
 func languageKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🇻🇳 Tiếng Việt", "settings:lang_vi"),
+		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("🇺🇸 English", "settings:lang_en"),
 			tgbotapi.NewInlineKeyboardButtonData("🇮🇩 Indonesia", "settings:lang_id"),

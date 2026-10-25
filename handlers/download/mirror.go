@@ -14,7 +14,7 @@ import (
 
 func HandleMirror(s *service.BotService, message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 	url, zip, unzip, password, quality, name, _, _ := utils.ParseFlags(args)
@@ -68,7 +68,7 @@ func HandleMirror(s *service.BotService, message *tgbotapi.Message, args string)
 		slog.Info("Mirror task created", "taskID", task.ID, "url", url)
 
 		confirmMsg := tgbotapi.NewMessage(message.Chat.ID,
-			service.GetSuccessMessage("TASK QUEUED",
+			service.GetSuccessMessage("ĐÃ THÊM VÀO HÀNG ĐỢI",
 				fmt.Sprintf("Task: `%s`\nFile: `%s`",
 					task.ID, utils.EscapeMarkdownV2(fileName))))
 		confirmMsg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -89,7 +89,7 @@ func HandleMirror(s *service.BotService, message *tgbotapi.Message, args string)
 
 func HandleLeech(s *service.BotService, message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.Reply(message, GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 
@@ -147,7 +147,7 @@ func HandleLeech(s *service.BotService, message *tgbotapi.Message, args string) 
 		slog.Info("Leech task created", "taskID", task.ID, "url", url)
 
 		confirmMsg := tgbotapi.NewMessage(message.Chat.ID,
-			service.GetSuccessMessage("TASK QUEUED",
+			service.GetSuccessMessage("ĐÃ THÊM VÀO HÀNG ĐỢI",
 				fmt.Sprintf("Task: `%s`\nFile: `%s`",
 					task.ID, utils.EscapeMarkdownV2(fileName))))
 		confirmMsg.ParseMode = tgbotapi.ModeMarkdownV2

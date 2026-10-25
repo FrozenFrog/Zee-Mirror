@@ -86,17 +86,17 @@ func HandleStorages(s *service.BotService, message *tgbotapi.Message) {
 
 	providers, err := GetAvailableStorages(s)
 	if err != nil {
-		s.Reply(message, fmt.Sprintf("❌ *Gagal mendapatkan daftar storage*\n\n%s", utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, fmt.Sprintf("❌ *Không lấy được danh sách lưu trữ*\n\n%s", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
 	if len(providers) == 0 {
-		s.Reply(message, "📭 *Tidak ada storage yang dikonfigurasi*\n\nTambahkan remote di rclone\\.conf")
+		s.Reply(message, "📭 *Chưa cấu hình lưu trữ nào*\n\nHãy thêm Remote vào rclone\\.conf")
 		return
 	}
 
 	var text strings.Builder
-	text.WriteString("💾 *Available Storage Providers*\n")
+	text.WriteString("💾 *Các nhà cung cấp lưu trữ khả dụng*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	for _, p := range providers {
@@ -104,8 +104,8 @@ func HandleStorages(s *service.BotService, message *tgbotapi.Message) {
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	text.WriteString("*Current:* `" + utils.EscapeMarkdownV2Code(s.TaskManager.RcloneDest) + "`\n\n")
-	text.WriteString("Pilih storage untuk upload\\:")
+	text.WriteString("*Hiện tại:* `" + utils.EscapeMarkdownV2Code(s.TaskManager.RcloneDest) + "`\n\n")
+	text.WriteString("Chọn nơi lưu trữ để tải lên\\:")
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text.String())
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -134,12 +134,12 @@ func HandleStorageCallback(s *service.BotService, callback *tgbotapi.CallbackQue
 	case service.CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Closed"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
 	}
 }
 
 func handleStorageSelect(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName string) {
-	text := fmt.Sprintf("💾 *Storage: %s*\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nPilih aksi:", utils.EscapeMarkdownV2(storageName))
+	text := fmt.Sprintf("💾 *Lưu trữ: %s*\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nChọn thao tác:", utils.EscapeMarkdownV2(storageName))
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -161,7 +161,7 @@ func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery
 	output, err := cmd.Output()
 
 	if err != nil {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Failed to browse"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không duyệt được"))
 		return
 	}
 
@@ -179,7 +179,7 @@ func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery
 
 	for i, f := range files {
 		if i >= 15 {
-			fmt.Fprintf(&text, "\n_\\.\\.\\. dan %d item lainnya_", len(files)-15)
+			fmt.Fprintf(&text, "\n_\\.\\.\\. và %d mục khác_", len(files)-15)
 			break
 		}
 		icon := "📄"
@@ -204,22 +204,22 @@ func handleStorageInfo(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 	output, err := cmd.Output()
 
 	var text strings.Builder
-	fmt.Fprintf(&text, "ℹ️ *Storage Info: %s*\n", utils.EscapeMarkdownV2(storageName))
+	fmt.Fprintf(&text, "ℹ️ *Thông tin lưu trữ: %s*\n", utils.EscapeMarkdownV2(storageName))
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	if err != nil {
-		text.WriteString("_Info tidak tersedia_\n")
+		text.WriteString("_Không có thông tin_\n")
 	} else {
 		var info map[string]interface{}
 		if jsonErr := json.Unmarshal(output, &info); jsonErr == nil {
 			if total, ok := info["total"].(float64); ok {
-				fmt.Fprintf(&text, "📊 *Total:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(total))))
+				fmt.Fprintf(&text, "📊 *Tổng:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(total))))
 			}
 			if used, ok := info["used"].(float64); ok {
-				fmt.Fprintf(&text, "💾 *Used:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(used))))
+				fmt.Fprintf(&text, "💾 *Đã dùng:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(used))))
 			}
 			if free, ok := info["free"].(float64); ok {
-				fmt.Fprintf(&text, "✅ *Free:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(free))))
+				fmt.Fprintf(&text, "✅ *Còn trống:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(free))))
 			}
 		}
 	}
@@ -231,19 +231,19 @@ func handleStorageInfo(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 
 func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args string) {
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, "❌ *Akses Ditolak*")
+		s.Reply(message, "❌ *Truy cập bị từ chối*")
 		return
 	}
 
 	if args == "" {
-		s.Reply(message, "⚠️ *Format Salah*\n\nGunakan: `/setstorage remote:/path`\n\nContoh: `/setstorage gdrive:/MyMirror`")
+		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/setstorage remote:/path`\n\nVí dụ: `/setstorage gdrive:/MyMirror`")
 		return
 	}
 
 	remoteName := strings.Split(args, ":")[0]
 	providers, err := GetAvailableStorages(s)
 	if err != nil {
-		s.Reply(message, "❌ *Gagal validasi storage*")
+		s.Reply(message, "❌ *Xác thực lưu trữ thất bại*")
 		return
 	}
 
@@ -256,7 +256,7 @@ func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args str
 	}
 
 	if !found {
-		s.Reply(message, fmt.Sprintf("❌ *Remote tidak ditemukan:* `%s`", utils.EscapeMarkdownV2(remoteName)))
+		s.Reply(message, fmt.Sprintf("❌ *Không tìm thấy Remote:* `%s`", utils.EscapeMarkdownV2(remoteName)))
 		return
 	}
 
@@ -264,5 +264,5 @@ func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args str
 	ctx := context.Background()
 	_ = s.DB.Set(ctx, "rclone_dest", args)
 
-	s.Reply(message, fmt.Sprintf("✅ *Storage Updated*\n\n📂 Destination: `%s`", utils.EscapeMarkdownV2Code(args)))
+	s.Reply(message, fmt.Sprintf("✅ *Đã cập nhật lưu trữ*\n\n📂 Đích: `%s`", utils.EscapeMarkdownV2Code(args)))
 }

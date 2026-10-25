@@ -16,7 +16,7 @@ const (
 func StartHandler(s *service.BotService, message *tgbotapi.Message) {
 	userName := message.From.FirstName
 	if userName == "" {
-		userName = "User"
+		userName = "bạn"
 	}
 
 	lang := s.GetUserLanguage(message.From.ID)
@@ -50,7 +50,7 @@ func HelpHandler(s *service.BotService, message *tgbotapi.Message) {
 	if sentMsg, err := s.Bot.Send(msg); err != nil {
 		slog.Error("Error sending help message", "error", err)
 		msg.ParseMode = ""
-		msg.Text = "📖 Panduan Bantuan\n\nSilakan pilih kategori di bawah:"
+		msg.Text = "📖 Hướng dẫn sử dụng\n\nVui lòng chọn danh mục bên dưới:"
 		_, _ = s.Bot.Send(msg)
 	} else {
 		s.AutoDeleteMessage(message.Chat.ID, sentMsg.MessageID, 60*time.Second)

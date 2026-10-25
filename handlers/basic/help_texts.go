@@ -23,8 +23,8 @@ func SetRegisteredCommands(commands []HelpCommandEntry) {
 func GetHelpMirror() string {
 	return service.HelpDetailMessage(
 		"📥 MIRROR",
-		"Upload file dari URL langsung ke Google Drive\\.\nFile akan disimpan di cloud storage tanpa menyimpan di server\\.",
-		"• `/mirror` atau `/m` <URL\\> ─ Download dan upload ke Drive\n• Reply ke file dengan `/mirror`\n\n⚙️ *FLAGS OPSIONAL*\n• `\\-n <nama\\>` ─ Rename file\n• `\\-z` ─ Zip file sebelum upload\n• `\\-uz` ─ Unzip setelah download\n• `\\-p <pass\\>` ─ Password zip/unzip",
+		"Tải file từ URL rồi upload thẳng lên Google Drive\\.\nFile được lưu trên cloud storage, không lưu lại trên server\\.",
+		"• `/mirror` hoặc `/m` <URL\\> ─ Tải và upload lên Drive\n• Reply vào file với `/mirror`\n\n⚙️ *FLAG TÙY CHỌN*\n• `\\-n <tên\\>` ─ Đổi tên file\n• `\\-z` ─ Nén zip trước khi upload\n• `\\-uz` ─ Giải nén sau khi tải xuống\n• `\\-p <pass\\>` ─ Mật khẩu zip/unzip",
 		"`/mirror https://example\\.com/file\\.zip`\n`/mirror \\-n \"My File\\.zip\" https://example\\.com/file\\.zip`\n`/mirror \\-z https://example\\.com/folder`\n`/mirror \\-uz \\-p secret https://file\\.rar`",
 		"",
 	)
@@ -33,8 +33,8 @@ func GetHelpMirror() string {
 func GetHelpLeech() string {
 	return service.HelpDetailMessage(
 		"📤 LEECH",
-		"Download file dari URL ke server bot\\.\nFile akan dikirim langsung ke chat Telegram setelah selesai\\.",
-		"• `/leech` atau `/l` <URL\\> ─ Download ke server\n• Reply ke file dengan `/leech`\n\n⚙️ *FLAGS OPSIONAL*\n• `\\-n <nama\\>` ─ Rename file\n• `\\-z` ─ Zip file sebelum kirim\n• `\\-uz` ─ Unzip setelah download\n• `\\-p <pass\\>` ─ Password zip/unzip",
+		"Tải file từ URL về server bot\\.\nFile sẽ được gửi thẳng vào chat Telegram khi hoàn tất\\.",
+		"• `/leech` hoặc `/l` <URL\\> ─ Tải về server\n• Reply vào file với `/leech`\n\n⚙️ *FLAG TÙY CHỌN*\n• `\\-n <tên\\>` ─ Đổi tên file\n• `\\-z` ─ Nén zip trước khi gửi\n• `\\-uz` ─ Giải nén sau khi tải xuống\n• `\\-p <pass\\>` ─ Mật khẩu zip/unzip",
 		"`/leech https://example\\.com/video\\.mp4`\n`/leech \\-n \"My Video\\.mp4\" https://example\\.com/video\\.mp4`\n`/leech \\-uz https://archive\\.rar`",
 		"",
 	)
@@ -43,8 +43,8 @@ func GetHelpLeech() string {
 func GetHelpYTDLP() string {
 	return service.HelpDetailMessage(
 		"🎬 YT-DLP MIRROR",
-		"Download video/audio dari 1000\\+ situs langsung ke Drive\\.\nSupport: YouTube, TikTok, Twitter/X, Instagram, Facebook, Vimeo, dll\\.",
-		"• `/ytdlp` atau `/y` <URL\\> ─ Download dengan pilihan kualitas\n\n⚙️ *FLAGS OPSIONAL*\n• `\\-q <quality\\>` ─ Pilih kualitas \\(best, 1080p, 720p\\)\n• `\\-n <nama\\>` ─ Rename file\n• `\\-z` ─ Zip file\n• `\\-p <pass\\>` ─ Password zip\n\n✨ *FITUR*\n• Pilih kualitas video \\(360p\\-8K\\)\n• Download audio only \\(MP3\\)\n• Subtitle otomatis",
+		"Tải video/audio từ hơn 1000 trang web thẳng lên Drive\\.\nHỗ trợ: YouTube, TikTok, Twitter/X, Instagram, Facebook, Vimeo, v\\.v\\.",
+		"• `/ytdlp` hoặc `/y` <URL\\> ─ Tải xuống, có chọn chất lượng\n\n⚙️ *FLAG TÙY CHỌN*\n• `\\-q <quality\\>` ─ Chọn chất lượng \\(best, 1080p, 720p\\)\n• `\\-n <tên\\>` ─ Đổi tên file\n• `\\-z` ─ Nén zip\n• `\\-p <pass\\>` ─ Mật khẩu zip\n\n✨ *TÍNH NĂNG*\n• Chọn chất lượng video \\(360p\\-8K\\)\n• Chỉ tải audio \\(MP3\\)\n• Phụ đề tự động",
 		"`/ytdlp https://youtube\\.com/watch?v=xxxxx`\n`/ytdlp \\-q 1080p https://tiktok\\.com/@user/video/123`",
 		"",
 	)
@@ -53,8 +53,8 @@ func GetHelpYTDLP() string {
 func GetHelpYTDLPLeech() string {
 	return service.HelpDetailMessage(
 		"🎬 YT-DLP LEECH",
-		"Download video/audio dari 1000\\+ situs langsung ke Telegram\\.\nSupport: YouTube, TikTok, Twitter/X, Instagram, Facebook, Vimeo, dll\\.",
-		"• `/ytdlpleech` atau `/yl` <URL\\> ─ Download ke Telegram\n\n⚙️ *FLAGS OPSIONAL*\n• `\\-q <quality\\>` ─ Pilih kualitas \\(best, 1080p, 720p\\)\n• `\\-n <nama\\>` ─ Rename file\n• `\\-z` ─ Zip file\n• `\\-p <pass\\>` ─ Password zip\n\n✨ *FITUR*\n• Pilih kualitas video \\(360p\\-8K\\)\n• Kirim sebagai video Telegram",
+		"Tải video/audio từ hơn 1000 trang web thẳng về Telegram\\.\nHỗ trợ: YouTube, TikTok, Twitter/X, Instagram, Facebook, Vimeo, v\\.v\\.",
+		"• `/ytdlpleech` hoặc `/yl` <URL\\> ─ Tải về Telegram\n\n⚙️ *FLAG TÙY CHỌN*\n• `\\-q <quality\\>` ─ Chọn chất lượng \\(best, 1080p, 720p\\)\n• `\\-n <tên\\>` ─ Đổi tên file\n• `\\-z` ─ Nén zip\n• `\\-p <pass\\>` ─ Mật khẩu zip\n\n✨ *TÍNH NĂNG*\n• Chọn chất lượng video \\(360p\\-8K\\)\n• Gửi dưới dạng video Telegram",
 		"`/ytdlpleech https://youtube\\.com/watch?v=xxxxx`",
 		"",
 	)
@@ -63,8 +63,8 @@ func GetHelpYTDLPLeech() string {
 func GetHelpViking() string {
 	return service.HelpDetailMessage(
 		"⚔️ VIKING FILE",
-		"Download dari URL dan upload ke ViKiNG FiLE\\.\nSupport anonymous upload atau user upload jika hash di-set\\.",
-		"• `/viking` atau `/v` <URL\\> ─ Upload ke Viking\n\n⚙️ *FLAGS OPSIONAL*\n• `\\-n <nama\\>` ─ Rename file\n• `\\-z` ─ Zip file\n• `\\-p <pass\\>` ─ Password zip",
+		"Tải từ URL rồi upload lên ViKiNG FiLE\\.\nHỗ trợ upload ẩn danh, hoặc upload theo tài khoản nếu đã đặt hash\\.",
+		"• `/viking` hoặc `/v` <URL\\> ─ Upload lên Viking\n\n⚙️ *FLAG TÙY CHỌN*\n• `\\-n <tên\\>` ─ Đổi tên file\n• `\\-z` ─ Nén zip\n• `\\-p <pass\\>` ─ Mật khẩu zip",
 		"`/viking https://example\\.com/file\\.zip`",
 		"",
 	)
@@ -73,18 +73,18 @@ func GetHelpViking() string {
 func GetHelpTorrent() string {
 	return service.HelpDetailMessage(
 		"🧲 TORRENT",
-		"Download file via magnet link atau file torrent \\(\\.torrent\\)\\.\nBot akan otomatis mendeteksi jika Anda mengirim magnet link tanpa command\\.",
-		"• `/torrent` atau `/t` <magnet\\> ─ Download dari magnet\n• Reply ke \\.torrent dengan `/torrent`\n• Kirim magnet link langsung \\(Auto\\-Detect\\)\n\n⚙️ *FLAGS OPSIONAL*\n• `\\-n <nama\\>` ─ Rename file/folder\n• `\\-z` ─ Zip file sebelum upload\n• `\\-uz` ─ Unzip setelah download\n• `\\-p <pass\\>` ─ Password zip/unzip\n\n✨ *FITUR*\n• Support magnet link dan file \\.torrent\n• Multi\\-connection download\n• Resume download",
+		"Tải file qua Magnet link hoặc file torrent \\(\\.torrent\\)\\.\nBot sẽ tự động nhận diện khi bạn gửi Magnet link mà không kèm lệnh\\.",
+		"• `/torrent` hoặc `/t` <magnet\\> ─ Tải từ Magnet\n• Reply vào file \\.torrent với `/torrent`\n• Gửi thẳng Magnet link \\(tự động nhận diện\\)\n\n⚙️ *FLAG TÙY CHỌN*\n• `\\-n <tên\\>` ─ Đổi tên file/thư mục\n• `\\-z` ─ Nén zip trước khi upload\n• `\\-uz` ─ Giải nén sau khi tải xuống\n• `\\-p <pass\\>` ─ Mật khẩu zip/unzip\n\n✨ *TÍNH NĂNG*\n• Hỗ trợ Magnet link và file \\.torrent\n• Tải đa kết nối\n• Tải tiếp khi bị gián đoạn",
 		"`/torrent magnet:?xt=urn:btih:xxxxx`\n`/torrent \\-z magnet:?xt=urn:btih:xxxxx`",
-		"💡 *AUTO\\-DETECT:* Anda bisa langsung mengirim magnet link, bot akan otomatis memprosesnya\\.",
+		"💡 *TỰ ĐỘNG NHẬN DIỆN:* Bạn có thể gửi thẳng Magnet link, bot sẽ tự động xử lý\\.",
 	)
 }
 
 func GetHelpClone() string {
 	return service.HelpDetailMessage(
 		"📋 CLONE",
-		"Clone/salin file atau folder dari Google Drive ke Drive tujuan\\.",
-		"• `/clone` atau `/cl` <drive\\_url\\> ─ Clone ke storage aktif\n\n🔗 *URL YANG DIDUKUNG*\n• `drive\\.google\\.com/file/d/xxx`\n• `drive\\.google\\.com/drive/folders/xxx`\n• `drive\\.google\\.com/open?id=xxx`",
+		"Clone/sao chép file hoặc thư mục từ Google Drive sang Drive đích\\.",
+		"• `/clone` hoặc `/cl` <drive\\_url\\> ─ Clone vào storage đang dùng\n\n🔗 *URL ĐƯỢC HỖ TRỢ*\n• `drive\\.google\\.com/file/d/xxx`\n• `drive\\.google\\.com/drive/folders/xxx`\n• `drive\\.google\\.com/open?id=xxx`",
 		"`/clone https://drive\\.google\\.com/file/d/abc123`",
 		"",
 	)
@@ -93,18 +93,18 @@ func GetHelpClone() string {
 func GetHelpBatch() string {
 	return service.HelpDetailMessage(
 		"📦 BATCH",
-		"Download multiple URLs sekaligus dalam satu batch\\.",
-		"/batch\nURL1\nURL2\nURL3\n\n⚙️ *FLAGS OPSIONAL* \\(First Line\\)\n• `\\-name <name\\>` ─ Set nama batch\n• `\\-z` / `\\-zip` ─ Zip semua hasil\n• `\\-p <pass\\>` ─ Password zip\n• `\\-priority <1\\-10\\>` ─ Set prioritas\n\n✨ *FITUR*\n• Download parallel\n• Progress tracking per URL\n• Auto retry jika gagal",
-		"/batch\nhttps://file1\\.com/a\\.zip\nhttps://file2\\.com/b\\.zip\n\n`/batch \\-name Liburan \\-z`\n`https://photo\\.com/a\\.jpg`\n`https://photo\\.com/b\\.jpg`",
+		"Tải nhiều URL cùng lúc trong một Batch\\.",
+		"/batch\nURL1\nURL2\nURL3\n\n⚙️ *FLAG TÙY CHỌN* \\(dòng đầu tiên\\)\n• `\\-name <tên\\>` ─ Đặt tên Batch\n• `\\-z` / `\\-zip` ─ Nén zip toàn bộ kết quả\n• `\\-p <pass\\>` ─ Mật khẩu zip\n• `\\-priority <1\\-10\\>` ─ Đặt mức ưu tiên\n\n✨ *TÍNH NĂNG*\n• Tải song song\n• Theo dõi tiến độ từng URL\n• Tự động thử lại khi lỗi",
+		"/batch\nhttps://file1\\.com/a\\.zip\nhttps://file2\\.com/b\\.zip\n\n`/batch \\-name DuLich \\-z`\n`https://photo\\.com/a\\.jpg`\n`https://photo\\.com/b\\.jpg`",
 		"",
 	)
 }
 
 func GetHelpSearch() string {
 	return service.HelpDetailMessage(
-		"🔍 SEARCH",
-		"Cari torrent dari berbagai sumber/tracker\\.",
-		"• `/search <keyword\\>` ─ Cari torrent\n\n✨ *FITUR*\n• Multi\\-tracker search\n• Filter hasil\n• Download langsung dari hasil",
+		"🔍 TÌM TORRENT",
+		"Tìm torrent từ nhiều nguồn/tracker\\.",
+		"• `/search <từ khóa\\>` ─ Tìm torrent\n\n✨ *TÍNH NĂNG*\n• Tìm trên nhiều tracker\n• Lọc kết quả\n• Tải trực tiếp từ kết quả",
 		"`/search ubuntu 22\\.04`\n`/search archlinux iso`",
 		"",
 	)
@@ -112,9 +112,9 @@ func GetHelpSearch() string {
 
 func GetHelpStatus() string {
 	return service.HelpDetailMessage(
-		"📊 STATUS",
-		"Melihat semua task yang sedang aktif \\(download/upload\\)\\.",
-		"• `/status` atau `/st` ─ Tampilkan semua task aktif\n\n📋 *INFO DITAMPILKAN*\n• Nama file\n• Progress \\(%\\)\n• Kecepatan download/upload\n• ETA \\(estimasi waktu selesai\\)\n• Status \\(downloading/uploading\\)\n\n🔘 *TOMBOL AKSI*\n• Refresh ─ Update status\n• Cancel ─ Batalkan task",
+		"📊 TRẠNG THÁI",
+		"Xem tất cả task đang chạy \\(tải xuống/upload\\)\\.",
+		"• `/status` hoặc `/st` ─ Hiển thị tất cả task đang chạy\n\n📋 *THÔNG TIN HIỂN THỊ*\n• Tên file\n• Tiến độ \\(%\\)\n• Tốc độ tải xuống/upload\n• ETA \\(thời gian hoàn tất dự kiến\\)\n• Trạng thái \\(đang tải xuống/đang upload\\)\n\n🔘 *NÚT THAO TÁC*\n• Làm mới ─ Cập nhật trạng thái\n• Hủy ─ Hủy task",
 		"`/status`",
 		"",
 	)
@@ -122,9 +122,9 @@ func GetHelpStatus() string {
 
 func GetHelpStats() string {
 	return service.HelpDetailMessage(
-		"📈 STATS",
-		"Melihat statistik penggunaan bot\\.",
-		"• `/stats` ─ Tampilkan statistik\n\n📋 *INFO DITAMPILKAN*\n• Total download\n• Total upload\n• Data yang diproses\n• Uptime bot\n• Task completed/failed",
+		"📈 THỐNG KÊ",
+		"Xem thống kê sử dụng bot\\.",
+		"• `/stats` ─ Hiển thị thống kê\n\n📋 *THÔNG TIN HIỂN THỊ*\n• Tổng lượt tải xuống\n• Tổng lượt upload\n• Dữ liệu đã xử lý\n• Uptime của bot\n• Task hoàn tất/thất bại",
 		"`/stats`",
 		"",
 	)
@@ -132,9 +132,9 @@ func GetHelpStats() string {
 
 func GetHelpSystem() string {
 	return service.HelpDetailMessage(
-		"🖥️ SYSTEM",
-		"Melihat informasi lengkap sistem server\\.",
-		"• `/system` ─ Tampilkan info sistem\n\n📋 *INFO DITAMPILKAN*\n• CPU usage\n• RAM usage\n• Disk space\n• Network stats\n• Uptime server\n• OS info",
+		"🖥️ HỆ THỐNG",
+		"Xem thông tin chi tiết hệ thống server\\.",
+		"• `/system` ─ Hiển thị thông tin hệ thống\n\n📋 *THÔNG TIN HIỂN THỊ*\n• Mức dùng CPU\n• Mức dùng RAM\n• Dung lượng ổ đĩa\n• Thống kê mạng\n• Uptime server\n• Thông tin hệ điều hành",
 		"`/system`",
 		"",
 	)
@@ -142,9 +142,9 @@ func GetHelpSystem() string {
 
 func GetHelpHealth() string {
 	return service.HelpDetailMessage(
-		"🏥 HEALTH",
-		"Mengecek kesehatan semua komponen bot\\.",
-		"• `/health` ─ Cek kesehatan sistem\n\n🔍 *KOMPONEN YANG DICEK*\n• Aria2 daemon\n• Rclone\n• Database\n• Disk space\n• Memory\n• Network connectivity",
+		"🏥 KIỂM TRA HỆ THỐNG",
+		"Kiểm tra tình trạng tất cả thành phần của bot\\.",
+		"• `/health` ─ Kiểm tra tình trạng hệ thống\n\n🔍 *THÀNH PHẦN ĐƯỢC KIỂM TRA*\n• Aria2 daemon\n• Rclone\n• Database\n• Dung lượng ổ đĩa\n• Bộ nhớ\n• Kết nối mạng",
 		"`/health`",
 		"",
 	)
@@ -152,10 +152,10 @@ func GetHelpHealth() string {
 
 func GetHelpLogs() string {
 	return service.HelpDetailMessage(
-		"📜 LOGS",
-		"Melihat log aktivitas bot\\.",
-		"• `/logs` ─ Lihat 50 baris terakhir\n• `/logs <n\\>` ─ Lihat n baris terakhir",
-		"`/logs` ─ Default 50 baris\n`/logs 100` ─ 100 baris terakhir\n`/logs 20` ─ 20 baris terakhir",
+		"📜 LOG",
+		"Xem log hoạt động của bot\\.",
+		"• `/logs` ─ Xem 50 dòng cuối\n• `/logs <n\\>` ─ Xem n dòng cuối",
+		"`/logs` ─ Mặc định 50 dòng\n`/logs 100` ─ 100 dòng cuối\n`/logs 20` ─ 20 dòng cuối",
 		"",
 	)
 }
@@ -163,8 +163,8 @@ func GetHelpLogs() string {
 func GetHelpPing() string {
 	return service.HelpDetailMessage(
 		"🏓 PING",
-		"Mengecek latency/response time bot\\.",
-		"• `/ping` ─ Cek latency\n\n📋 *INFO DITAMPILKAN*\n• Response time \\(ms\\)\n• Bot status",
+		"Kiểm tra độ trễ/thời gian phản hồi của bot\\.",
+		"• `/ping` ─ Kiểm tra độ trễ\n\n📋 *THÔNG TIN HIỂN THỊ*\n• Thời gian phản hồi \\(ms\\)\n• Trạng thái bot",
 		"`/ping`",
 		"",
 	)
@@ -172,9 +172,9 @@ func GetHelpPing() string {
 
 func GetHelpSpeed() string {
 	return service.HelpDetailMessage(
-		"🚀 SPEED",
-		"Test kecepatan internet server\\.",
-		"• `/speed` ─ Jalankan speedtest\n\n📋 *INFO DITAMPILKAN*\n• Download speed\n• Upload speed\n• Ping\n• Server lokasi",
+		"🚀 TỐC ĐỘ MẠNG",
+		"Kiểm tra tốc độ internet của server\\.",
+		"• `/speed` ─ Chạy speedtest\n\n📋 *THÔNG TIN HIỂN THỊ*\n• Tốc độ tải xuống\n• Tốc độ tải lên\n• Ping\n• Vị trí server",
 		"`/speed`",
 		"",
 	)
@@ -182,19 +182,19 @@ func GetHelpSpeed() string {
 
 func GetHelpLs() string {
 	return service.HelpDetailMessage(
-		"📂 LIST (LS / DIR)",
-		"Melihat isi folder di cloud storage\\.\nPerintah ini mendukung navigasi interaktif melalui tombol\\.",
-		"• `/ls` ─ Lihat root folder\n• `/dir` ─ Alias dari /ls\n• `/ls <path\\>` ─ Lihat folder tertentu",
-		"`/ls` ─ Root folder\n`/ls Movies` ─ Folder Movies\n`/ls Movies/2024` ─ Subfolder",
-		"💡 *TIP:* Anda bisa klik nama folder di tombol untuk masuk ke dalam folder tersebut\\.",
+		"📂 DANH SÁCH (LS / DIR)",
+		"Xem nội dung thư mục trên cloud storage\\.\nLệnh này hỗ trợ điều hướng tương tác bằng nút bấm\\.",
+		"• `/ls` ─ Xem thư mục gốc\n• `/dir` ─ Alias của /ls\n• `/ls <đường dẫn\\>` ─ Xem thư mục cụ thể",
+		"`/ls` ─ Thư mục gốc\n`/ls Movies` ─ Thư mục Movies\n`/ls Movies/2024` ─ Thư mục con",
+		"💡 *MẸO:* Bấm vào tên thư mục trên nút để mở thư mục đó\\.",
 	)
 }
 
 func GetHelpMkdir() string {
 	return service.HelpDetailMessage(
-		"📁 MKDIR",
-		"Membuat folder baru di cloud storage\\.",
-		"• `/mkdir <nama\\_folder\\>` ─ Buat folder",
+		"📁 TẠO THƯ MỤC (MKDIR)",
+		"Tạo thư mục mới trên cloud storage\\.",
+		"• `/mkdir <tên\\_thư\\_mục\\>` ─ Tạo thư mục",
 		"`/mkdir Movies`\n`/mkdir Backup/2024`",
 		"",
 	)
@@ -202,9 +202,9 @@ func GetHelpMkdir() string {
 
 func GetHelpRm() string {
 	return service.HelpDetailMessage(
-		"🗑️ REMOVE (RM)",
-		"Menghapus file atau folder di cloud storage\\.",
-		"• `/rm <nama\\>` ─ Hapus file/folder\n\n⚠️ *PERINGATAN*\nPenghapusan bersifat permanen\\!",
+		"🗑️ XÓA (RM)",
+		"Xóa file hoặc thư mục trên cloud storage\\.",
+		"• `/rm <tên\\>` ─ Xóa file/thư mục\n\n⚠️ *CẢNH BÁO*\nThao tác xóa là vĩnh viễn\\!",
 		"`/rm old_file\\.zip`\n`/rm Temp/cache`",
 		"",
 	)
@@ -212,9 +212,9 @@ func GetHelpRm() string {
 
 func GetHelpMv() string {
 	return service.HelpDetailMessage(
-		"📦 MOVE (MV)",
-		"Memindahkan file/folder ke lokasi lain atau ganti nama\\.",
-		"• `/mv <source\\> <destination\\>`",
+		"📦 DI CHUYỂN (MV)",
+		"Di chuyển file/thư mục sang vị trí khác hoặc đổi tên\\.",
+		"• `/mv <nguồn\\> <đích\\>`",
 		"`/mv file\\.zip Backup/`\n`/mv old\\.mp4 new\\.mp4`",
 		"",
 	)
@@ -222,9 +222,9 @@ func GetHelpMv() string {
 
 func GetHelpShare() string {
 	return service.HelpDetailMessage(
-		"🔗 SHARE",
-		"Membuat link berbagi untuk file/folder\\.",
-		"• `/share <nama\\>` ─ Generate share link",
+		"🔗 CHIA SẺ",
+		"Tạo link chia sẻ cho file/thư mục\\.",
+		"• `/share <tên\\>` ─ Tạo link chia sẻ",
 		"`/share movie\\.mp4`\n`/share SharedFolder`",
 		"",
 	)
@@ -232,30 +232,30 @@ func GetHelpShare() string {
 
 func GetHelpFind() string {
 	return service.HelpDetailMessage(
-		"🔍 FIND",
-		"Mencari file di cloud storage secara rekursif\\.",
-		"• `/find <keyword\\>` ─ Cari file",
-		"`/find movie`\n`/find \\.mp4` ─ Cari semua MP4",
+		"🔍 TÌM FILE",
+		"Tìm file đệ quy trên cloud storage\\.",
+		"• `/find <từ khóa\\>` ─ Tìm file",
+		"`/find movie`\n`/find \\.mp4` ─ Tìm tất cả file MP4",
 		"",
 	)
 }
 
 func GetHelpExtractAudio() string {
 	return service.HelpDetailMessage(
-		"🎵 EXTRACT AUDIO",
-		"Mengekstrak audio dari file video\\.",
-		"• Reply ke video dengan `/extractaudio`\n\n📋 *FORMAT OUTPUT*\nMP3 \\(LAME Codec\\)",
-		"Reply ke video lalu ketik `/extractaudio`",
+		"🎵 TÁCH AUDIO",
+		"Tách audio từ file video\\.",
+		"• Reply vào video với `/extractaudio`\n\n📋 *ĐỊNH DẠNG ĐẦU RA*\nMP3 \\(LAME Codec\\)",
+		"Reply vào video rồi gõ `/extractaudio`",
 		"",
 	)
 }
 
 func GetHelpCompress() string {
 	return service.HelpDetailMessage(
-		"🗜️ COMPRESS",
-		"Mengkompresi ukuran file video dengan FFmpeg\\.",
-		"• Reply ke video dengan `/compress [low|medium|high]`\n\n✨ *FITUR*\n• Kurangi bitrate video\n• Auto scale audio",
-		"`/compress` \\(Default medium\\)\n`/compress high` \\(Kualitas lebih baik\\)",
+		"🗜️ NÉN VIDEO",
+		"Giảm dung lượng file video bằng FFmpeg\\.",
+		"• Reply vào video với `/compress [low|medium|high]`\n\n✨ *TÍNH NĂNG*\n• Giảm bitrate video\n• Tự động điều chỉnh audio",
+		"`/compress` \\(mặc định medium\\)\n`/compress high` \\(chất lượng tốt hơn\\)",
 		"",
 	)
 }
@@ -263,58 +263,58 @@ func GetHelpCompress() string {
 func GetHelpThumbnail() string {
 	return service.HelpDetailMessage(
 		"🖼️ THUMBNAIL",
-		"Generate thumbnail dari video pada detik tertentu\\.",
-		"• Reply ke video dengan `/thumbnail [HH:MM:SS]`\n\n✨ *FITUR*\n• Default: Detik ke-5",
-		"`/thumbnail` ─ Detik ke-5\n`/thumbnail 00:01:30` ─ Menit 1\\.5",
+		"Tạo thumbnail từ video tại thời điểm chỉ định\\.",
+		"• Reply vào video với `/thumbnail [HH:MM:SS]`\n\n✨ *TÍNH NĂNG*\n• Mặc định: giây thứ 5",
+		"`/thumbnail` ─ Giây thứ 5\n`/thumbnail 00:01:30` ─ Phút 1:30",
 		"",
 	)
 }
 
 func GetHelpScreenshots() string {
 	return service.HelpDetailMessage(
-		"📸 SCREENSHOTS",
-		"Membuat multiple screenshot dari video secara otomatis\\.",
-		"• Reply ke video dengan `/screenshots [jumlah]`\n\n✨ *FITUR*\n• Antara 1 s/d 10 screenshot",
-		"`/screenshots` ─ Default 4 SS\n`/screenshots 10` ─ Maksimum 10 SS",
+		"📸 CHỤP ẢNH MÀN HÌNH",
+		"Tự động chụp nhiều ảnh màn hình từ video\\.",
+		"• Reply vào video với `/screenshots [số lượng]`\n\n✨ *TÍNH NĂNG*\n• Từ 1 đến 10 ảnh",
+		"`/screenshots` ─ Mặc định 4 ảnh\n`/screenshots 10` ─ Tối đa 10 ảnh",
 		"",
 	)
 }
 
 func GetHelpSubtitle() string {
 	return service.HelpDetailMessage(
-		"💬 SOFT-SUB (SUBTITLE)",
-		"Embed subtitle track ke dalam container video \\(Soft-sub\\)\\.\nSubtitle bisa di-on/off saat nonton.",
-		"1\\. Kirim subtitle \\(\\.srt/\\.vtt\\)\n2\\. Reply ke video dengan `/subtitle`",
-		"Reply ke video lalu ketik `/subtitle`",
+		"💬 PHỤ ĐỀ MỀM (SOFT-SUB)",
+		"Nhúng track phụ đề vào container video \\(Soft\\-sub\\)\\.\nPhụ đề có thể bật/tắt khi xem\\.",
+		"1\\. Gửi file phụ đề \\(\\.srt/\\.vtt\\)\n2\\. Reply vào video với `/subtitle`",
+		"Reply vào video rồi gõ `/subtitle`",
 		"",
 	)
 }
 
 func GetHelpHardsub() string {
 	return service.HelpDetailMessage(
-		"🔥 HARD-SUB (BURN SUBTITLE)",
-		"Membakar subtitle permanen ke dalam gambar video \\(Hard-sub\\)\\.\nSubtitle akan menempel selamanya di video dan tidak bisa dimatikan.",
-		"1\\. Kirim subtitle \\(\\.srt/\\.ssa/\\.ass\\)\n2\\. Reply ke video dengan `/hardsub`",
-		"Reply ke video lalu ketik `/hardsub`",
-		"⚠️ *INFO:* Proses ini memakan waktu lama karena bot harus melakukan re-encoding video.",
+		"🔥 PHỤ ĐỀ CỨNG (HARD-SUB)",
+		"Ghi cứng phụ đề vào hình ảnh video \\(Hard\\-sub\\)\\.\nPhụ đề sẽ dính vĩnh viễn trên video và không thể tắt\\.",
+		"1\\. Gửi file phụ đề \\(\\.srt/\\.ssa/\\.ass\\)\n2\\. Reply vào video với `/hardsub`",
+		"Reply vào video rồi gõ `/hardsub`",
+		"⚠️ *LƯU Ý:* Quá trình này mất khá lâu vì bot phải encode lại video\\.",
 	)
 }
 
 func GetHelpRescale() string {
 	return service.HelpDetailMessage(
-		"📐 RESCALE (TRANSCODE)",
-		"Mengubah resolusi/dimensi video \\(Transcoding\\)\\.",
-		"• Reply ke video dengan `/rescale <preset|WxH\\>`\n\n🏷️ *PRESET*\n`4k`, `2k`, `1080p`, `720p`, `480p`, `360p`",
-		"Reply ke video dengan `/rescale 720p` atau `/rescale 1280x720`",
+		"📐 ĐỔI ĐỘ PHÂN GIẢI (RESCALE)",
+		"Thay đổi độ phân giải/kích thước video \\(Transcode\\)\\.",
+		"• Reply vào video với `/rescale <preset|WxH\\>`\n\n🏷️ *PRESET*\n`4k`, `2k`, `1080p`, `720p`, `480p`, `360p`",
+		"Reply vào video với `/rescale 720p` hoặc `/rescale 1280x720`",
 		"",
 	)
 }
 
 func GetHelpConvert() string {
 	return service.HelpDetailMessage(
-		"🔄 CONVERT",
-		"Konversi format file video/audio tanpa mengganti kualitas \\(Remux\\)\\.",
-		"• Reply ke file dengan `/convert <format\\>`\n\n📋 *SUPPORT*\nmp4, mkv, avi, mov, webm, mp3, aac, flac, wav",
+		"🔄 CHUYỂN ĐỊNH DẠNG",
+		"Chuyển đổi định dạng file video/audio mà không thay đổi chất lượng \\(Remux\\)\\.",
+		"• Reply vào file với `/convert <định dạng\\>`\n\n📋 *HỖ TRỢ*\nmp4, mkv, avi, mov, webm, mp3, aac, flac, wav",
 		"`/convert mp4`\n`/convert mp3`",
 		"",
 	)
@@ -322,39 +322,39 @@ func GetHelpConvert() string {
 
 func GetHelpMediaInfo() string {
 	return service.HelpDetailMessage(
-		"ℹ️ MEDIA INFO",
-		"Melihat informasi detail teknis file media menggunakan ffprobe\\.",
-		"• Reply ke file dengan `/mediainfo`\n\n📋 *INFO*\nCodec, Resolusi, Bitrate, Duration, Streams",
-		"Reply ke video lalu ketik `/mediainfo`",
+		"ℹ️ THÔNG TIN MEDIA",
+		"Xem thông tin kỹ thuật chi tiết của file media bằng ffprobe\\.",
+		"• Reply vào file với `/mediainfo`\n\n📋 *THÔNG TIN*\nCodec, độ phân giải, bitrate, thời lượng, streams",
+		"Reply vào video rồi gõ `/mediainfo`",
 		"",
 	)
 }
 
 func GetHelpCancel() string {
 	return service.HelpDetailMessage(
-		"❌ CANCEL",
-		"Membatalkan task tertentu\\.",
-		"• `/cancel` atau `/c` <task\\_id\\> ─ Batalkan task\n• Klik tombol Cancel di status",
+		"❌ HỦY TASK",
+		"Hủy một task cụ thể\\.",
+		"• `/cancel` hoặc `/c` <task\\_id\\> ─ Hủy task\n• Bấm nút Hủy trong tin nhắn trạng thái",
 		"`/cancel abc123`",
-		"💡 *TIP:* Lihat task ID dengan `/status`",
+		"💡 *MẸO:* Xem ID task bằng `/status`",
 	)
 }
 
 func GetHelpCancelAll() string {
 	return service.HelpDetailMessage(
-		"🚫 CANCEL ALL",
-		"Membatalkan SEMUA task yang sedang berjalan\\.",
-		"• `/cancelall` ─ Batalkan semua task",
+		"🚫 HỦY TẤT CẢ",
+		"Hủy TẤT CẢ task đang chạy\\.",
+		"• `/cancelall` ─ Hủy tất cả task",
 		"`/cancelall`",
-		"⚠️ Semua download/upload aktif akan dihentikan\\!",
+		"⚠️ Mọi tiến trình tải xuống/upload đang chạy sẽ bị dừng\\!",
 	)
 }
 
 func GetHelpStorages() string {
 	return service.HelpDetailMessage(
-		"📋 STORAGES",
-		"Melihat daftar cloud storage yang tersedia\\.",
-		"• `/storages` ─ Lihat semua storage",
+		"📋 DANH SÁCH STORAGE",
+		"Xem danh sách cloud storage hiện có\\.",
+		"• `/storages` ─ Xem tất cả storage",
 		"`/storages`",
 		"",
 	)
@@ -362,9 +362,9 @@ func GetHelpStorages() string {
 
 func GetHelpSetStorage() string {
 	return service.HelpDetailMessage(
-		"⚙️ SET STORAGE",
-		"Mengatur storage aktif untuk proses Mirror/Clone\\.",
-		"• `/setstorage <nama\\>` ─ Set storage",
+		"⚙️ CHỌN STORAGE",
+		"Chọn storage đang dùng cho Mirror/Clone\\.",
+		"• `/setstorage <tên\\>` ─ Chọn storage",
 		"`/setstorage gdrive`",
 		"",
 	)
@@ -372,9 +372,9 @@ func GetHelpSetStorage() string {
 
 func GetHelpAuthorize() string {
 	return service.HelpDetailMessage(
-		"✅ AUTHORIZE",
-		"Menambahkan user baru yang diizinkan menggunakan bot\\.",
-		"• `/authorize <user\\_id\\> [nama]` ─ Tambah user\n• Reply ke user dengan `/authorize`",
+		"✅ CẤP QUYỀN",
+		"Thêm người dùng mới được phép sử dụng bot\\.",
+		"• `/authorize <user\\_id\\> [tên]` ─ Thêm người dùng\n• Reply vào tin nhắn của người dùng với `/authorize`",
 		"`/authorize 123456789 Zee`",
 		"",
 	)
@@ -382,9 +382,9 @@ func GetHelpAuthorize() string {
 
 func GetHelpUnauthorize() string {
 	return service.HelpDetailMessage(
-		"❌ UNAUTHORIZE",
-		"Menghapus akses user dari bot\\.",
-		"• `/unauthorize <user\\_id\\>` ─ Hapus akses",
+		"❌ THU HỒI QUYỀN",
+		"Thu hồi quyền truy cập bot của người dùng\\.",
+		"• `/unauthorize <user\\_id\\>` ─ Thu hồi quyền",
 		"`/unauthorize 123456789`",
 		"",
 	)
@@ -392,9 +392,9 @@ func GetHelpUnauthorize() string {
 
 func GetHelpUsers() string {
 	return service.HelpDetailMessage(
-		"👥 USERS",
-		"Melihat daftar semua user yang terdaftar di database\\.",
-		"• `/users` ─ Lihat semua user",
+		"👥 NGƯỜI DÙNG",
+		"Xem danh sách tất cả người dùng đã đăng ký trong database\\.",
+		"• `/users` ─ Xem tất cả người dùng",
 		"`/users`",
 		"",
 	)
@@ -402,8 +402,8 @@ func GetHelpUsers() string {
 
 func GetHelpSetAlertChannel() string {
 	return service.HelpDetailMessage(
-		"🚨 SET ALERT CHANNEL",
-		"Mengatur channel untuk notifikasi log error/penting\\.",
+		"🚨 KÊNH CẢNH BÁO",
+		"Đặt kênh nhận thông báo lỗi/sự kiện quan trọng\\.",
 		"• `/setalertchannel <channel\\_id\\>`",
 		"`/setalertchannel \\-1001234567890`",
 		"",
@@ -412,19 +412,19 @@ func GetHelpSetAlertChannel() string {
 
 func GetHelpSetLogChannel() string {
 	return service.HelpDetailMessage(
-		"📜 SET LOG CHANNEL",
-		"Mengatur channel khusus untuk dump log aktivitas\\.",
+		"📜 KÊNH LOG",
+		"Đặt kênh riêng để lưu log hoạt động\\.",
 		"• `/setlogchannel <channel\\_id\\>`",
 		"`/setlogchannel -1001234567890`",
-		"💡 *CATATAN:* ID channel biasanya dimulai dengan \\-100\\.",
+		"💡 *LƯU Ý:* ID kênh thường bắt đầu bằng \\-100\\.",
 	)
 }
 
 func GetHelpRecover() string {
 	return service.HelpDetailMessage(
-		"🔄 RECOVER",
-		"Memulihkan task yang terhenti akibat restart bot\\.",
-		"• `/recover` ─ Pulihkan task",
+		"🔄 KHÔI PHỤC TASK",
+		"Khôi phục các task bị dừng do bot khởi động lại\\.",
+		"• `/recover` ─ Khôi phục task",
 		"`/recover`",
 		"",
 	)
@@ -432,9 +432,9 @@ func GetHelpRecover() string {
 
 func GetHelpRecoveryStatus() string {
 	return service.HelpDetailMessage(
-		"📊 RECOVERY STATUS",
-		"Melihat statistik task yang bisa dipulihkan\\.",
-		"• `/recoverystatus` ─ Lihat status",
+		"📊 TRẠNG THÁI KHÔI PHỤC",
+		"Xem thống kê các task có thể khôi phục\\.",
+		"• `/recoverystatus` ─ Xem trạng thái",
 		"`/recoverystatus`",
 		"",
 	)
@@ -442,9 +442,9 @@ func GetHelpRecoveryStatus() string {
 
 func GetHelpSettings() string {
 	return service.HelpDetailMessage(
-		"⚙️ SETTINGS",
-		"Mengatur preferensi dan konfigurasi bot\\.",
-		"• `/settings` ─ Buka menu pengaturan\n\n📋 *OPSI*\n• Auto Delete\n• Default Mode",
+		"⚙️ CÀI ĐẶT",
+		"Tùy chỉnh tùy chọn và cấu hình của bot\\.",
+		"• `/settings` ─ Mở menu cài đặt\n\n📋 *TÙY CHỌN*\n• Tự động xóa tin nhắn\n• Chế độ mặc định",
 		"`/settings`",
 		"",
 	)
@@ -465,20 +465,20 @@ func escapeMarkdownV2(text string) string {
 
 func GenerateAllCommandsHelp(commands []HelpCommandEntry) string {
 	if len(commands) == 0 {
-		return service.ProfessionalMessage("ALL COMMANDS", "📋 *DAFTAR SELURUH PERINTAH BOT*\n\nTidak ada command yang terdaftar\\.")
+		return service.ProfessionalMessage("TẤT CẢ LỆNH", "📋 *DANH SÁCH TẤT CẢ LỆNH CỦA BOT*\n\nChưa có lệnh nào được đăng ký\\.")
 	}
 
 	categoryOrder := []string{"download", "monitor", "files", "media", "task", "storage", "admin", "recovery", "general"}
 	categoryNames := map[string]string{
-		"download": "📥 DOWNLOAD",
-		"monitor":  "📊 MONITOR & SYSTEM",
-		"files":    "📁 STORAGE & FILES",
-		"media":    "🎞️ MEDIA TOOLS",
-		"task":     "📋 TASK MANAGEMENT",
-		"storage":  "💾 STORAGE",
-		"admin":    "👑 ADMINISTRATION",
-		"recovery": "🔧 RECOVERY",
-		"general":  "🛠️ GENERAL",
+		"download": "📥 TẢI XUỐNG",
+		"monitor":  "📊 THEO DÕI & HỆ THỐNG",
+		"files":    "📁 LƯU TRỮ & FILE",
+		"media":    "🎞️ CÔNG CỤ MEDIA",
+		"task":     "📋 QUẢN LÝ TASK",
+		"storage":  "💾 LƯU TRỮ",
+		"admin":    "👑 QUẢN TRỊ",
+		"recovery": "🔧 KHÔI PHỤC",
+		"general":  "🛠️ CHUNG",
 	}
 
 	byCategory := make(map[string][]HelpCommandEntry)
@@ -493,7 +493,7 @@ func GenerateAllCommandsHelp(commands []HelpCommandEntry) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("📋 *DAFTAR SELURUH PERINTAH BOT*\n")
+	sb.WriteString("📋 *DANH SÁCH TẤT CẢ LỆNH CỦA BOT*\n")
 
 	for _, cat := range categoryOrder {
 		cmds, ok := byCategory[cat]
@@ -514,7 +514,7 @@ func GenerateAllCommandsHelp(commands []HelpCommandEntry) string {
 						sb.WriteString(", ")
 					}
 					sb.WriteString("/")
-					sb.WriteString(alias)
+					sb.WriteString(escapeMarkdownV2(alias))
 				}
 				sb.WriteString("\\)")
 			}
@@ -524,15 +524,15 @@ func GenerateAllCommandsHelp(commands []HelpCommandEntry) string {
 		}
 	}
 
-	return service.ProfessionalMessage("ALL COMMANDS", sb.String())
+	return service.ProfessionalMessage("TẤT CẢ LỆNH", sb.String())
 }
 
 func GetHelpNotify() string {
 	return service.HelpDetailMessage(
-		"🔔 NOTIFY",
-		"Mendaftarkan URL webhook untuk notifikasi otomatis saat task selesai atau gagal.",
-		"`/notify <webhook_url>` — Daftarkan webhook",
-		"`/notify off` — Hapus webhook",
+		"🔔 THÔNG BÁO WEBHOOK",
+		"Đăng ký URL webhook để nhận thông báo tự động khi task hoàn tất hoặc thất bại\\.",
+		"`/notify <webhook_url>` — Đăng ký webhook",
+		"`/notify off` — Xóa webhook",
 		"",
 	)
 }

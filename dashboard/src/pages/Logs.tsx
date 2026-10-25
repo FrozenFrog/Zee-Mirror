@@ -21,9 +21,9 @@ const Logs: React.FC<LogsProps> = ({ token }) => {
             <Terminal size={32} />
           </div>
           <div>
-            <h3 className="text-4xl font-black text-slate-900 dark:text-white">Terminal Runtime</h3>
+            <h3 className="text-4xl font-black text-slate-900 dark:text-white">Nhật ký hệ thống</h3>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1">
-              Direct Engine Output Interface
+              Đầu ra trực tiếp từ Engine
             </p>
           </div>
         </div>
@@ -44,10 +44,10 @@ const Logs: React.FC<LogsProps> = ({ token }) => {
           </div>
           <div className="flex items-center space-x-4">
             <span className="px-3 py-1 bg-primary/20 text-primary text-[9px] font-black rounded-lg uppercase tracking-widest">
-              Buffer Live
+              Trực tiếp
             </span>
             <span className="text-[10px] font-black text-slate-500 dark:text-zinc-600 tracking-[0.2em] uppercase">
-              RUNTIME.ZEE — {logsContent.split('\n').length} ENTRIES
+              RUNTIME.ZEE — {logsContent.split('\n').length} DÒNG
             </span>
           </div>
         </div>

@@ -20,7 +20,7 @@ import (
 
 func (s *BotService) HandleClone(message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.reply(message, GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.reply(message, GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 
@@ -30,14 +30,14 @@ func (s *BotService) HandleClone(message *tgbotapi.Message, args string) {
 	}
 
 	if url == "" {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Error*\n\nBerikan URL Google Drive untuk di\\-clone\\.")
+		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nVui lòng cung cấp URL Google Drive để Clone\\.")
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
 	}
 
 	if !strings.Contains(url, "drive.google.com") && !strings.Contains(url, "docs.google.com") && !strings.Contains(url, "drive.usercontent.google.com") {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Error*\n\nURL bukan link Google Drive yang valid\\.")
+		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nURL không phải link Google Drive hợp lệ\\.")
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
@@ -71,7 +71,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 
 	driveID, isFolderHint := drive.ExtractDriveID(task.URL)
 	if driveID == "" {
-		task.SetError("Gagal ekstrak ID dari URL Google Drive")
+		task.SetError("Không trích xuất được ID từ URL Google Drive")
 		s.updateTaskStatus(task)
 		return
 	}
@@ -81,7 +81,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 
 	driveName, isDir, driveSize, err := drive.GetDriveInfo(task.Ctx, driveID, configPath, remoteName, isFolderHint, task.URL)
 	if err != nil {
-		task.SetError(fmt.Sprintf("Gagal mendapatkan info Google Drive: %v", err))
+		task.SetError(fmt.Sprintf("Không lấy được thông tin Google Drive: %v", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -121,7 +121,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 	slog.Info("Starting rclone clone", "taskID", task.ID, "args", strings.Join(args, " "))
 
 	if err := cmd.Start(); err != nil {
-		task.SetError(fmt.Sprintf("rclone failed to start: %v", err))
+		task.SetError(fmt.Sprintf("Không khởi động được rclone: %v", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -132,7 +132,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 		if task.Status == StatusCancelled {
 			return
 		}
-		task.SetError(fmt.Sprintf("rclone clone failed: %v", err))
+		task.SetError(fmt.Sprintf("Clone bằng rclone thất bại: %v", err))
 		s.updateTaskStatus(task)
 		return
 	}

@@ -42,7 +42,7 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, botSvc
 				case service.AccessDenied:
 					slog.Warn("Unauthorized access attempt", "userID", update.Message.From.ID, "username", update.Message.From.UserName, "text", update.Message.Text)
 
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, service.GetErrorMessage("ACCESS DENIED", "Anda belum terautentikasi untuk menggunakan bot ini.\nSilakan hubungi Owner untuk mendapatkan akses."))
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Bạn chưa được cấp quyền sử dụng bot này\\.\nVui lòng liên hệ Owner để được cấp quyền truy cập\\."))
 					msg.ParseMode = tgbotapi.ModeMarkdownV2
 					msg.ReplyParameters.MessageID = update.Message.MessageID
 					_, _ = botSvc.Bot.Send(msg)
@@ -63,7 +63,7 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, botSvc
 				if !botSvc.AdmitCallback(update.CallbackQuery) && !isHelp {
 					slog.Warn("Unauthorized callback attempt", "userID", update.CallbackQuery.From.ID, "username", update.CallbackQuery.From.UserName, "data", data)
 
-					cb := tgbotapi.NewCallback(update.CallbackQuery.ID, "🚫 Access Denied")
+					cb := tgbotapi.NewCallback(update.CallbackQuery.ID, "🚫 Truy cập bị từ chối")
 					_, _ = botSvc.Bot.Request(cb)
 					continue
 				}

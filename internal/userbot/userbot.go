@@ -139,20 +139,20 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	u.Mu.RLock()
 	if !u.Started {
 		u.Mu.RUnlock()
-		return "", fmt.Errorf("userbot not started")
+		return "", fmt.Errorf("userbot chưa được khởi động")
 	}
 	u.Mu.RUnlock()
 
 	isPrivate := strings.Contains(link, "/c/")
 	parts := strings.Split(link, "/")
 	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid link format")
+		return "", fmt.Errorf("định dạng link không hợp lệ")
 	}
 
 	msgIDStr := parts[len(parts)-1]
 	msgID, err := strconv.Atoi(msgIDStr)
 	if err != nil {
-		return "", fmt.Errorf("invalid message ID")
+		return "", fmt.Errorf("ID tin nhắn không hợp lệ")
 	}
 
 	var identifier string
@@ -169,13 +169,13 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	if isPrivate {
 		p, resolveErr := u.Manager.Resolve(ctx, identifier)
 		if resolveErr != nil {
-			return "", fmt.Errorf("could not resolve private channel: %v (make sure userbot has joined)", resolveErr)
+			return "", fmt.Errorf("không xác định được channel riêng tư: %v (hãy chắc chắn userbot đã tham gia)", resolveErr)
 		}
 		peer = p
 	} else {
 		p, resolveErr := u.Manager.Resolve(ctx, "@"+identifier)
 		if resolveErr != nil {
-			return "", fmt.Errorf("resolve username failed: %v", resolveErr)
+			return "", fmt.Errorf("không xác định được username: %v", resolveErr)
 		}
 		peer = p
 	}
@@ -224,7 +224,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	}
 
 	if media == nil {
-		return "", fmt.Errorf("no media found in message")
+		return "", fmt.Errorf("không tìm thấy media trong tin nhắn")
 	}
 
 	dl := downloader.NewDownloader()
@@ -246,7 +246,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 
 	f, err := os.Create(outPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create file: %v", err)
+		return "", fmt.Errorf("không tạo được file: %v", err)
 	}
 	defer f.Close()
 
@@ -264,7 +264,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	}
 
 	if _, err := dl.Download(u.Client.API(), location).Stream(dlCtx, pw); err != nil {
-		return "", fmt.Errorf("download failed: %v", err)
+		return "", fmt.Errorf("tải xuống thất bại: %v", err)
 	}
 
 	return outPath, nil
@@ -309,14 +309,14 @@ func getFileLocation(media tg.MessageMediaClass) (tg.InputFileLocationClass, err
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("media type not supported for download")
+	return nil, fmt.Errorf("loại media này không hỗ trợ tải xuống")
 }
 
 func (u *UserBot) JoinChat(hash string) (string, error) {
 	u.Mu.RLock()
 	if !u.Started {
 		u.Mu.RUnlock()
-		return "", fmt.Errorf("userbot not started")
+		return "", fmt.Errorf("userbot chưa được khởi động")
 	}
 	u.Mu.RUnlock()
 
@@ -328,7 +328,7 @@ func (u *UserBot) JoinChat(hash string) (string, error) {
 		if strings.Contains(err.Error(), "USER_ALREADY_PARTICIPANT") {
 			return "Already joined", nil
 		}
-		return "", fmt.Errorf("failed to join chat: %w", err)
+		return "", fmt.Errorf("không tham gia được chat: %w", err)
 	}
 
 	var title string
@@ -346,8 +346,8 @@ func (u *UserBot) JoinChat(hash string) (string, error) {
 	}
 
 	if title == "" {
-		title = "Unknown Chat"
+		title = "Chat không rõ tên"
 	}
 
-	return fmt.Sprintf("Successfully joined: %s", title), nil
+	return fmt.Sprintf("Đã tham gia thành công: %s", title), nil
 }

@@ -86,7 +86,7 @@ func HandleSearch(s *service.BotService, message *tgbotapi.Message, args string)
 	}
 
 	if args == "" {
-		s.Reply(message, "⚠️ *Format Salah*\n\nGunakan: `/search <query>` atau `/searchall <query>`")
+		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/search <từ khóa>` hoặc `/searchall <từ khóa>`")
 		return
 	}
 
@@ -94,7 +94,7 @@ func HandleSearch(s *service.BotService, message *tgbotapi.Message, args string)
 	isSearchAll := message.Command() == "searchall"
 
 	if !isSearchAll {
-		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔍 *Pencarian:* `%s`\n\nPilih provider torrent untuk mulai mencari:", utils.EscapeMarkdownV2(query)))
+		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔍 *Tìm kiếm:* `%s`\n\nChọn nguồn Torrent để bắt đầu tìm kiếm:", utils.EscapeMarkdownV2(query)))
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
@@ -112,7 +112,7 @@ func HandleSearch(s *service.BotService, message *tgbotapi.Message, args string)
 	}
 	SearchMu.Unlock()
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔍 *Mencari* `%s` di semua sumber\\.\\.\\.", utils.EscapeMarkdownV2(query)))
+	msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔍 *Đang tìm* `%s` trên tất cả các nguồn\\.\\.\\.", utils.EscapeMarkdownV2(query)))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(msg)
 	if err != nil {
@@ -161,16 +161,16 @@ func parseSeeders(s string) int {
 
 func HandleSearchCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
 	if len(parts) < 3 {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Query tidak valid"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Từ khóa không hợp lệ"))
 		return
 	}
 
 	provider := parts[1]
 	query := strings.Join(parts[2:], ":")
 
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔍 Mencari..."))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔍 Đang tìm kiếm..."))
 
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, fmt.Sprintf("🔍 Mencari `%s` • *%s*...", utils.EscapeMarkdownV2(query), provider))
+	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, fmt.Sprintf("🔍 Đang tìm `%s` • *%s*\\.\\.\\.", utils.EscapeMarkdownV2(query), provider))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
 
@@ -208,7 +208,7 @@ func HandleSearchCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 		SearchSessions[sessionID] = session
 		SearchMu.Unlock()
 
-		text := fmt.Sprintf("📭 *Tidak ada hasil ditemukan di %s*\n\n_Cobalah menggunakan kata kunci lain atau provider yang berbeda\\._", provider)
+		text := fmt.Sprintf("📭 *Không tìm thấy kết quả nào trên %s*\n\n_Hãy thử từ khóa khác hoặc nguồn khác\\._", provider)
 
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -238,7 +238,7 @@ func showSearchResults(s *service.BotService, chatID int64, messageID int, sessi
 
 	if !exists {
 		SearchMu.Unlock()
-		s.SendOrEditMessage(chatID, messageID, "❌ Sesi pencarian telah berakhir. Silakan cari ulang.", nil)
+		s.SendOrEditMessage(chatID, messageID, "❌ Phiên tìm kiếm đã hết hạn\\. Hãy tìm kiếm lại\\.", nil)
 		return
 	}
 
@@ -266,8 +266,8 @@ func showSearchResults(s *service.BotService, chatID int64, messageID int, sessi
 	query := session.Query
 	SearchMu.Unlock()
 
-	text := fmt.Sprintf("🔍 *Hasil Pencarian \\(%s\\)*\n`%s`\n\n", utils.EscapeMarkdownV2(provider), utils.EscapeMarkdownV2Code(query))
-	text += fmt.Sprintf("📄 Halaman %d/%d\n\n", page+1, totalPages)
+	text := fmt.Sprintf("🔍 *Kết quả tìm kiếm \\(%s\\)*\n`%s`\n\n", utils.EscapeMarkdownV2(provider), utils.EscapeMarkdownV2Code(query))
+	text += fmt.Sprintf("📄 Trang %d/%d\n\n", page+1, totalPages)
 
 	for i, item := range visibleItems {
 		idx := start + i + 1
@@ -285,9 +285,9 @@ func showSearchResults(s *service.BotService, chatID int64, messageID int, sessi
 
 	if _, err := s.Bot.Send(editMsg); err != nil {
 		slog.Warn("Search results markdown error, using fallback", "error", err)
-		fallbackText := fmt.Sprintf("🔍 Hasil Pencarian (%s): %s\n\nHalaman %d/%d\n\n", provider, query, page+1, totalPages)
+		fallbackText := fmt.Sprintf("🔍 Kết quả tìm kiếm (%s): %s\n\nTrang %d/%d\n\n", provider, query, page+1, totalPages)
 		for i, item := range visibleItems {
-			fallbackText += fmt.Sprintf("%d. %s\nSize: %s | Seeds: %s\n\n", start+i+1, item.Title, item.Size, item.Seeders)
+			fallbackText += fmt.Sprintf("%d. %s\nDung lượng: %s | Seed: %s\n\n", start+i+1, item.Title, item.Size, item.Seeders)
 		}
 		fallbackEdit := tgbotapi.NewEditMessageText(chatID, messageID, fallbackText)
 		_, _ = s.Bot.Send(fallbackEdit)
@@ -307,13 +307,13 @@ func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 		session, exists := SearchSessions[sessionID]
 		if !exists {
 			SearchMu.RUnlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Sesi berakhir"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên đã hết hạn"))
 			return
 		}
 		query := session.Query
 		SearchMu.RUnlock()
 
-		textRaw := fmt.Sprintf("🔍 Pencarian: %s\n\nPilih provider pencarian yang lebih stabil:", query)
+		textRaw := fmt.Sprintf("🔍 Tìm kiếm: %s\n\nChọn nguồn tìm kiếm ổn định hơn:", query)
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, textRaw)
 
 		if _, err := s.Bot.Send(editMsg); err != nil {
@@ -361,7 +361,7 @@ func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 		if !exists || index < 0 || index >= len(session.Results) {
 			SearchMu.RUnlock()
 			if !exists {
-				_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Sesi berakhir"))
+				_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên đã hết hạn"))
 			}
 			return
 		}
@@ -374,13 +374,13 @@ func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 		source := item.Source
 		SearchMu.RUnlock()
 
-		text := fmt.Sprintf("📄 *Detail Torrent*\n\n"+
-			"*Judul:* `%s`\n"+
-			"*Size:* `%s`\n"+
+		text := fmt.Sprintf("📄 *Chi tiết Torrent*\n\n"+
+			"*Tiêu đề:* `%s`\n"+
+			"*Dung lượng:* `%s`\n"+
 			"*Seeders:* `%s`\n"+
-			"*Source:* `%s`\n\n"+
-			"🧲 *Magnet Link:*\n`%s`\n\n"+
-			"Klik link di atas untuk menyalin atau reply dengan /mirror",
+			"*Nguồn:* `%s`\n\n"+
+			"🧲 *Link Magnet:*\n`%s`\n\n"+
+			"Nhấn vào link trên để sao chép hoặc reply bằng /mirror",
 			utils.EscapeMarkdownV2Code(title),
 			utils.EscapeMarkdownV2Code(size),
 			utils.EscapeMarkdownV2Code(seeders),
@@ -393,7 +393,7 @@ func HandleSearchNavCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 
 		if _, err := s.Bot.Send(editMsg); err != nil {
 			slog.Warn("Search item detail markdown error, using fallback", "error", err)
-			fallbackText := fmt.Sprintf("Detail Torrent:\n\n%s\nSize: %s\nMagnet:\n%s", title, size, cleanMagnet)
+			fallbackText := fmt.Sprintf("Chi tiết Torrent:\n\n%s\nDung lượng: %s\nMagnet:\n%s", title, size, cleanMagnet)
 			fallbackEdit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, fallbackText)
 			_, _ = s.Bot.Send(fallbackEdit)
 		}
@@ -581,7 +581,7 @@ func searchPirateBay(query string) []Result {
 
 func CleanMagnetLink(magnet string) string {
 	if magnet == "" {
-		return "Magnet not available"
+		return "Không có Magnet"
 	}
 	if strings.HasPrefix(magnet, "magnet:?") {
 		return magnet

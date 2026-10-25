@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { statusLabel } from '../utils/format';
 
 interface HistoryTask {
   id: string;
@@ -42,7 +43,7 @@ const TaskHistory: React.FC = () => {
 
   const formatDate = (d: string) => {
     if (!d) return '-';
-    return new Date(d).toLocaleString();
+    return new Date(d).toLocaleString('vi-VN');
   };
 
   const formatSize = (bytes: number) => {
@@ -69,9 +70,9 @@ const TaskHistory: React.FC = () => {
             <History size={32} />
           </div>
           <div>
-            <h3 className="text-4xl font-black text-slate-900 dark:text-white">Task History</h3>
+            <h3 className="text-4xl font-black text-slate-900 dark:text-white">Lịch sử Task</h3>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1">
-              Completed & Failed Task Archive
+              Lưu trữ Task hoàn tất & thất bại
             </p>
           </div>
         </div>
@@ -87,7 +88,7 @@ const TaskHistory: React.FC = () => {
               : 'bg-white dark:bg-zinc-900/60 text-slate-400 border border-slate-200 dark:border-white/5 hover:bg-slate-50'
               }`}
           >
-            {s || 'All'}
+            {s ? statusLabel(s) : 'Tất cả'}
           </button>
         ))}
       </div>
@@ -97,14 +98,14 @@ const TaskHistory: React.FC = () => {
 
         {loading ? (
           <div className="py-32 flex items-center justify-center">
-            <div className="text-slate-400 text-sm font-bold uppercase tracking-widest">Loading...</div>
+            <div className="text-slate-400 text-sm font-bold uppercase tracking-widest">Đang tải...</div>
           </div>
         ) : tasks.length === 0 ? (
           <div className="glass-card py-32 rounded-[3.5rem] flex flex-col items-center justify-center text-center opacity-40">
             <div className="p-8 bg-slate-100 dark:bg-white/5 rounded-full mb-6">
               <History size={48} className="text-slate-400" />
             </div>
-            <h4 className="text-xl font-black uppercase tracking-widest text-slate-400">No tasks found</h4>
+            <h4 className="text-xl font-black uppercase tracking-widest text-slate-400">Không tìm thấy Task nào</h4>
           </div>
         ) : (
           <>
@@ -112,12 +113,12 @@ const TaskHistory: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 border-b border-slate-200 dark:border-white/5">
-                    <th className="p-4 pl-0">Type</th>
-                    <th className="p-4">File</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Size</th>
+                    <th className="p-4 pl-0">Loại</th>
+                    <th className="p-4">Tên file</th>
+                    <th className="p-4">Trạng thái</th>
+                    <th className="p-4">Dung lượng</th>
                     <th className="p-4">MD5</th>
-                    <th className="p-4 pr-0">Date</th>
+                    <th className="p-4 pr-0">Ngày tạo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -133,7 +134,7 @@ const TaskHistory: React.FC = () => {
                           {t.file_name || t.url}
                         </div>
                       </td>
-                      <td className={`p-4 text-sm font-black uppercase ${statusColor(t.status)}`}>{t.status}</td>
+                      <td className={`p-4 text-sm font-black uppercase ${statusColor(t.status)}`}>{statusLabel(t.status)}</td>
                       <td className="p-4 text-sm font-mono text-slate-500 dark:text-zinc-400">{formatSize(t.file_size)}</td>
                       <td className="p-4">
                         {t.md5 ? (
@@ -160,7 +161,7 @@ const TaskHistory: React.FC = () => {
                 <ChevronLeft size={20} className="text-slate-500" />
               </button>
               <span className="px-6 py-3 text-sm font-black text-slate-500 dark:text-zinc-400">
-                Page {page + 1}
+                Trang {page + 1}
               </span>
               <button
                 onClick={() => setPage(p => p + 1)}

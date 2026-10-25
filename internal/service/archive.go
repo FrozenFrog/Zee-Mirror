@@ -26,7 +26,7 @@ func (s *BotService) extractArchive(task *Task) error {
 	extractDir := filepath.Join(filepath.Dir(task.LocalPath), originalFilename)
 
 	if err := os.MkdirAll(extractDir, 0750); err != nil {
-		return fmt.Errorf("%w: failed to create extract directory: %v", domain.ErrStorage, err)
+		return fmt.Errorf("%w: không tạo được thư mục giải nén: %v", domain.ErrStorage, err)
 	}
 
 	args := []string{
@@ -52,7 +52,7 @@ func (s *BotService) extractArchive(task *Task) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%w: 7zz extract failed: %v, output: %s", domain.ErrExternal, err, string(output))
+		return fmt.Errorf("%w: 7zz giải nén thất bại: %v, output: %s", domain.ErrExternal, err, string(output))
 	}
 
 	task.LocalPath = extractDir
@@ -110,7 +110,7 @@ func (s *BotService) createZipArchive(task *Task) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%w: 7zz zip failed: %v, output: %s", domain.ErrExternal, err, string(output))
+		return fmt.Errorf("%w: 7zz nén zip thất bại: %v, output: %s", domain.ErrExternal, err, string(output))
 	}
 
 	task.LocalPath = zipPath

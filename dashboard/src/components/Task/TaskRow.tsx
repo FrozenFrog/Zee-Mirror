@@ -1,6 +1,7 @@
 import React from 'react'
 import { Clock, Trash2, Download, TrendingUp, Upload, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import { Task } from '../../types'
+import { statusLabel } from '../../utils/format'
 
 interface TaskRowProps {
   task: Task
@@ -42,14 +43,14 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, formatBytes, onCancel }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center flex-wrap gap-2 mb-2">
               <span className="px-2.5 py-1 bg-slate-100 dark:bg-white/5 text-slate-900 dark:text-white text-[8px] font-black uppercase tracking-[0.2em] rounded-lg border border-slate-200 dark:border-white/5">
-                {task.status}
+                {statusLabel(task.status)}
               </span>
             </div>
             <h4
               className="font-black text-xl text-slate-900 dark:text-white truncate pr-4 leading-tight group-hover:text-primary transition-colors"
               title={task.file_name || task.id}
             >
-              {task.file_name || `Thread: ${task.id}`}
+              {task.file_name || `Luồng: ${task.id}`}
             </h4>
           </div>
         </div>
@@ -68,7 +69,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, formatBytes, onCancel }) => {
           <div className="flex items-center space-x-12">
             <div className="space-y-1">
               <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mb-1">
-                Bandwidth
+                Tốc độ
               </p>
               <div className="flex items-center text-sm font-black text-slate-900 dark:text-slate-200">
                 <TrendingUp size={16} className="mr-2 text-primary" /> {formatBytes(task.speed || 0)}
@@ -77,13 +78,13 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, formatBytes, onCancel }) => {
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mb-1">
-                Time Buffer
+                Thời gian còn lại
               </p>
               <div className="flex items-center text-sm font-black text-slate-900 dark:text-slate-200">
                 <Clock size={16} className="mr-2 text-indigo-400" />{' '}
                 {task.eta
-                  ? `${Math.floor(task.eta / 1e9 / 60)}m ${Math.floor(task.eta / 1e9) % 60}s`
-                  : 'Stable'}
+                  ? `${Math.floor(task.eta / 1e9 / 60)} phút ${Math.floor(task.eta / 1e9) % 60} giây`
+                  : 'Ổn định'}
               </div>
             </div>
           </div>

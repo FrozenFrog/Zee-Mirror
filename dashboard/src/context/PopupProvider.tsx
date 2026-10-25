@@ -37,8 +37,8 @@ export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
         title,
         content,
         type: 'confirm',
-        confirmText: options.confirmText || 'Confirm',
-        cancelText: options.cancelText || 'Cancel',
+        confirmText: options.confirmText || 'Xác nhận',
+        cancelText: options.cancelText || 'Hủy',
         showCancel: true,
         onConfirm: () => {
           setModal(null)
@@ -59,7 +59,7 @@ export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
         title,
         content,
         type: options.type || 'info',
-        confirmText: options.confirmText || 'OK',
+        confirmText: options.confirmText || 'Đồng ý',
         showCancel: false,
         onConfirm: () => {
           setModal(null)

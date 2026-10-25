@@ -18,7 +18,7 @@ const (
 	LineSeparator    = "━━━━━━━━━━━━━━━━━━━━━━"
 	CompactSeparator = "──────────────────────"
 	RepoURL          = "https://github.com/ifauzeee/Zee-Mirror"
-	UnknownSize      = "Unknown"
+	UnknownSize      = "Không rõ"
 )
 
 func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL string) string {
@@ -45,10 +45,10 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 		}
 
 		text = fmt.Sprintf("%s\n\n"+
-			"📄 *Name:* `%s`\n"+
-			"📦 *Size:* `%s`\n"+
-			"⏱ *Time:* `%s`\n"+
-			"📁 *Path:* `%s`%s%s%s",
+			"📄 *Tên:* `%s`\n"+
+			"📦 *Dung lượng:* `%s`\n"+
+			"⏱ *Thời gian:* `%s`\n"+
+			"📁 *Đường dẫn:* `%s`%s%s%s",
 			i18n.T(lang, "status_completed"),
 			utils.EscapeMarkdownV2Code(snapshot.FileName),
 			utils.EscapeMarkdownV2Code(sizeStr),
@@ -58,7 +58,7 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 			md5Line,
 			streamLine)
 	case domain.StatusFailed:
-		text = fmt.Sprintf("%s\n📄 `%s`\nError: `%s`",
+		text = fmt.Sprintf("%s\n📄 `%s`\nLỗi: `%s`",
 			i18n.T(lang, "status_failed"),
 			utils.EscapeMarkdownV2Code(snapshot.FileName),
 			utils.EscapeMarkdownV2Code(utils.TruncateString(snapshot.Error, 100)))
@@ -116,23 +116,25 @@ func ProfessionalMessage(title string, content string) string {
 		LineSeparator)
 }
 
+// HelpDetailMessage builds a help page. The sections are MarkdownV2 (already
+// escaped, with their own bold and code formatting); only title is escaped.
 func HelpDetailMessage(title, kegunaan, caraPakai, contoh, extra string) string {
 	content := ""
 
 	if kegunaan != "" {
-		content += "📝 *KEGUNAAN*\n" + utils.EscapeMarkdownV2(kegunaan) + "\n\n"
+		content += "📝 *CÔNG DỤNG*\n" + kegunaan + "\n\n"
 	}
 
 	if caraPakai != "" {
-		content += "📌 *CARA PAKAI*\n" + utils.EscapeMarkdownV2(caraPakai) + "\n\n"
+		content += "📌 *CÁCH DÙNG*\n" + caraPakai + "\n\n"
 	}
 
 	if contoh != "" {
-		content += "💡 *CONTOH*\n" + utils.EscapeMarkdownV2(contoh)
+		content += "💡 *VÍ DỤ*\n" + contoh
 	}
 
 	if extra != "" {
-		content += "\n\n" + utils.EscapeMarkdownV2(extra)
+		content += "\n\n" + extra
 	}
 
 	return ProfessionalMessage(title, content)
@@ -144,7 +146,7 @@ func GetWelcomeMessage(lang, userName string) string {
 }
 
 func GetStatusHeader() string {
-	return fmt.Sprintf("📊 <b>STATUS TASK AKTIF</b>\n%s\n\n", LineSeparator)
+	return fmt.Sprintf("📊 <b>TRẠNG THÁI TASK ĐANG CHẠY</b>\n%s\n\n", LineSeparator)
 }
 
 func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) string {
@@ -158,14 +160,14 @@ func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) strin
 
 	totalSizeStr := utils.FormatBytes(taskSnapshot.TotalSize)
 	if taskSnapshot.TotalSize == 0 {
-		totalSizeStr = "Unknown"
+		totalSizeStr = UnknownSize
 	}
 
 	msgLine := ""
 	if taskSnapshot.ProcessingMessage != "" {
-		msgLine = fmt.Sprintf("💬 <b>Status:</b> <i>%s</i>\n", html.EscapeString(taskSnapshot.ProcessingMessage))
+		msgLine = fmt.Sprintf("💬 <b>Trạng thái:</b> <i>%s</i>\n", html.EscapeString(taskSnapshot.ProcessingMessage))
 	} else if taskSnapshot.Status == domain.StatusDownloading && taskSnapshot.Progress >= 100 {
-		msgLine = "💬 <b>Status:</b> <i>Memproses file...</i>\n"
+		msgLine = "💬 <b>Trạng thái:</b> <i>Đang xử lý file...</i>\n"
 	}
 
 	playlistInfo := ""
@@ -179,9 +181,9 @@ func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) strin
 			"%s"+
 			"%s"+
 			"📄 <b>File:</b> <code>%s</code>\n"+
-			"📦 <b>Size:</b> <code>%s / %s</code>\n"+
-			"⚡ <b>Speed:</b> <code>%s</code> • ⏱️ <b>ETA:</b> <code>%s</code>\n"+
-			"🚫 <b>Cancel:</b> /cancel_%s\n",
+			"📦 <b>Dung lượng:</b> <code>%s / %s</code>\n"+
+			"⚡ <b>Tốc độ:</b> <code>%s</code> • ⏱️ <b>Còn lại:</b> <code>%s</code>\n"+
+			"🚫 <b>Hủy:</b> /cancel_%s\n",
 		html.EscapeString(taskSnapshot.ID),
 		emoji,
 		html.EscapeString(i18n.T(lang, strings.ToLower(string(taskSnapshot.Status)))),

@@ -29,14 +29,14 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
     return false
   }
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: Activity },
-    { id: 'tasks', label: 'Queued Tasks', icon: Download },
-    { id: 'tasks/history', label: 'Task History', icon: Clock },
-    { id: 'files', label: 'File Explorer', icon: Folder },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'logs', label: 'System Logs', icon: Terminal },
-    { id: 'users', label: 'User Management', icon: Users },
-    { id: 'settings', label: 'Environment', icon: Settings },
+    { id: 'overview', label: 'Tổng quan', icon: Activity },
+    { id: 'tasks', label: 'Task đang chờ', icon: Download },
+    { id: 'tasks/history', label: 'Lịch sử Task', icon: Clock },
+    { id: 'files', label: 'Trình duyệt file', icon: Folder },
+    { id: 'analytics', label: 'Thống kê', icon: BarChart3 },
+    { id: 'logs', label: 'Nhật ký hệ thống', icon: Terminal },
+    { id: 'users', label: 'Quản lý người dùng', icon: Users },
+    { id: 'settings', label: 'Cài đặt', icon: Settings },
   ]
 
   return (
@@ -53,7 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
               Zee<span className="text-primary italic">Mirror</span>
             </h1>
             <p className="text-[9px] font-black text-primary/60 tracking-[0.4em] uppercase mt-1.5 opacity-80">
-              Cloud Interface
+              Giao diện đám mây
             </p>
           </div>
         </div>
@@ -99,7 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500">
-              Maintained By
+              Duy trì bởi
             </p>
             <p className="text-sm font-black text-slate-800 dark:text-white group-hover/credit:text-primary transition-colors">
               ifauzee
@@ -112,7 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
           className="w-full flex items-center justify-center space-x-3 p-5 rounded-[2rem] bg-red-500/5 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/10 transition-all duration-500 group"
         >
           <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Exit Engine</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Đăng xuất</span>
         </button>
       </div>
     </aside>

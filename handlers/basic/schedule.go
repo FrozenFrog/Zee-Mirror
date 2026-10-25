@@ -8,6 +8,7 @@ import (
 
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
@@ -16,7 +17,7 @@ import (
 func HandleSchedule(s *service.BotService, message *tgbotapi.Message, args string) {
 	parts := strings.Fields(args)
 	if len(parts) < 3 {
-		s.Reply(message, "Usage: /schedule <type> <HH:MM> <url> [filename]\nType: mirror, zip, unzip, mp3, audio, video")
+		s.Reply(message, "Cách dùng: `/schedule <type> <HH:MM> <url> [filename]`\nLoại: mirror, zip, unzip, mp3, audio, video")
 		return
 	}
 
@@ -30,13 +31,13 @@ func HandleSchedule(s *service.BotService, message *tgbotapi.Message, args strin
 
 	validTypes := map[string]bool{"mirror": true, "zip": true, "unzip": true, "mp3": true, "audio": true, "video": true}
 	if !validTypes[taskType] {
-		s.Reply(message, fmt.Sprintf("Invalid type: %s. Valid: mirror, zip, unzip, mp3, audio, video", taskType))
+		s.Reply(message, fmt.Sprintf("Loại không hợp lệ: %s\\. Hợp lệ: mirror, zip, unzip, mp3, audio, video", utils.EscapeMarkdownV2(taskType)))
 		return
 	}
 
 	parsedTime, err := time.Parse("15:04", timeStr)
 	if err != nil {
-		s.Reply(message, "Invalid time format. Use HH:MM (24-hour)")
+		s.Reply(message, "Định dạng giờ không hợp lệ\\. Dùng HH:MM \\(24 giờ\\)")
 		return
 	}
 
@@ -62,9 +63,9 @@ func HandleSchedule(s *service.BotService, message *tgbotapi.Message, args strin
 	}
 
 	if err := s.DB.SaveScheduled(context.Background(), st); err != nil {
-		s.Reply(message, "Failed to schedule task")
+		s.Reply(message, "Không thể lên lịch Task")
 		return
 	}
 
-	s.Reply(message, fmt.Sprintf("Task scheduled for %s", scheduledAt.Format("Mon Jan 2 15:04")))
+	s.Reply(message, fmt.Sprintf("Đã lên lịch Task lúc %s", scheduledAt.Format("15:04 02/01/2006")))
 }

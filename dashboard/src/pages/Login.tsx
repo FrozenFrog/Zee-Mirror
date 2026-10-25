@@ -26,7 +26,7 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                     </div>
                     <div className="h-[1px] w-12 bg-white/20 rounded-full" />
                     <span className="text-[10px] font-black uppercase tracking-[0.8em] opacity-40">
-                        System Core
+                        Lõi hệ thống
                     </span>
                 </div>
 
@@ -41,8 +41,8 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                         <div className="h-[5px] w-24 bg-primary/50 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)]" />
                     </div>
                     <p className="text-white/80 text-xl lg:text-3xl font-bold leading-relaxed max-w-lg mt-12 opacity-80 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
-                        Orchestrating the next generation of resilient cloud orchestration & global distribution
-                        networks.
+                        Điều phối thế hệ mới của hạ tầng đám mây bền vững và mạng lưới phân phối toàn
+                        cầu.
                     </p>
                 </div>
 
@@ -53,10 +53,10 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 leading-none">
-                                Global Engine
+                                Engine toàn cầu
                             </p>
                             <p className="text-sm font-black uppercase tracking-widest text-white leading-none">
-                                Sync Status: <span className="text-green-400">Online</span>
+                                Trạng thái đồng bộ: <span className="text-green-400">Trực tuyến</span>
                             </p>
                         </div>
                     </div>
@@ -66,10 +66,10 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 leading-none">
-                                Security Protocol
+                                Giao thức bảo mật
                             </p>
                             <p className="text-sm font-black uppercase tracking-widest text-white leading-none">
-                                Authorization: <span className="text-primary italic font-black">Secure</span>
+                                Xác thực: <span className="text-primary italic font-black">An toàn</span>
                             </p>
                         </div>
                     </div>
@@ -86,21 +86,21 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                                 <div className="flex items-center justify-center md:justify-start space-x-4">
                                     <div className="h-[2px] w-12 bg-primary rounded-full shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
                                     <span className="text-[11px] font-black text-primary uppercase tracking-[0.8em]">
-                                        Entry Protocol
+                                        Đăng nhập hệ thống
                                     </span>
                                 </div>
                                 <h3 className="text-8xl font-[1000] text-slate-900 dark:text-white tracking-[-0.08em] leading-none">
-                                    Hello.
+                                    Xin chào.
                                 </h3>
                                 <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[280px] mx-auto md:mx-0">
-                                    System standby. Provide identity to bridge link.
+                                    Hệ thống sẵn sàng. Hãy xác minh danh tính để kết nối.
                                 </p>
                             </div>
                             <button
                                 onClick={() => setAuthStep('password')}
                                 className="w-full p-10 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.5em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group"
                             >
-                                <span>Enter Engine</span>
+                                <span>Đăng nhập</span>
                                 <ArrowRight
                                     size={28}
                                     className="ml-6 group-hover:translate-x-3 transition-transform"
@@ -124,21 +124,21 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                                 <div className="flex items-center justify-center md:justify-start space-x-4">
                                     <div className="h-[2px] w-12 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
                                     <span className="text-[11px] font-black text-red-500 uppercase tracking-[0.8em]">
-                                        Security Level 5
+                                        Bảo mật cấp 5
                                     </span>
                                 </div>
                                 <h3 className="text-7xl font-[1000] tracking-[-0.06em] leading-none text-slate-900 dark:text-white">
-                                    Secret Key
+                                    Khóa bí mật
                                 </h3>
                                 <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[320px] mx-auto md:mx-0">
-                                    System demands the encrypted synchronization token.
+                                    Hệ thống yêu cầu Token đồng bộ đã được mã hóa.
                                 </p>
                             </div>
                             <div className="space-y-8">
                                 <div className="relative group">
                                     <input
                                         type="password"
-                                        placeholder="SYNC_SECRET_KEY"
+                                        placeholder="NHẬP TOKEN"
                                         autoFocus
                                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 p-12 rounded-[3.5rem] text-center font-black outline-none focus:ring-[16px] ring-primary/10 transition-all text-2xl tracking-[0.2em] text-slate-950 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-900 group-hover:bg-white dark:group-hover:bg-white/10"
                                         onKeyDown={(e) => {
@@ -155,7 +155,7 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
                                 <div className="flex items-center justify-center space-x-4 text-slate-300 dark:text-zinc-700">
                                     <Lock size={16} className="animate-pulse" />
                                     <p className="text-[10px] font-black uppercase tracking-[0.6em] italic">
-                                        Established Encrypted Link
+                                        Kết nối đã được mã hóa
                                     </p>
                                 </div>
                             </div>
@@ -165,7 +165,7 @@ const Login: React.FC<LoginScreenProps> = ({ setApiToken, setLoginError }) => {
 
                 <div className="absolute bottom-12 flex items-center space-x-6 opacity-30">
                     <p className="text-[10px] font-black text-slate-400 dark:text-zinc-600 uppercase tracking-[0.5em]">
-                        Built for Resilient Distributions
+                        Xây dựng cho hệ thống phân phối bền vững
                     </p>
                 </div>
             </div>

@@ -72,8 +72,8 @@ func (s *Server) processWebhookUpdate(update tgbotapi.Update) {
 			)
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-				service.GetErrorMessage("ACCESS DENIED",
-					"Anda belum terautentikasi untuk menggunakan bot ini.\nSilakan hubungi Owner untuk mendapatkan akses."))
+				service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI",
+					"Bạn chưa được cấp quyền sử dụng bot này\\.\nVui lòng liên hệ Owner để được cấp quyền truy cập\\."))
 			msg.ParseMode = tgbotapi.ModeMarkdownV2
 			msg.ReplyParameters.MessageID = update.Message.MessageID
 			_, _ = s.Service.Bot.Send(msg)
@@ -91,7 +91,7 @@ func (s *Server) processWebhookUpdate(update tgbotapi.Update) {
 				"data", data,
 			)
 
-			cb := tgbotapi.NewCallback(update.CallbackQuery.ID, "🚫 Access Denied")
+			cb := tgbotapi.NewCallback(update.CallbackQuery.ID, "🚫 Truy cập bị từ chối")
 			_, _ = s.Service.Bot.Request(cb)
 			return
 		}

@@ -49,7 +49,7 @@ func (tr *TaskRecovery) RecoverIncompleteTasks() error {
 	for _, record := range tasks {
 		if time.Since(record.CreatedAt) > 24*time.Hour {
 			slog.Info("Skipping old task", "taskID", record.ID)
-			_ = tr.DB.UpdateStatus(ctx, record.ID, string(domain.StatusExpired), "Task expired")
+			_ = tr.DB.UpdateStatus(ctx, record.ID, string(domain.StatusExpired), "Task đã hết hạn")
 			skipped++
 			continue
 		}
@@ -116,56 +116,56 @@ func (tr *TaskRecovery) createTaskFromRecord(record domain.TaskRecord) *Task {
 
 func (s *BotService) HandleRecoveryStatus(message *tgbotapi.Message) {
 	if message.From.ID != s.Config.OwnerID {
-		s.reply(message, "❌ *Akses Ditolak*")
+		s.reply(message, "❌ *Truy cập bị từ chối*")
 		return
 	}
 
 	ctx := context.Background()
 	tasks, err := s.DB.GetRecoverable(ctx)
 	if err != nil {
-		s.reply(message, "❌ *Gagal mengambil data recovery*")
+		s.reply(message, "❌ *Không lấy được dữ liệu khôi phục*")
 		return
 	}
 
 	if len(tasks) == 0 {
-		s.reply(message, "✅ *Tidak ada task yang perlu di\\-recover*")
+		s.reply(message, "✅ *Không có task nào cần khôi phục*")
 		return
 	}
 
 	var text strings.Builder
-	text.WriteString("🔄 *Recoverable Tasks*\n")
+	text.WriteString("🔄 *Task có thể khôi phục*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	for i, t := range tasks {
 		if i >= 10 {
-			fmt.Fprintf(&text, "\n_\\.\\.\\. dan %d task lainnya_", len(tasks)-10)
+			fmt.Fprintf(&text, "\n_\\.\\.\\. và %d task khác_", len(tasks)-10)
 			break
 		}
 		fmt.Fprintf(&text, "• `%s` • %s\n", t.ID, utils.EscapeMarkdownV2(t.Type))
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	text.WriteString("Use /recover to recover all tasks")
+	text.WriteString("Dùng /recover để khôi phục tất cả task")
 
 	s.reply(message, text.String())
 }
 
 func (s *BotService) HandleRecover(message *tgbotapi.Message) {
 	if message.From.ID != s.Config.OwnerID {
-		s.reply(message, "❌ *Akses Ditolak*")
+		s.reply(message, "❌ *Truy cập bị từ chối*")
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🔄 *Recovering tasks\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🔄 *Đang khôi phục task\\.\\.\\.*")
 	statusMsg.ParseMode = MarkdownV2
 	sent, _ := s.Bot.Send(statusMsg)
 
 	recovery := NewTaskRecovery(s.DB, s.TaskManager)
 	if err := recovery.RecoverIncompleteTasks(); err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Recovery failed*\n\n%s", utils.EscapeMarkdownV2(err.Error())))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Khôi phục thất bại*\n\n%s", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
 	activeTasks := s.TaskManager.GetActiveTasks()
-	s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("✅ *Recovery Complete*\n\nActive tasks: %d", len(activeTasks)))
+	s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("✅ *Khôi phục hoàn tất*\n\nTask đang chạy: %d", len(activeTasks)))
 }

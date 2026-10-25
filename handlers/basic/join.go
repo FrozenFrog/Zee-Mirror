@@ -13,7 +13,7 @@ import (
 
 func HandleJoin(s *service.BotService, m *tgbotapi.Message, args string) {
 	if args == "" {
-		reply := tgbotapi.NewMessage(m.Chat.ID, "⚠️ *Format Salah*\n\nGunakan: `/join <link invite>`\nContoh: `/join https://t.me/+FnboT0dqFiozNzA1`")
+		reply := tgbotapi.NewMessage(m.Chat.ID, "⚠️ *Sai định dạng*\n\nDùng: `/join <link invite>`\nVí dụ: `/join https://t.me/+FnboT0dqFiozNzA1`")
 		reply.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(reply)
 		return
@@ -40,7 +40,7 @@ func HandleJoin(s *service.BotService, m *tgbotapi.Message, args string) {
 	hash = strings.Split(hash, "/")[0]
 
 	if hash == "" {
-		msg := tgbotapi.NewMessage(m.Chat.ID, "❌ *Error:* Could not extract invite hash from link")
+		msg := tgbotapi.NewMessage(m.Chat.ID, "❌ *Lỗi:* Không lấy được hash mời từ liên kết")
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
 		msg.ReplyParameters.MessageID = m.MessageID
 		s.AutoDeleteMessage(m.Chat.ID, m.MessageID, 30*time.Second)
@@ -48,11 +48,11 @@ func HandleJoin(s *service.BotService, m *tgbotapi.Message, args string) {
 		return
 	}
 
-	msg := tgbotapi.NewMessage(m.Chat.ID, fmt.Sprintf("🔄 *Mencoba bergabung ke channel\\.\\.\\.*\nHash: `%s`", hash))
+	msg := tgbotapi.NewMessage(m.Chat.ID, fmt.Sprintf("🔄 *Đang thử tham gia channel\\.\\.\\.*\nHash: `%s`", hash))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	sentMsg, err := s.Bot.Send(msg)
 	if err != nil {
-		msg = tgbotapi.NewMessage(m.Chat.ID, fmt.Sprintf("🔄 Mencoba bergabung ke channel...\nHash: %s", hash))
+		msg = tgbotapi.NewMessage(m.Chat.ID, fmt.Sprintf("🔄 Đang thử tham gia channel...\nHash: %s", hash))
 		sentMsg, _ = s.Bot.Send(msg)
 	}
 
@@ -62,15 +62,15 @@ func HandleJoin(s *service.BotService, m *tgbotapi.Message, args string) {
 	text := ""
 	if err != nil {
 		if strings.Contains(err.Error(), "USER_ALREADY_PARTICIPANT") {
-			text = "✅ *Sudah Bergabung\\!* Bot sudah ada di dalam channel tersebut\\."
+			text = "✅ *Đã tham gia\\!* Bot đã ở trong channel này rồi\\."
 		} else {
-			text = fmt.Sprintf("❌ *Gagal Bergabung*\nError: `%s`", utils.EscapeMarkdownV2(err.Error()))
+			text = fmt.Sprintf("❌ *Tham gia thất bại*\nLỗi: `%s`", utils.EscapeMarkdownV2(err.Error()))
 		}
 	} else {
 		if result == "Already joined" {
-			text = "✅ *Sudah Bergabung\\!* Bot sudah ada di dalam channel tersebut\\."
+			text = "✅ *Đã tham gia\\!* Bot đã ở trong channel này rồi\\."
 		} else {
-			text = fmt.Sprintf("✅ *Berhasil\\!* %s", utils.EscapeMarkdownV2(result))
+			text = fmt.Sprintf("✅ *Thành công\\!* %s", utils.EscapeMarkdownV2(result))
 		}
 	}
 

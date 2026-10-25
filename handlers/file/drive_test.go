@@ -24,8 +24,8 @@ func TestGetFileIcon(t *testing.T) {
 
 func TestFormatDriveFileList(t *testing.T) {
 	empty := formatDriveFileList("/root", nil)
-	if !strings.Contains(empty, "kosong") {
-		t.Error("empty folder should report kosong")
+	if !strings.Contains(empty, "trống") {
+		t.Error("empty folder should report trống")
 	}
 
 	files := []service.DriveFile{
@@ -33,7 +33,7 @@ func TestFormatDriveFileList(t *testing.T) {
 		{Name: "movie.mkv", Size: 1024},
 	}
 	out := formatDriveFileList("/root", files)
-	for _, want := range []string{"FOLDERS", "FILES", "sub", "movie.mkv", "Folders: `1`", "Files: `1`"} {
+	for _, want := range []string{"THƯ MỤC", "FILE", "sub", "movie.mkv", "Thư mục: `1`", "File: `1`"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q", want)
 		}

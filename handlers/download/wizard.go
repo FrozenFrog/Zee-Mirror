@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	PromptMirrorURL = "🔗 Silakan kirim *URL* yang ingin Anda mirror:"
-	PromptRename    = "✏️ Silakan kirim *Nama Baru* untuk file ini:"
+	PromptMirrorURL = "🔗 Hãy gửi *URL* bạn muốn Mirror:"
+	PromptRename    = "✏️ Hãy gửi *Tên mới* cho file này:"
 )
 
 func HandleMirrorWizard(s *service.BotService, message *tgbotapi.Message) {
 	text := service.ProfessionalMessage("MIRROR WIZARD",
-		"Selamat datang di Mirror Wizard\\.\n"+
-			"Silakan pilih metode input yang Anda inginkan\\.")
+		"Chào mừng đến với Mirror Wizard\\.\n"+
+			"Hãy chọn phương thức nhập bạn muốn\\.")
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -39,8 +39,8 @@ func HandleMirrorWizardCallback(s *service.BotService, callback *tgbotapi.Callba
 	case "back_main":
 		HandleMirrorWizard(s, callback.Message)
 		text := service.ProfessionalMessage("MIRROR WIZARD",
-			"Selamat datang di Mirror Wizard\\.\n"+
-				"Silakan pilih metode input yang Anda inginkan\\.")
+			"Chào mừng đến với Mirror Wizard\\.\n"+
+				"Hãy chọn phương thức nhập bạn muốn\\.")
 
 		edit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		edit.ParseMode = tgbotapi.ModeMarkdownV2
@@ -64,10 +64,11 @@ func HandleMirrorWizardCallback(s *service.BotService, callback *tgbotapi.Callba
 func HandleWizardInput(s *service.BotService, message *tgbotapi.Message) {
 	replyText := message.ReplyToMessage.Text
 
-	if strings.Contains(replyText, "Silakan kirim URL") {
+	// The Indonesian marker matches prompts sent before the translation.
+	if strings.Contains(replyText, "Hãy gửi URL") || strings.Contains(replyText, "Silakan kirim URL") {
 		url := message.Text
 		if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "magnet") {
-			s.Reply(message, "❌ URL tidak valid. Harap kirim link http/https atau magnet.")
+			s.Reply(message, "❌ URL không hợp lệ\\. Hãy gửi link http/https hoặc Magnet\\.")
 			return
 		}
 
@@ -78,10 +79,10 @@ func HandleWizardInput(s *service.BotService, message *tgbotapi.Message) {
 func showWizardOptionsMenu(s *service.BotService, chatID int64, url string, isZip bool) {
 	cleanURL := utils.EscapeMarkdownV2(url)
 
-	text := fmt.Sprintf("⚙️ *Mirror Options*\n\n"+
+	text := fmt.Sprintf("⚙️ *Tùy chọn Mirror*\n\n"+
 		"🔗 *URL:* `%s`\n"+
 		"📦 *Zip:* %s\n\n"+
-		"Silakan atur opsi sebelum memulai\\.",
+		"Hãy thiết lập tùy chọn trước khi bắt đầu\\.",
 		cleanURL,
 		utils.BoolToEmoji(isZip),
 	)
@@ -114,10 +115,10 @@ func toggleWizardOption(s *service.BotService, callback *tgbotapi.CallbackQuery,
 	}
 
 	cleanURL := utils.EscapeMarkdownV2(url)
-	newText := fmt.Sprintf("⚙️ *Mirror Options*\n\n"+
+	newText := fmt.Sprintf("⚙️ *Tùy chọn Mirror*\n\n"+
 		"🔗 *URL:* `%s`\n"+
 		"📦 *Zip:* %s\n\n"+
-		"Silakan atur opsi sebelum memulai\\.",
+		"Hãy thiết lập tùy chọn trước khi bắt đầu\\.",
 		cleanURL,
 		utils.BoolToEmoji(isZip),
 	)
@@ -146,7 +147,7 @@ func executeWizardTask(s *service.BotService, callback *tgbotapi.CallbackQuery) 
 	}
 
 	if url == "" {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Failed to parse URL"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không đọc được URL"))
 		return
 	}
 
@@ -154,7 +155,7 @@ func executeWizardTask(s *service.BotService, callback *tgbotapi.CallbackQuery) 
 	task, err := s.TaskManager.CreateTask(service.TypeMirror, url, fileName, callback.Message.Chat.ID, callback.Message.MessageID, 0, callback.From.ID, isZip, false, "", "", 0, "", false)
 
 	if err != nil {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Error starting task"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi khi bắt đầu Task"))
 		return
 	}
 
@@ -162,5 +163,5 @@ func executeWizardTask(s *service.BotService, callback *tgbotapi.CallbackQuery) 
 	s.HandleAutoDelete(task)
 
 	_, _ = s.Bot.Request(tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID))
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🚀 Task Started"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🚀 Đã bắt đầu Task"))
 }

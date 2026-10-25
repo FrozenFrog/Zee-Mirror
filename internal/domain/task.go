@@ -40,8 +40,8 @@ const (
 )
 
 const (
-	BtnTextCloudLink = "☁️ Cloud Link"
-	BtnTextIndexURL  = "🌐 Index URL"
+	BtnTextCloudLink = "☁️ Link Cloud"
+	BtnTextIndexURL  = "🌐 Link Index"
 )
 
 type Task struct {

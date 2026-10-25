@@ -38,7 +38,7 @@ func HandleDriveList(s *service.BotService, message *tgbotapi.Message, args stri
 
 	files, err := listDriveFiles(s, fullPath)
 	if err != nil {
-		handleDriveError(s, message.Chat.ID, sent.MessageID, "Gagal memuat daftar file", err)
+		handleDriveError(s, message.Chat.ID, sent.MessageID, "Không tải được danh sách file", err)
 		return
 	}
 
@@ -90,7 +90,7 @@ func resolveDrivePath(s *service.BotService, args string) (string, string) {
 }
 
 func sendLoadingStatus(s *service.BotService, chatID int64, editMessageID int) (*tgbotapi.Message, error) {
-	loadingText := "🔍 *Memuat daftar file\\.\\.\\.*"
+	loadingText := "🔍 *Đang tải danh sách file\\.\\.\\.*"
 	if editMessageID != 0 {
 		editMsg := tgbotapi.NewEditMessageText(chatID, editMessageID, loadingText)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -111,7 +111,7 @@ func sendLoadingStatus(s *service.BotService, chatID int64, editMessageID int) (
 
 func handleDriveError(s *service.BotService, chatID int64, messageID int, title string, err error) {
 	slog.Error("Drive operation error", "title", title, "error", err)
-	errorText := fmt.Sprintf("❌ *%s*\n\nError: %s", title, utils.EscapeMarkdownV2(err.Error()))
+	errorText := fmt.Sprintf("❌ *%s*\n\nLỗi: %s", title, utils.EscapeMarkdownV2(err.Error()))
 	editMsg := tgbotapi.NewEditMessageText(chatID, messageID, errorText)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
@@ -144,7 +144,7 @@ func renderDriveList(s *service.BotService, chatID int64, messageID int, relPath
 
 	if _, err := s.Bot.Send(editMsg); err != nil {
 		slog.Error("Error sending final list message", "error", err)
-		handleDriveError(s, chatID, messageID, "Gagal menampilkan daftar file", err)
+		handleDriveError(s, chatID, messageID, "Không hiển thị được danh sách file", err)
 	}
 }
 
@@ -177,12 +177,12 @@ func listDriveFiles(s *service.BotService, path string) ([]service.DriveFile, er
 func formatDriveFileList(path string, files []service.DriveFile) string {
 	var text strings.Builder
 
-	text.WriteString("📂 *FILE MANAGER \\- GDRIVE*\n")
+	text.WriteString("📂 *QUẢN LÝ FILE \\- GDRIVE*\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&text, "📍 *PATH:* `%s`\n\n", utils.EscapeMarkdownV2Code(path))
+	fmt.Fprintf(&text, "📍 *ĐƯỜNG DẪN:* `%s`\n\n", utils.EscapeMarkdownV2Code(path))
 
 	if len(files) == 0 {
-		text.WriteString("📭 _Folder ini kosong_\n")
+		text.WriteString("📭 _Thư mục này trống_\n")
 	} else {
 		folderCount := 0
 		fileCount := 0
@@ -196,7 +196,7 @@ func formatDriveFileList(path string, files []service.DriveFile) string {
 		}
 
 		if len(folders) > 0 {
-			text.WriteString("📁 *FOLDERS*\n")
+			text.WriteString("📁 *THƯ MỤC*\n")
 			for _, f := range folders {
 				text.WriteString(f + "\n")
 			}
@@ -217,16 +217,16 @@ func formatDriveFileList(path string, files []service.DriveFile) string {
 		}
 
 		if len(fileList) > 0 {
-			text.WriteString("📄 *FILES*\n")
+			text.WriteString("📄 *FILE*\n")
 			for _, f := range fileList {
 				text.WriteString(f + "\n")
 			}
 			text.WriteString("\n")
 		}
 
-		text.WriteString("📊 *SUMMARY*\n")
-		fmt.Fprintf(&text, "📂 Folders: `%d`\n", folderCount)
-		fmt.Fprintf(&text, "📄 Files: `%d`\n", fileCount)
+		text.WriteString("📊 *TỔNG KẾT*\n")
+		fmt.Fprintf(&text, "📂 Thư mục: `%d`\n", folderCount)
+		fmt.Fprintf(&text, "📄 File: `%d`\n", fileCount)
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")

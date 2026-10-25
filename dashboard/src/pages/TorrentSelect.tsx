@@ -46,12 +46,12 @@ const TorrentSelect: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(!!sessionId)
   const [fileLoading, setFileLoading] = useState<boolean>(true)
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set())
-  const [error, setError] = useState<string | null>(!sessionId ? 'Invalid session ID' : null)
+  const [error, setError] = useState<string | null>(!sessionId ? 'ID phiên không hợp lệ' : null)
   const [starting, setStarting] = useState<boolean>(false)
   const [success, setSuccess] = useState<boolean>(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [statusLogs, setStatusLogs] = useState<string[]>([])
-  const [statusMessage, setStatusMessage] = useState<string>('Mengambil daftar file dari torrent...')
+  const [statusMessage, setStatusMessage] = useState<string>('Đang lấy danh sách file từ Torrent...')
 
   const fetchSession = useCallback(async () => {
     if (!sessionId) return
@@ -63,10 +63,10 @@ const TorrentSelect: React.FC = () => {
     } catch (err: any) {
       if (err.response?.status === 404) {
         setError(
-          'Session tidak ditemukan atau sudah kadaluarsa. Silakan kembali ke bot dan mulai ulang.',
+          'Không tìm thấy phiên hoặc phiên đã hết hạn. Vui lòng quay lại bot và bắt đầu lại.',
         )
       } else {
-        setError('Gagal memuat sesi: ' + (err.response?.data || err.message))
+        setError('Không thể tải phiên: ' + (err.response?.data || err.message))
       }
       setLoading(false)
     }
@@ -82,7 +82,7 @@ const TorrentSelect: React.FC = () => {
         if (response.data.loading) {
           setFileLoading(true)
           setStatusLogs(response.data.logs || [])
-          setStatusMessage(response.data.message || 'Mengambil metadata torrent...')
+          setStatusMessage(response.data.message || 'Đang lấy metadata Torrent...')
 
           if (response.data.error) {
             setError(response.data.error)
@@ -103,9 +103,9 @@ const TorrentSelect: React.FC = () => {
       } catch (err: any) {
         console.error('Failed to fetch files:', err)
         if (err.response?.status === 404) {
-          setError('Sesi tidak ditemukan atau sudah kadaluarsa.')
+          setError('Không tìm thấy phiên hoặc phiên đã hết hạn.')
         } else {
-          setError('Gagal mengambil daftar file: ' + (err.response?.data || err.message))
+          setError('Không thể lấy danh sách file: ' + (err.response?.data || err.message))
         }
         setFileLoading(false)
       }
@@ -147,7 +147,7 @@ const TorrentSelect: React.FC = () => {
 
   const handleStartDownload = async () => {
     if (selectedFiles.size === 0) {
-      setError('Pilih minimal satu file untuk didownload')
+      setError('Chọn ít nhất một file để tải xuống')
       return
     }
 
@@ -169,7 +169,7 @@ const TorrentSelect: React.FC = () => {
         window.close()
       }, 3000)
     } catch (err: any) {
-      setError('Gagal memulai download: ' + (err.response?.data || err.message))
+      setError('Không thể bắt đầu tải xuống: ' + (err.response?.data || err.message))
       setStarting(false)
     }
   }
@@ -217,7 +217,7 @@ const TorrentSelect: React.FC = () => {
       <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <Loader2 size={48} className="animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-slate-600 dark:text-white/60 text-lg">Memuat sesi torrent...</p>
+          <p className="text-slate-600 dark:text-white/60 text-lg">Đang tải phiên Torrent...</p>
         </div>
       </div>
     )
@@ -228,7 +228,7 @@ const TorrentSelect: React.FC = () => {
       <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-8">
         <div className="bg-white dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-3xl p-8 max-w-md text-center shadow-2xl">
           <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Error</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Lỗi</h2>
           <p className="text-slate-600 dark:text-white/60">{error}</p>
         </div>
       </div>
@@ -241,14 +241,14 @@ const TorrentSelect: React.FC = () => {
         <div className="bg-white dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-3xl p-8 max-w-md text-center shadow-2xl">
           <Check size={48} className="text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-            Download Dimulai!
+            Đã bắt đầu tải xuống!
           </h2>
           <p className="text-slate-600 dark:text-white/60">
-            Download telah dimulai. Anda dapat menutup halaman ini dan kembali ke bot untuk melihat
-            progress.
+            Quá trình tải xuống đã bắt đầu. Bạn có thể đóng trang này và quay lại bot để theo dõi
+            tiến độ.
           </p>
           <p className="text-slate-400 dark:text-white/40 text-sm mt-4">
-            Halaman akan ditutup otomatis...
+            Trang sẽ tự động đóng...
           </p>
         </div>
       </div>
@@ -268,14 +268,14 @@ const TorrentSelect: React.FC = () => {
           <div className="flex items-center space-x-3 mb-4">
             <div className="h-1 w-12 bg-blue-500 rounded-full" />
             <span className="text-xs font-bold tracking-widest text-blue-500 uppercase">
-              Torrent File Selection
+              Chọn file Torrent
             </span>
           </div>
           <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-2">
-            Pilih File untuk Download
+            Chọn file để tải xuống
           </h1>
           <p className="text-slate-600 dark:text-white/60">
-            Pilih file yang ingin Anda download dari torrent ini
+            Chọn các file bạn muốn tải xuống từ Torrent này
           </p>
         </div>
 
@@ -285,7 +285,7 @@ const TorrentSelect: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider mb-1">
-                  Magnet Link
+                  Liên kết Magnet
                 </p>
                 <p className="text-slate-700 dark:text-white/80 text-sm font-mono break-all">
                   {session.url?.slice(0, 100)}...
@@ -330,13 +330,13 @@ const TorrentSelect: React.FC = () => {
                 onClick={selectAll}
                 className="px-4 py-2 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-black hover:bg-blue-500/20 dark:hover:bg-blue-500/30 transition uppercase tracking-wider"
               >
-                Select All
+                Chọn tất cả
               </button>
               <button
                 onClick={deselectAll}
                 className="px-4 py-2 bg-slate-200/50 dark:bg-white/5 text-slate-600 dark:text-white/60 rounded-lg text-sm font-black hover:bg-slate-200 dark:hover:bg-white/10 transition uppercase tracking-wider"
               >
-                Deselect All
+                Bỏ chọn tất cả
               </button>
             </div>
             <button
@@ -357,7 +357,7 @@ const TorrentSelect: React.FC = () => {
                 <Loader2 size={40} className="animate-spin text-blue-500 mx-auto mb-4" />
                 <p className="text-slate-900 dark:text-white text-lg font-black">{statusMessage}</p>
                 <p className="text-slate-500 dark:text-white/40 text-sm mt-1">
-                  Halaman ini akan diperbarui otomatis saat file ditemukan.
+                  Trang này sẽ tự động cập nhật khi tìm thấy file.
                 </p>
               </div>
 
@@ -366,12 +366,12 @@ const TorrentSelect: React.FC = () => {
                 <div className="flex items-center space-x-2 mb-3 border-b border-slate-200 dark:border-white/5 pb-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                   <span className="text-slate-500 dark:text-white/40 uppercase tracking-widest font-bold">
-                    Bot Progress Logs
+                    Nhật ký tiến độ Bot
                   </span>
                 </div>
                 {statusLogs.length === 0 ? (
                   <p className="text-slate-400 dark:text-white/20 italic">
-                    Menunggu respon dari bot...
+                    Đang chờ phản hồi từ bot...
                   </p>
                 ) : (
                   statusLogs.map((log, i) => (
@@ -385,14 +385,14 @@ const TorrentSelect: React.FC = () => {
 
               <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 text-center">
                 <p className="text-slate-500 dark:text-white/40 text-sm mb-4 italic">
-                  &quot;Jika torrent memiliki banyak seeder, metadata biasanya didapat dalam &lt; 30
-                  detik. Namun untuk torrent lama bisa memakan waktu hingga beberapa menit.&quot;
+                  &quot;Nếu Torrent có nhiều Seeders, metadata thường được lấy trong &lt; 30
+                  giây. Tuy nhiên, với Torrent cũ có thể mất đến vài phút.&quot;
                 </p>
                 <button
                   onClick={() => handleStartDownload()}
                   className="px-6 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-white/40 rounded-lg text-xs font-black transition uppercase tracking-widest"
                 >
-                  Force Select All & Download
+                  Chọn tất cả & tải xuống ngay
                 </button>
               </div>
             </div>
@@ -403,16 +403,16 @@ const TorrentSelect: React.FC = () => {
                 className="text-yellow-600 dark:text-yellow-500 mx-auto mb-4"
               />
               <p className="text-slate-900 dark:text-white/60 font-black">
-                Tidak dapat mengambil daftar file
+                Không thể lấy danh sách file
               </p>
               <p className="text-slate-500 dark:text-white/40 text-sm mt-2">
-                Torrent mungkin hanya berisi satu file, atau metadata belum tersedia
+                Torrent có thể chỉ chứa một file, hoặc metadata chưa sẵn sàng
               </p>
               <button
                 onClick={handleStartDownload}
                 className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-blue-700 transition shadow-lg shadow-blue-500/20"
               >
-                Download Semua File
+                Tải xuống tất cả file
               </button>
             </div>
           ) : (
@@ -462,7 +462,7 @@ const TorrentSelect: React.FC = () => {
                           {folder}
                         </span>
                         <span className="text-slate-500 dark:text-white/40 text-xs font-bold uppercase">
-                          {folderFiles.length} files
+                          {folderFiles.length} file
                         </span>
                       </div>
                     )}
@@ -506,13 +506,14 @@ const TorrentSelect: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 dark:text-white/60 text-sm">
+                  Đã chọn{' '}
                   <span className="text-slate-900 dark:text-white font-black">{totalSelected}</span>{' '}
-                  dari{' '}
+                  /{' '}
                   <span className="text-slate-900 dark:text-white font-black">{files.length}</span>{' '}
-                  file dipilih
+                  file
                 </p>
                 <p className="text-slate-500 dark:text-white/40 text-sm mt-1">
-                  Total ukuran:{' '}
+                  Tổng dung lượng:{' '}
                   <span className="text-primary font-black">{formatBytes(totalSize)}</span>
                 </p>
               </div>
@@ -527,12 +528,12 @@ const TorrentSelect: React.FC = () => {
                 {starting ? (
                   <>
                     <Loader2 size={20} className="animate-spin" />
-                    <span>Memulai...</span>
+                    <span>Đang bắt đầu...</span>
                   </>
                 ) : (
                   <>
                     <Download size={20} />
-                    <span>Download {totalSelected} File</span>
+                    <span>Tải xuống {totalSelected} file</span>
                   </>
                 )}
               </button>

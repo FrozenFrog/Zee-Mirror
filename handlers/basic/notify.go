@@ -18,23 +18,23 @@ func HandleNotify(s *service.BotService, m *tgbotapi.Message, args string) {
 	}
 	arg := strings.TrimSpace(args)
 	if arg == "" {
-		notifyReply(s, m, "🔔 NOTIFY WEBHOOK\n\nGunakan: /notify <webhook_url>\nHapus: /notify off\n\nWebhook akan menerima POST JSON saat task kamu selesai/gagal.")
+		notifyReply(s, m, "🔔 WEBHOOK THÔNG BÁO\n\nDùng: /notify <webhook_url>\nXóa: /notify off\n\nWebhook sẽ nhận POST JSON khi Task của bạn hoàn thành/thất bại.")
 		return
 	}
 
 	if strings.EqualFold(arg, "off") {
 		n := s.SetUserNotify(m.From.ID, "")
-		notifyReply(s, m, fmt.Sprintf("🔕 Webhook notifikasi dinonaktifkan (%d task aktif)", n))
+		notifyReply(s, m, fmt.Sprintf("🔕 Đã tắt webhook thông báo (%d Task đang chạy)", n))
 		return
 	}
 
 	if !service.ValidNotifyURL(arg) {
-		notifyReply(s, m, "❌ URL tidak valid — harus http/https")
+		notifyReply(s, m, "❌ URL không hợp lệ — phải là http/https")
 		return
 	}
 
 	n := s.SetUserNotify(m.From.ID, arg)
-	text := fmt.Sprintf("✅ Webhook disimpan untuk %d task aktif\n\nURL: `%s`\nWebhook akan menerima POST JSON saat task selesai/gagal\\.",
+	text := fmt.Sprintf("✅ Đã lưu webhook cho %d Task đang chạy\n\nURL: `%s`\nWebhook sẽ nhận POST JSON khi Task hoàn thành/thất bại\\.",
 		n, utils.EscapeMarkdownV2Code(arg))
 	detail := tgbotapi.NewMessage(m.Chat.ID, text)
 	detail.ParseMode = tgbotapi.ModeMarkdownV2

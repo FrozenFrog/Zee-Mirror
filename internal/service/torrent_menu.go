@@ -71,7 +71,7 @@ func (s *BotService) CreateTorrentSession(url, name string, zip, unzip bool, pas
 
 func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQuery, parts []string) {
 	if len(parts) < 3 {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Sesi tidak valid"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên không hợp lệ"))
 		return
 	}
 
@@ -82,7 +82,7 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 	session, exists := s.TaskManager.TorrentSessions[sessionID]
 	if !exists {
 		s.TaskManager.Mu.Unlock()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Sesi tidak ditemukan atau sudah kadaluarsa"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không tìm thấy phiên hoặc phiên đã hết hạn"))
 		return
 	}
 
@@ -91,11 +91,11 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 		delete(s.TaskManager.TorrentSessions, sessionID)
 		s.TaskManager.Mu.Unlock()
 
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Memulai download semua file..."))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Bắt đầu tải tất cả file..."))
 
 		_, _ = s.Bot.Request(tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID))
 
-		confirmMsg := tgbotapi.NewMessage(callback.Message.Chat.ID, "✅ *Download dimulai*\n\nMendownload semua file dalam torrent\\.\\.\\.")
+		confirmMsg := tgbotapi.NewMessage(callback.Message.Chat.ID, "✅ *Đã bắt đầu tải*\n\nĐang tải tất cả file trong torrent\\.\\.\\.")
 		confirmMsg.ParseMode = MarkdownV2
 		sentMsg, _ := s.Bot.Send(confirmMsg)
 		statusMsgID := sentMsg.MessageID
@@ -125,13 +125,13 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 
 		if session.IsFetching {
 			s.TaskManager.Mu.Unlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "⏳ Masih mengambil metadata..."))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "⏳ Vẫn đang lấy metadata..."))
 			return
 		}
 
 		if len(session.Files) == 0 {
 			s.TaskManager.Mu.Unlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Gagal mendapatkan daftar file"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không lấy được danh sách file"))
 			return
 		}
 
@@ -163,13 +163,13 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 
 		s.TaskManager.Mu.Unlock()
 		s.ShowTorrentBrowseMenu(callback, sessionID, offset)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Pilihan diperbarui"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã cập nhật lựa chọn"))
 
 	case "start_sel":
 		selected := session.SelectedFiles
 		if len(selected) == 0 {
 			s.TaskManager.Mu.Unlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "⚠️ Pilih minimal satu file!"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "⚠️ Hãy chọn ít nhất một file!"))
 			return
 		}
 		s.TaskManager.Mu.Unlock()
@@ -189,7 +189,7 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 		delete(s.TaskManager.TorrentSessions, sessionID)
 		s.TaskManager.Mu.Unlock()
 
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Dibatalkan"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Đã hủy"))
 
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
@@ -198,7 +198,7 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 
 	default:
 		s.TaskManager.Mu.Unlock()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Aksi tidak valid"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Thao tác không hợp lệ"))
 	}
 }
 
@@ -255,7 +255,7 @@ func (s *BotService) StartTorrentWithSelectedFiles(sessionID string, selectedFil
 
 	_, _ = s.Bot.Request(tgbotapi.NewDeleteMessage(session.ChatID, session.MessageID))
 
-	confirmText := fmt.Sprintf("✅ *Download dimulai*\n\nMendownload %d file yang dipilih\\.\\.\\.", len(selectedFiles))
+	confirmText := fmt.Sprintf("✅ *Đã bắt đầu tải*\n\nĐang tải %d file đã chọn\\.\\.\\.", len(selectedFiles))
 	msg := tgbotapi.NewMessage(session.ChatID, confirmText)
 	msg.ParseMode = MarkdownV2
 	sentMsg, _ := s.Bot.Send(msg)

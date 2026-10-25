@@ -45,7 +45,7 @@ func (s *BotService) processTask(task *Task) {
 
 		tgFile, isOfficial, err := s.GetFileWithFallback(fileID)
 		if err != nil {
-			task.SetError(fmt.Sprintf("Failed to resolve Telegram file: %v", err))
+			task.SetError(fmt.Sprintf("Không lấy được file Telegram: %v", err))
 			s.updateTaskStatus(task)
 			return
 		}
@@ -111,7 +111,7 @@ func (s *BotService) executeDownloadEngine(engine downloader.DownloadEngine, tas
 	outputDir := filepath.Join(s.TaskManager.DownloadDir, task.ID)
 
 	if err := os.MkdirAll(outputDir, 0750); err != nil {
-		task.SetError(fmt.Sprintf("%v: failed to create output dir: %v", domain.ErrStorage, err))
+		task.SetError(fmt.Sprintf("%v: không tạo được thư mục đầu ra: %v", domain.ErrStorage, err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -181,7 +181,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 	slog.Info("findDownloadedFile result", "taskID", task.ID, "localPath", task.LocalPath, "outputDir", outputDir)
 	if task.LocalPath == "" {
 		if task.Error == "" {
-			task.SetError("Downloaded file not found")
+			task.SetError("Không tìm thấy file đã tải xuống")
 		}
 		s.updateTaskStatus(task)
 		s.cleanupTask(task)
@@ -191,7 +191,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 
 	if task.Unzip && (organizer.IsArchiveFile(task.LocalPath) || organizer.LooksLikeArchive(task.LocalPath)) {
 		if err := s.extractArchive(task); err != nil {
-			task.SetError(fmt.Sprintf("Extraction failed: %v", err))
+			task.SetError(fmt.Sprintf("Giải nén thất bại: %v", err))
 			s.updateTaskStatus(task)
 			s.cleanupTask(task)
 			return
@@ -200,7 +200,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 
 	if task.Zip {
 		if err := s.createZipArchive(task); err != nil {
-			task.SetError(fmt.Sprintf("Compression failed: %v", err))
+			task.SetError(fmt.Sprintf("Nén file thất bại: %v", err))
 			s.updateTaskStatus(task)
 			s.cleanupTask(task)
 			return
@@ -236,7 +236,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 			s.cleanupTask(task)
 			return
 		}
-		task.SetError(fmt.Sprintf("%v: Upload failed: %v", domain.ErrExternal, err))
+		task.SetError(fmt.Sprintf("%v: Tải lên thất bại: %v", domain.ErrExternal, err))
 	} else {
 		task.SetStatus(StatusCompleted)
 	}

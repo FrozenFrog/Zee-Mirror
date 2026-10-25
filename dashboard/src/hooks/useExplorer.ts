@@ -42,13 +42,13 @@ const useExplorer = (token: string) => {
         window.open(res.data.link, '_blank')
       } else {
         showAlert(
-          'Link Unavailable',
-          'No public distribution link is currently available for this resource.',
+          'Không có liên kết',
+          'Hiện chưa có liên kết công khai cho tài nguyên này.',
           { type: 'alert' },
         )
       }
     } catch {
-      showAlert('Extraction Error', 'Failed to generate a secure cloud link for this resource.', {
+      showAlert('Lỗi tạo liên kết', 'Không thể tạo liên kết đám mây bảo mật cho tài nguyên này.', {
         type: 'error',
       })
     }
@@ -57,19 +57,19 @@ const useExplorer = (token: string) => {
   const deleteFile = async (name: string) => {
     if (
       await showConfirm(
-        'Delete Resource',
-        `Permanently delete ${name}? This action will wipe the data from the cloud engine.`,
+        'Xóa tài nguyên',
+        `Xóa vĩnh viễn ${name}? Dữ liệu sẽ bị xóa khỏi kho lưu trữ đám mây.`,
       )
     ) {
       try {
         const path = explorerPath ? `${explorerPath}/${name}` : name
         await api.delete(`/api/explorer/remote?path=${encodeURIComponent(path)}`)
-        showToast('Resource deleted successfully', 'success')
+        showToast('Đã xóa tài nguyên thành công', 'success')
         fetchExplorer(explorerPath)
       } catch {
         showAlert(
-          'Elimination error',
-          'Failed to delete the specified cloud item from the storage matrix.',
+          'Lỗi khi xóa',
+          'Không thể xóa mục đã chọn khỏi kho lưu trữ đám mây.',
           { type: 'error' },
         )
       }
@@ -85,11 +85,11 @@ const useExplorer = (token: string) => {
       await api.post('/api/explorer/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      showToast(`Resource ${file.name} deployed successfully`, 'success')
+      showToast(`Đã tải lên ${file.name} thành công`, 'success')
       fetchExplorer(explorerPath)
       return { success: true }
     } catch (err: unknown) {
-      showAlert('Deployment Error', `Failed to upload ${file.name} to the remote matrix.`, {
+      showAlert('Lỗi tải lên', `Không thể tải ${file.name} lên kho lưu trữ từ xa.`, {
         type: 'error',
       })
       return { success: false, error: err }

@@ -129,14 +129,14 @@ func (s *BotService) HandleBatch(message *tgbotapi.Message, args string) {
 	options := parseBatchArguments(args)
 
 	if len(options.URLs) == 0 {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Error*\n\nTidak ada URL valid yang ditemukan\\.\n\nGunakan `/batch` untuk melihat cara penggunaan\\.")
+		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nKhông tìm thấy URL hợp lệ nào\\.\n\nGõ `/batch` để xem cách dùng\\.")
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
 	}
 
 	if !options.ZipAll {
-		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔄 *Creating %d regular tasks\\.\\.\\.*", len(options.URLs)))
+		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔄 *Đang tạo %d task thường\\.\\.\\.*", len(options.URLs)))
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 
@@ -172,9 +172,9 @@ func (s *BotService) updateBatchStatus(batch *BatchTask) {
 }
 
 func (s *BotService) sendBatchHelp(chatID int64) {
-	helpText := `📦 *Batch Download System*
+	helpText := `📦 *Hệ thống tải Batch*
 
-*Penggunaan:*
+*Cách dùng:*
 ` + "```" + `
 /batch
 URL1
@@ -182,13 +182,13 @@ URL2
 URL3
 ` + "```" + `
 
-*Flags Opsional:*
-• ` + "`-name <nama\\>`" + ` \\- Nama batch
-• ` + "`-z`" + ` atau ` + "`-zip`" + ` \\- Zip semua hasil
-• ` + "`-p <password\\>`" + ` \\- Password untuk zip
-• ` + "`-priority <1\\-10\\>`" + ` \\- Prioritas \\(default: 5\\)
+*Flag tùy chọn:*
+• ` + "`-name <tên\\>`" + ` \- Tên batch
+• ` + "`-z`" + ` hoặc ` + "`-zip`" + ` \- Nén zip toàn bộ kết quả
+• ` + "`-p <password\\>`" + ` \- Mật khẩu cho file zip
+• ` + "`-priority <1\\-10\\>`" + ` \- Độ ưu tiên \(mặc định: 5\)
 
-*Contoh:*
+*Ví dụ:*
 ` + "```" + `
 /batch -name MyDownloads -z
 [https://example.com/file1.zip](https://example.com/file1.zip)
@@ -196,11 +196,11 @@ URL3
 [https://example.com/file3.rar](https://example.com/file3.rar)
 ` + "```" + `
 
-*Fitur:*
-✅ Download multiple URL sekaligus
-✅ Zip semua hasil dalam satu archive
-✅ Queue management dengan prioritas
-✅ Progress tracking per\\-file dan total`
+*Tính năng:*
+✅ Tải nhiều URL cùng lúc
+✅ Nén toàn bộ kết quả vào một file zip
+✅ Quản lý hàng đợi theo độ ưu tiên
+✅ Theo dõi tiến độ từng file và tổng thể`
 	msg := tgbotapi.NewMessage(chatID, helpText)
 	msg.ParseMode = MarkdownV2
 	_, _ = s.Bot.Send(msg)
@@ -250,7 +250,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 	slog.Info("Processing batch task", "batchID", batch.ID, "count", len(batch.URLs))
 
 	if err := os.MkdirAll(batch.DownloadDir, 0750); err != nil {
-		batch.SetError(fmt.Sprintf("Failed to create batch directory: %v", err))
+		batch.SetError(fmt.Sprintf("Không tạo được thư mục batch: %v", err))
 		s.updateBatchStatus(batch)
 		return
 	}
@@ -341,7 +341,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 
 		err := s.zipBatchResults(batch)
 		if err != nil {
-			batch.SetError(fmt.Sprintf("Zip failed: %v", err))
+			batch.SetError(fmt.Sprintf("Nén zip thất bại: %v", err))
 			s.updateBatchStatus(batch)
 			s.cleanupBatch(batch)
 			return
@@ -352,7 +352,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 
 		err = s.uploadBatchResults(batch)
 		if err != nil {
-			batch.SetError(fmt.Sprintf("Upload failed: %v", err))
+			batch.SetError(fmt.Sprintf("Tải lên thất bại: %v", err))
 			s.updateBatchStatus(batch)
 			s.cleanupBatch(batch)
 			return
@@ -402,7 +402,7 @@ func (s *BotService) downloadBatchItem(batch *BatchTask, task *Task) error {
 
 	taskDir := filepath.Join(batch.DownloadDir, task.ID)
 	if err := os.MkdirAll(taskDir, 0750); err != nil {
-		return fmt.Errorf("%w: failed to create task directory: %v", domain.ErrStorage, err)
+		return fmt.Errorf("%w: không tạo được thư mục task: %v", domain.ErrStorage, err)
 	}
 
 	noRange := downloader.IsNonRangeURL(task.URL)
@@ -442,12 +442,12 @@ func (s *BotService) downloadBatchItem(batch *BatchTask, task *Task) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%w: aria2c failed: %v, output: %s", domain.ErrExternal, err, string(output))
+		return fmt.Errorf("%w: aria2c thất bại: %v, output: %s", domain.ErrExternal, err, string(output))
 	}
 
 	downloadedFile := findDownloadedFile(taskDir, task.Quality)
 	if downloadedFile == "" {
-		return fmt.Errorf("%w: no file downloaded", domain.ErrNotFound)
+		return fmt.Errorf("%w: không có file nào được tải xuống", domain.ErrNotFound)
 	}
 
 	task.LocalPath = downloadedFile
@@ -581,14 +581,14 @@ func (s *BotService) uploadBatchResults(batch *BatchTask) error {
 func (s *BotService) sendBatchCompletionMessage(batch *BatchTask) {
 	duration := batch.CompletedAt.Sub(batch.CreatedAt)
 
-	text := fmt.Sprintf(`✅ *Batch Download Selesai\\!*
+	text := fmt.Sprintf(`✅ *Tải Batch hoàn tất\!*
 
-🏷️ *Name:* %s
-📊 *Total Files:* %d
-✅ *Berhasil:* %d
-❌ *Gagal:* %d
-📦 *Total Size:* %s
-⏱️ *Duration:* %s`,
+🏷️ *Tên:* %s
+📊 *Tổng số file:* %d
+✅ *Thành công:* %d
+❌ *Thất bại:* %d
+📦 *Tổng dung lượng:* %s
+⏱️ *Thời gian:* %s`,
 		utils.EscapeMarkdownV2(batch.Name),
 		len(batch.URLs),
 		batch.Completed,
@@ -598,7 +598,7 @@ func (s *BotService) sendBatchCompletionMessage(batch *BatchTask) {
 	)
 
 	if batch.RemoteURL != "" {
-		text += fmt.Sprintf("\n\n🔗 *Link:* [Download](%s)", batch.RemoteURL)
+		text += fmt.Sprintf("\n\n🔗 *Link:* [Tải xuống](%s)", batch.RemoteURL)
 	}
 
 	msg := tgbotapi.NewMessage(batch.ChatID, text)
@@ -643,24 +643,24 @@ func (s *BotService) HandleBatchCallback(callback *tgbotapi.CallbackQuery, parts
 	s.BatchManager.Mu.RUnlock()
 
 	if !exists {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Batch not found"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không tìm thấy batch"))
 		return
 	}
 
 	switch action {
 	case CmdRefresh:
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Refreshed"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã làm mới"))
 		s.updateBatchStatus(batch)
 
 	case "cancel":
 		batch.Cancel()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🚫 Batch cancelled"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🚫 Đã hủy batch"))
 		s.updateBatchStatus(batch)
 
 	case CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Closed"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
 		return
 	}
 }

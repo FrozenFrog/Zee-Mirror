@@ -44,7 +44,7 @@ type VikingErrorResponse struct {
 
 func (s *BotService) HandleViking(message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.reply(message, GetErrorMessage("QUOTA EXCEEDED", err.Error()))
+		s.reply(message, GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
 		return
 	}
 
@@ -58,7 +58,7 @@ func (s *BotService) HandleViking(message *tgbotapi.Message, args string) {
 	if message.ReplyToMessage != nil {
 		fileID, _, _ := s.ExtractFileFromReply(message.ReplyToMessage)
 		if fileID != "" {
-			s.reply(message, "❌ *Error*\n\nReply file untuk Viking belum disupport saat ini (hanya URL).")
+			s.reply(message, "❌ *Lỗi*\n\nHiện chưa hỗ trợ reply file cho Viking \\(chỉ hỗ trợ URL\\)\\.")
 			return
 		}
 	}
@@ -84,7 +84,7 @@ func (s *BotService) HandleViking(message *tgbotapi.Message, args string) {
 		return
 	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Error*\n\nBerikan URL untuk di-upload ke ViKiNG FiLE.")
+	msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nVui lòng cung cấp URL để tải lên ViKiNG FiLE\\.")
 	msg.ParseMode = MarkdownV2
 	_, _ = s.Bot.Send(msg)
 }
@@ -99,12 +99,12 @@ func (s *BotService) UploadToViking(task *Task) error {
 
 	filePath := task.LocalPath
 	if filePath == "" {
-		return fmt.Errorf("%w: no file to upload", domain.ErrInvalidInput)
+		return fmt.Errorf("%w: không có file để tải lên", domain.ErrInvalidInput)
 	}
 
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return fmt.Errorf("%w: failed to stat file: %v", domain.ErrStorage, err)
+		return fmt.Errorf("%w: không đọc được thông tin file: %v", domain.ErrStorage, err)
 	}
 
 	fileSize := info.Size()
@@ -112,12 +112,12 @@ func (s *BotService) UploadToViking(task *Task) error {
 	slog.Info("Initiating Viking upload", "taskID", task.ID, "size", fileSize)
 	initResp, err := s.vikingGetUploadURL(fileSize)
 	if err != nil {
-		return fmt.Errorf("%w: failed to get upload url: %v", domain.ErrExternal, err)
+		return fmt.Errorf("%w: không lấy được URL tải lên: %v", domain.ErrExternal, err)
 	}
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("%w: failed to open file: %v", domain.ErrStorage, err)
+		return fmt.Errorf("%w: không mở được file: %v", domain.ErrStorage, err)
 	}
 	defer file.Close()
 
@@ -150,7 +150,7 @@ func (s *BotService) UploadToViking(task *Task) error {
 
 			etag, errUpload := s.vikingUploadPart(pURL, sectionReader, size)
 			if errUpload != nil {
-				errChan <- fmt.Errorf("%w: part %d failed: %v", domain.ErrExternal, pNum+1, errUpload)
+				errChan <- fmt.Errorf("%w: phần %d thất bại: %v", domain.ErrExternal, pNum+1, errUpload)
 				return
 			}
 			partsETags[pNum] = etag
@@ -180,7 +180,7 @@ func (s *BotService) UploadToViking(task *Task) error {
 
 	completeResp, err := s.vikingCompleteUpload(initResp.Key, initResp.UploadID, partsETags, task.FileName, s.Config.VikingUserHash)
 	if err != nil {
-		return fmt.Errorf("%w: failed to complete upload: %v", domain.ErrExternal, err)
+		return fmt.Errorf("%w: không hoàn tất được việc tải lên: %v", domain.ErrExternal, err)
 	}
 
 	task.Update(func() {

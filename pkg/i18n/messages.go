@@ -5,7 +5,93 @@ import (
 	"strings"
 )
 
+// DefaultLang is used for users without a language and for keys a language
+// does not translate.
+const DefaultLang = "vi"
+
 var translations = map[string]map[string]string{
+	"vi": {
+		"error_header":                "❌ *Lỗi*",
+		"access_denied":               "🚫 *Truy cập bị từ chối*\n\nBạn không có quyền sử dụng tính năng này\\.",
+		"quota_exceeded":              "⚠️ *Vượt hạn mức*\n\n%s",
+		"invalid_url":                 "❌ *URL không hợp lệ*\n\nVui lòng cung cấp URL đúng\\.",
+		"reply_required":              "❌ *Lỗi*\n\nHãy reply vào một file hoặc cung cấp URL\\.",
+		"ytdlp_analysis":              "🎬 Đang phân tích chất lượng video…",
+		"ytdlp_analysis_failed":       "❌ *Không phân tích được video:* %s\n\n_Kiểm tra lại URL hoặc thử lại sau\\._",
+		"ytdlp_select_quality":        "📽️ *Chọn chất lượng video*\n\nVideo này hỗ trợ các độ phân giải sau:",
+		"ytdlp_no_resolution":         "📽️ *Chọn chất lượng video*\n\nKhông nhận diện được độ phân giải, dùng chất lượng tốt nhất:",
+		"ytdlp_session_expired":       "❌ Phiên đã hết hạn",
+		"ytdlp_session_not_found":     "❌ Không tìm thấy phiên",
+		"ytdlp_playlist_error":        "❌ *Lỗi*\n\nURL bạn gửi là link Kênh hoặc Playlist\\. Hiện bot chỉ hỗ trợ tải từng video riêng lẻ\\.",
+		"download_started":            "✅ *Đã bắt đầu tải*",
+		"torrent_mirror_title":        "🧲 *TORRENT MIRROR*",
+		"torrent_select_all":          "📦 Chọn tất cả",
+		"torrent_select_files":        "📋 Chọn file \\(Web\\)",
+		"torrent_cancel":              "❌ Hủy",
+		"torrent_selected_start":      "✅ *Đã bắt đầu tải*\n\nĐang tải %d file đã chọn\\.\\.\\.",
+		"telegram_file_limit":         "\n\n⚠️ *Giới hạn của Telegram:* Bot chỉ tải được file tối đa 20MB qua server chính thức\\. Dùng *Local Bot API Server* để tải file tối đa 2GB\\.",
+		"no_active_tasks":             "❌ *Không có task nào đang chạy\\.*",
+		"dashboard_refreshed":         "🔄 Đã làm mới dashboard",
+		"paging_error":                "Không tìm thấy trang\\.",
+		"task_cancelled":              "Đã hủy task `%s`\\.",
+		"batch_cancelled":             "Đã hủy batch `%s`",
+		"sub_task_cancelled":          "Đã hủy task con `%s`",
+		"task_not_found":              "Không tìm thấy task/batch `%s`",
+		"admin_only":                  "Tính năng này chỉ dành cho Admin/Owner\\.",
+		"all_tasks_cancelled":         "Đã hủy %d task/batch đang chạy\\.",
+		"status_completed":            "Hoàn tất\\!",
+		"status_failed":               "Thất bại\\!",
+		"queuing":                     "Đang chờ hàng đợi",
+		"downloading":                 "Đang tải xuống",
+		"fetching":                    "Đang lấy từ Telegram",
+		"uploading":                   "Đang tải lên",
+		"cloning":                     "Đang sao chép",
+		"waiting":                     "Đang chờ",
+		"processing":                  "Đang xử lý",
+		"completed":                   "Hoàn tất",
+		"failed":                      "Thất bại",
+		"cancelled":                   "Đã hủy",
+		"invalid_magnet":              "❌ *Lỗi*\n\nVui lòng cung cấp magnet link\\.",
+		"torrent_select_web":          "🧲 *CHỌN FILE TORRENT*\n\nHãy chọn các file muốn tải qua Web Dashboard:",
+		"torrent_menu_text":           "🧲 *TORRENT MIRROR*\n━━━━━━━━━━━━━━━━━━━━━━\n\nChọn cách tải torrent này:\n\n📦 *Chọn tất cả* \\- Tải mọi file trong torrent\n📂 *Duyệt file* \\- Chọn file cụ thể qua Telegram\n📋 *Chọn file* \\- Chọn file cụ thể qua Web\n\n_Torrent thường chứa nhiều file trong thư mục\\. Dùng Duyệt file hoặc Chọn file để chọn những file cần tải\\._",
+		"torrent_browse_title":        "📂 *Danh sách file torrent*\nTổng: %d file\n\n_Chọn file muốn tải_",
+		"torrent_start_selected":      "🚀 Tải file đã chọn",
+		"welcome_title":               "ZEE\\-MIRROR BOT",
+		"welcome_content":             "👋 Xin chào, *%s*\\!\n\nChào mừng đến với *ZEE\\-MIRROR*\\.\nBot đa năng cho Mirror, Leech và các công cụ Media\\.\n\n🚀 *Thiết kế để nhanh và dễ dùng\\.*",
+		"help_title":                  "HƯỚNG DẪN SỬ DỤNG",
+		"help_content":                "Chọn một mục bên dưới để xem chi tiết chức năng và cách dùng\\.\n\n💡 *Bấm nút để mở menu con\\.*",
+		"help_download":               "📥 TẢI XUỐNG",
+		"help_monitor":                "📊 THEO DÕI",
+		"help_files":                  "📁 FILE",
+		"help_media":                  "🎵 MEDIA",
+		"help_task":                   "📋 TASK",
+		"help_storage":                "💾 LƯU TRỮ",
+		"help_admin":                  "👑 QUẢN TRỊ",
+		"help_recovery":               "🔧 KHÔI PHỤC",
+		"help_settings":               "⚙️ CÀI ĐẶT",
+		"help_all":                    "📋 TẤT CẢ LỆNH",
+		"help_home":                   "🔙 TRANG CHÍNH",
+		"help_close":                  "✖️ Đóng",
+		"help_back":                   "🔙 Quay lại",
+		"help_menu":                   "📖 Menu trợ giúp",
+		"language_set":                "✅ Đã đặt ngôn ngữ: *Tiếng Việt*",
+		"settings_title":              "Cài đặt bot",
+		"settings_auto_delete":        "Tự động xóa tin nhắn",
+		"settings_auto_delete_desc":   "Xóa tin nhắn trạng thái sau khi task xong \\(60 giây\\)",
+		"settings_default_mode":       "Chế độ mặc định",
+		"settings_default_mode_desc":  "Chế độ dùng khi không có flag",
+		"settings_ytdlp_quality":      "Chất lượng YT\\-DLP",
+		"settings_ytdlp_quality_desc": "Chất lượng mặc định cho YT\\-DLP",
+		"settings_cookies":            "Cookies",
+		"settings_cookies_desc":       "Trạng thái file cookies cho các trang cần đăng nhập",
+		"settings_language":           "Ngôn ngữ / Language",
+		"settings_footer":             "Bấm các nút bên dưới để thay đổi cài đặt\\.",
+		"settings_set_mirror":         "Chọn Mirror",
+		"settings_set_leech":          "Chọn Leech",
+		"settings_cookies_missing":    "Chưa có",
+		"settings_cookies_installed":  "Đã cài",
+		"settings_select_language":    "🌐 *Chọn ngôn ngữ*",
+	},
 	"id": {
 		"error_header":                "❌ *Error*",
 		"access_denied":               "🚫 *Akses Ditolak*\n\nAnda tidak memiliki izin untuk menggunakan fitur ini\\.",
@@ -270,19 +356,19 @@ var translations = map[string]map[string]string{
 
 func T(lang, key string, args ...any) string {
 	if lang == "" {
-		lang = "id"
+		lang = DefaultLang
 	}
 	lang = strings.ToLower(lang)
 
 	t, ok := translations[lang]
 	if !ok {
-		t = translations["id"]
+		t = translations[DefaultLang]
 	}
 
 	msg, ok := t[key]
 	if !ok {
-		if lang != "id" {
-			msg = translations["id"][key]
+		if lang != DefaultLang {
+			msg = translations[DefaultLang][key]
 		}
 		if msg == "" {
 			return key

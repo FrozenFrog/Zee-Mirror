@@ -60,7 +60,7 @@ func (e *Aria2Engine) Download(ctx context.Context, task *domain.Task, outputDir
 
 		content, readErr := os.ReadFile(filePath)
 		if readErr != nil {
-			return &domain.StorageError{Path: filePath, Err: fmt.Errorf("failed to read local torrent file: %v", readErr)}
+			return &domain.StorageError{Path: filePath, Err: fmt.Errorf("không đọc được file torrent cục bộ: %v", readErr)}
 		}
 
 		encoded := base64.StdEncoding.EncodeToString(content)
@@ -70,7 +70,7 @@ func (e *Aria2Engine) Download(ctx context.Context, task *domain.Task, outputDir
 	}
 
 	if err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("aria2 rpc add failed: %v", err)}
+		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("aria2 rpc thêm task thất bại: %v", err)}
 	}
 
 	task.GID = gid
@@ -113,7 +113,7 @@ func (e *Aria2Engine) Download(ctx context.Context, task *domain.Task, outputDir
 			}
 
 			if status.Status == "removed" {
-				return &domain.ExternalError{Tool: "aria2", Err: fmt.Errorf("task was removed")}
+				return &domain.ExternalError{Tool: "aria2", Err: fmt.Errorf("task đã bị xóa khỏi aria2")}
 			}
 
 			update := downloader.ProgressUpdate{}

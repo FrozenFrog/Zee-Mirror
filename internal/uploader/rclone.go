@@ -61,7 +61,7 @@ func (r *RcloneUploader) Upload(ctx context.Context, task *domain.Task, onProgre
 
 	uploadPath := task.LocalPath
 	if uploadPath == "" {
-		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("no file to upload")}
+		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("không có file để tải lên")}
 	}
 
 	totalSize := task.TotalSize
@@ -177,7 +177,7 @@ func (r *RcloneUploader) uploadToDest(ctx context.Context, task *domain.Task, up
 
 	err = cmd.Start()
 	if err != nil {
-		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("failed to start rclone: %v", err)}
+		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("không khởi động được rclone: %v", err)}
 	}
 
 	done := make(chan struct{})
@@ -240,7 +240,7 @@ func (r *RcloneUploader) uploadToDest(ctx context.Context, task *domain.Task, up
 		if task.Status == domain.StatusCancelled {
 			return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("task cancelled")}
 		}
-		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("rclone failed: %v", err)}
+		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("rclone thất bại: %v", err)}
 	}
 
 	if task.Status == domain.StatusCancelled {
@@ -318,7 +318,7 @@ func (r *RcloneUploader) UploadToCustomDest(ctx context.Context, content io.Read
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("rclone to %s failed: %v", dest, err), Output: string(output)}
+		return &domain.ExternalError{Tool: "rclone", Err: fmt.Errorf("rclone tải lên %s thất bại: %v", dest, err), Output: string(output)}
 	}
 	slog.Info("Upload to custom dest completed", "dest", dest, "fileName", fileName)
 	return nil
@@ -723,7 +723,7 @@ func (r *RcloneUploader) parseRcloneProgress(taskID string, reader io.ReadCloser
 			strings.Contains(lowerLine, "token_has_expired") ||
 			strings.Contains(lowerLine, "oauth2") && strings.Contains(lowerLine, "error") {
 			slog.Error("Rclone auth error detected", "taskID", taskID, "line", line)
-			onProgress(ProgressUpdate{Error: "Rclone token expired! Refresh token dengan: docker exec -it zee-mirror-bot rclone config"})
+			onProgress(ProgressUpdate{Error: "Token Rclone đã hết hạn! Làm mới token bằng: docker exec -it zee-mirror-bot rclone config"})
 		}
 
 		allMatches := segmentRegex.FindAllStringSubmatch(line, -1)

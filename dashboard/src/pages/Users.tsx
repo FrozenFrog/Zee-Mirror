@@ -1,6 +1,6 @@
 import { useState, SyntheticEvent } from 'react'
 import { useUsers } from '../hooks/useUsers'
-import { formatBytes } from '../utils/format'
+import { formatBytes, roleLabel } from '../utils/format'
 import { usePopups } from '../hooks/usePopups'
 import { UserPlus, RefreshCw, Edit2, Trash2, X, Activity, Calendar, KeyRound } from 'lucide-react'
 import { User } from '../types'
@@ -57,7 +57,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
     let result
     if (isAdding) {
       if (!newID) {
-        showAlert('Identity Required', 'Telegram User ID is necessary.', { type: 'error' })
+        showAlert('Thiếu thông tin', 'Vui lòng nhập ID người dùng Telegram.', { type: 'error' })
         return
       }
       result = await addUser({
@@ -80,15 +80,15 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
       if (result.apiKey) {
         showAlert('API Key', `X-API-Key: ${result.apiKey}`, { type: 'success' })
       } else {
-        showToast(isAdding ? 'Subject authorized' : 'Access updated', 'success')
+        showToast(isAdding ? 'Đã thêm người dùng' : 'Đã cập nhật quyền truy cập', 'success')
       }
     } else {
-      showAlert('Operation Failed', result?.error || 'Unknown error', { type: 'error' })
+      showAlert('Thao tác thất bại', result?.error || 'Lỗi không xác định', { type: 'error' })
     }
   }
 
   const handleRotateKey = async (user: User) => {
-    if (!(await showConfirm('Rotate API Key', `Issue a new API key for ${user.username || user.id}? The old key stops working.`))) return
+    if (!(await showConfirm('Đổi API Key', `Cấp API Key mới cho ${user.username || user.id}? Key cũ sẽ ngừng hoạt động.`))) return
     const result = await updateUser({
       id: user.id,
       role: user.role,
@@ -98,19 +98,19 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
       rotateApiKey: true,
     })
     if (result.success && result.apiKey) {
-      showAlert('New API Key', `X-API-Key: ${result.apiKey}`, { type: 'success' })
+      showAlert('API Key mới', `X-API-Key: ${result.apiKey}`, { type: 'success' })
     } else if (!result.success) {
-      showAlert('Rotation Failed', result.error || 'Unknown error', { type: 'error' })
+      showAlert('Đổi Key thất bại', result.error || 'Lỗi không xác định', { type: 'error' })
     }
   }
 
   const handleDelete = async (id: number) => {
-    if (await showConfirm('Revoke Access', 'Permanently disconnect this subject?')) {
+    if (await showConfirm('Thu hồi quyền truy cập', 'Xóa vĩnh viễn người dùng này?')) {
       const result = await deleteUser(id)
       if (result.success) {
-        showToast('Link terminated', 'success')
+        showToast('Đã thu hồi quyền truy cập', 'success')
       } else {
-        showAlert('Revoke Failed', result.error || 'Unknown error', { type: 'error' })
+        showAlert('Thu hồi thất bại', result.error || 'Lỗi không xác định', { type: 'error' })
       }
     }
   }
@@ -123,14 +123,14 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
           <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
             <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/80">
-              Security Protocol
+              Giao thức bảo mật
             </span>
           </div>
           <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
-            Subject Matrix
+            Quản lý người dùng
           </h1>
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            Manage neural link authorizations and resource allocations.
+            Quản lý quyền truy cập và hạn mức tài nguyên của người dùng.
           </p>
         </div>
 
@@ -140,7 +140,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
             className="px-8 py-4 bg-primary text-white rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 group"
           >
             <UserPlus size={18} className="group-hover:rotate-12 transition-transform" />
-            Authorize New
+            Thêm người dùng
           </button>
           <button
             onClick={fetchUsers}
@@ -165,19 +165,19 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
             <thead>
               <tr className="border-b border-slate-100 dark:border-white/5">
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Subject
+                  Người dùng
                 </th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
-                  Auth Status
+                  Vai trò
                 </th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
-                  Load Limits
+                  Hạn mức
                 </th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Expiry
+                  Hết hạn
                 </th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">
-                  Actions
+                  Thao tác
                 </th>
               </tr>
             </thead>
@@ -188,7 +188,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     <div className="flex flex-col items-center gap-4 opacity-40">
                       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                       <span className="text-[10px] font-black uppercase tracking-widest">
-                        Syncing Matrix...
+                        Đang đồng bộ...
                       </span>
                     </div>
                   </td>
@@ -199,7 +199,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     colSpan={5}
                     className="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic opacity-50"
                   >
-                    Empty Database
+                    Chưa có người dùng
                   </td>
                 </tr>
               ) : (
@@ -215,7 +215,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
-                            {user.username || 'Anonymous'}
+                            {user.username || 'Ẩn danh'}
                           </p>
                           <p className="text-[10px] font-mono text-slate-400">ID:{user.id}</p>
                           {user.apiKey && (
@@ -234,7 +234,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                                 : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
                             }`}
                         >
-                          {user.role}
+                          {roleLabel(user.role)}
                         </span>
                       </div>
                     </td>
@@ -242,12 +242,12 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                       <div className="flex flex-col items-center gap-1">
                         {user.maxDailyTasks === -1 ? (
                           <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            Tasks: {user.usedTasks ?? 0} / ∞
+                            Task: {user.usedTasks ?? 0} / ∞
                           </span>
                         ) : (
                           <div className="flex flex-col items-center gap-0.5 w-full">
                             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                              Tasks: {user.usedTasks ?? 0} / {user.maxDailyTasks}
+                              Task: {user.usedTasks ?? 0} / {user.maxDailyTasks}
                             </span>
                             <div className="w-24 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                               <div
@@ -259,12 +259,12 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                         )}
                         {user.maxDailyBandwidth === -1 ? (
                           <span className="text-[10px] font-bold text-slate-400">
-                            BW: {formatBytes(user.usedBandwidth ?? 0)} / ∞
+                            Băng thông: {formatBytes(user.usedBandwidth ?? 0)} / ∞
                           </span>
                         ) : (
                           <div className="flex flex-col items-center gap-0.5 w-full">
                             <span className="text-[10px] font-bold text-slate-400">
-                              BW: {formatBytes(user.usedBandwidth ?? 0)} / {formatBytes(user.maxDailyBandwidth)}
+                              Băng thông: {formatBytes(user.usedBandwidth ?? 0)} / {formatBytes(user.maxDailyBandwidth)}
                             </span>
                             <div className="w-24 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                               <div
@@ -280,8 +280,8 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                       <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400">
                         <Calendar size={12} className="text-primary/60" />
                         {user.expiresAt?.Valid
-                          ? new Date(user.expiresAt.Time).toLocaleDateString()
-                          : 'INFINITE'}
+                          ? new Date(user.expiresAt.Time).toLocaleDateString('vi-VN')
+                          : 'Vĩnh viễn'}
                       </div>
                     </td>
                     <td className="px-8 py-6 text-right">
@@ -323,10 +323,10 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
             <div className="px-8 py-6 bg-slate-50 dark:bg-white/[0.03] border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">
-                  {isAdding ? 'Authorize Subject' : 'Subject Protocol'}
+                  {isAdding ? 'Thêm người dùng' : 'Chỉnh sửa người dùng'}
                 </h2>
                 <p className="text-[10px] font-bold text-primary uppercase tracking-[0.3em] mt-1">
-                  {isAdding ? 'New Node Request' : `ID: ${editingUser?.id}`}
+                  {isAdding ? 'Yêu cầu cấp quyền mới' : `ID: ${editingUser?.id}`}
                 </p>
               </div>
               <button
@@ -354,7 +354,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                      Alias (Optional)
+                      Tên hiển thị (tùy chọn)
                     </label>
                     <input
                       type="text"
@@ -369,7 +369,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Privilege
+                    Vai trò
                   </label>
                   <select
                     value={role}
@@ -377,14 +377,14 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     disabled={!isAdding && editingUser?.role === 'owner'}
                     className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3 text-xs font-bold uppercase transition-all"
                   >
-                    <option value="user">User</option>
-                    <option value="authorized">Authorized</option>
-                    <option value="admin">Admin</option>
+                    <option value="user">Người dùng</option>
+                    <option value="authorized">Được cấp quyền</option>
+                    <option value="admin">Quản trị viên</option>
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Task Limit
+                    Giới hạn Task
                   </label>
                   <div className="relative">
                     <input
@@ -396,11 +396,11 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       {maxTasks === '-1' || maxTasks === -1 ? (
                         <span className="text-[8px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase">
-                          Unlocked
+                          Không giới hạn
                         </span>
                       ) : (
                         <span className="text-[8px] font-black text-slate-400 uppercase">
-                          Tasks
+                          Task
                         </span>
                       )}
                     </div>
@@ -411,7 +411,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Bandwidth Limit
+                    Giới hạn băng thông
                   </label>
                   <div className="relative">
                     <input
@@ -435,7 +435,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Link Expiry
+                    Ngày hết hạn
                   </label>
                   <input
                     type="date"
@@ -450,7 +450,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                 type="submit"
                 className="w-full py-4 bg-primary text-white rounded-xl font-black uppercase text-[10px] tracking-[0.3em] shadow-lg shadow-primary/20 hover:brightness-110 transition-all mt-4"
               >
-                {isAdding ? 'Establish Source Connection' : 'Apply Modification'}
+                {isAdding ? 'Thêm người dùng' : 'Lưu thay đổi'}
               </button>
             </form>
           </div>

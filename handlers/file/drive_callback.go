@@ -57,7 +57,7 @@ func handleCDCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, p
 		From: callback.From,
 	}
 	HandleDriveList(s, msg, fullPath, callback.Message.MessageID)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📂 Membuka folder..."))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📂 Đang mở thư mục..."))
 }
 
 func handleHomeCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
@@ -66,7 +66,7 @@ func handleHomeCallback(s *service.BotService, callback *tgbotapi.CallbackQuery)
 		From: callback.From,
 	}
 	HandleDriveList(s, msg, "", callback.Message.MessageID)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🏠 Kembali ke awal"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🏠 Về thư mục gốc"))
 }
 
 func handleInfoCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
@@ -78,7 +78,7 @@ func handleInfoCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 func handleCloseCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
 	deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 	_, _ = s.Bot.Request(deleteMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Closed"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
 }
 
 func handleConfirmDeleteCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
@@ -89,12 +89,12 @@ func handleConfirmDeleteCallback(s *service.BotService, callback *tgbotapi.Callb
 func handleCancelDeleteCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
 	deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 	_, _ = s.Bot.Request(deleteMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Cancelled"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Đã hủy"))
 }
 
 func executeDelete(s *service.BotService, callback *tgbotapi.CallbackQuery, fileName string) {
 	if fileName == "" || fileName == "/" || fileName == "." {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Invalid path"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Đường dẫn không hợp lệ"))
 		return
 	}
 
@@ -117,9 +117,9 @@ func executeDelete(s *service.BotService, callback *tgbotapi.CallbackQuery, file
 
 		if errPurge != nil {
 			slog.Error("purge also failed", "error", errPurge, "path", targetPath)
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Failed to delete"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Xóa thất bại"))
 
-			errMsg := fmt.Sprintf("❌ *Gagal menghapus file/folder*\n\nTarget: `%s`\nError: `%s`\nOutput: `%s`",
+			errMsg := fmt.Sprintf("❌ *Xóa file/thư mục thất bại*\n\nĐích: `%s`\nLỗi: `%s`\nĐầu ra: `%s`",
 				utils.EscapeMarkdownV2(fileName),
 				utils.EscapeMarkdownV2(errPurge.Error()),
 				utils.EscapeMarkdownV2(utils.TruncateString(string(outputPurge), 100)))
@@ -132,10 +132,10 @@ func executeDelete(s *service.BotService, callback *tgbotapi.CallbackQuery, file
 		slog.Info("Successfully deleted file", "path", targetPath)
 	}
 
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Deleted successfully"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Đã xóa thành công"))
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID,
-		fmt.Sprintf("✅ *File Dihapus*\n\n📁 `%s`", utils.EscapeMarkdownV2(fileName)))
+		fmt.Sprintf("✅ *Đã xóa file*\n\n📁 `%s`", utils.EscapeMarkdownV2(fileName)))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 
 	_, _ = s.Bot.Send(editMsg)

@@ -46,7 +46,7 @@ func (s *BotService) HandleTelegramFileDownload(message *tgbotapi.Message, fileI
 		slog.Error("Failed to get file from Telegram", "error", err, "fileID", fileID)
 		errText := err.Error()
 		lang := s.GetUserLanguage(message.From.ID)
-		msgText := fmt.Sprintf("❌ *Error:* %s", utils.EscapeMarkdownV2(errText))
+		msgText := fmt.Sprintf("❌ *Lỗi:* %s", utils.EscapeMarkdownV2(errText))
 
 		if strings.Contains(errText, "file is too big") {
 			msgText += i18n.T(lang, "telegram_file_limit")
@@ -66,10 +66,10 @@ func (s *BotService) HandleTelegramFileDownload(message *tgbotapi.Message, fileI
 		}
 		if err != nil {
 			slog.Error("Failed to store uploaded secret file", "file", fileName, "error", err)
-			s.reply(message, fmt.Sprintf("❌ *Gagal menyimpan %s*", utils.EscapeMarkdownV2(fileName)))
+			s.reply(message, fmt.Sprintf("❌ *Không lưu được %s*", utils.EscapeMarkdownV2(fileName)))
 			return
 		}
-		s.reply(message, fmt.Sprintf("✅ *%s Berhasil Diperbarui*", utils.EscapeMarkdownV2(fileName)))
+		s.reply(message, fmt.Sprintf("✅ *Đã cập nhật %s*", utils.EscapeMarkdownV2(fileName)))
 		return
 	}
 
@@ -165,7 +165,7 @@ func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {
 	for {
 		info, err := os.Stat(sourcePath)
 		if err != nil {
-			task.SetError(fmt.Sprintf("Local file not found: %v", err))
+			task.SetError(fmt.Sprintf("Không tìm thấy file cục bộ: %v", err))
 			s.updateTaskStatus(task)
 			return
 		}
@@ -207,7 +207,7 @@ func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {
 
 	info, err := os.Stat(sourcePath)
 	if err != nil {
-		task.SetError(fmt.Sprintf("Local file not found: %v", err))
+		task.SetError(fmt.Sprintf("Không tìm thấy file cục bộ: %v", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -228,7 +228,7 @@ func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {
 	cleanedSource := filepath.Clean(sourcePath)
 	source, err := os.Open(cleanedSource)
 	if err != nil {
-		task.SetError(fmt.Sprintf("Failed to open source file: %v", err))
+		task.SetError(fmt.Sprintf("Không mở được file nguồn: %v", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -237,7 +237,7 @@ func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {
 	cleanedDest := filepath.Clean(destPath)
 	dest, err := os.Create(cleanedDest)
 	if err != nil {
-		task.SetError(fmt.Sprintf("Failed to create destination file: %v", err))
+		task.SetError(fmt.Sprintf("Không tạo được file đích: %v", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -262,12 +262,12 @@ func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {
 				copied += int64(nw)
 			}
 			if writeErr != nil {
-				task.SetError(fmt.Sprintf("Failed to copy file: %v", writeErr))
+				task.SetError(fmt.Sprintf("Sao chép file thất bại: %v", writeErr))
 				s.updateTaskStatus(task)
 				return
 			}
 			if nr != nw {
-				task.SetError("Failed to copy file: short write")
+				task.SetError("Sao chép file thất bại: ghi thiếu dữ liệu")
 				s.updateTaskStatus(task)
 				return
 			}
@@ -296,7 +296,7 @@ func (s *BotService) HandleLocalFileDownload(task *Task, outputDir string) {
 			if readErr == io.EOF {
 				break
 			}
-			task.SetError(fmt.Sprintf("Failed to copy file: %v", readErr))
+			task.SetError(fmt.Sprintf("Sao chép file thất bại: %v", readErr))
 			s.updateTaskStatus(task)
 			return
 		}

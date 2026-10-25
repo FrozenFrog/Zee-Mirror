@@ -15,7 +15,7 @@ export const useUsers = (apiToken: string) => {
       setUsers(response.data || [])
       setError(null)
     } catch {
-      setError('Failed to fetch users')
+      setError('Không thể tải danh sách người dùng')
     } finally {
       setLoading(false)
     }
@@ -28,9 +28,9 @@ export const useUsers = (apiToken: string) => {
         await fetchUsers()
         return { success: true, apiKey: (response.data as { apiKey?: string }).apiKey }
       }
-      return { success: false, error: 'Update failed' }
+      return { success: false, error: 'Cập nhật thất bại' }
     } catch {
-      return { success: false, error: 'Network error' }
+      return { success: false, error: 'Lỗi mạng' }
     }
   }
 
@@ -41,9 +41,9 @@ export const useUsers = (apiToken: string) => {
         await fetchUsers()
         return { success: true }
       }
-      return { success: false, error: 'Delete failed' }
+      return { success: false, error: 'Xóa thất bại' }
     } catch {
-      return { success: false, error: 'Network error' }
+      return { success: false, error: 'Lỗi mạng' }
     }
   }
 
@@ -54,9 +54,9 @@ export const useUsers = (apiToken: string) => {
         await fetchUsers()
         return { success: true, apiKey: (response.data as { apiKey?: string }).apiKey }
       }
-      return { success: false, error: (response.data as { error?: string }).error || 'Add failed' }
+      return { success: false, error: (response.data as { error?: string }).error || 'Thêm thất bại' }
     } catch {
-      return { success: false, error: 'Network error' }
+      return { success: false, error: 'Lỗi mạng' }
     }
   }
 

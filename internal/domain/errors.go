@@ -145,32 +145,32 @@ func GetUserMessage(err error) string {
 	}
 
 	if errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrAuth) {
-		return "⚠️ Akses ditolak. Silakan hubungi pemilik bot."
+		return "⚠️ Truy cập bị từ chối. Vui lòng liên hệ chủ bot."
 	}
 	if errors.Is(err, ErrDuplicateTask) {
-		return "🚫 Tugas yang sama sudah sedang berjalan."
+		return "🚫 Task tương tự đang chạy."
 	}
 	if errors.Is(err, ErrLimitExceeded) || errors.Is(err, ErrQuota) {
-		return "📉 Limit harian Anda telah habis."
+		return "📉 Bạn đã dùng hết hạn mức hôm nay."
 	}
 	if errors.Is(err, ErrNotFound) {
-		return "🔍 File atau resource tidak ditemukan."
+		return "🔍 Không tìm thấy file hoặc tài nguyên."
 	}
 	if errors.Is(err, ErrLinkExpired) {
-		return "🔗 Link sudah kedaluwarsa atau tidak valid. Silakan gunakan link baru."
+		return "🔗 Link đã hết hạn hoặc không hợp lệ. Vui lòng dùng link mới."
 	}
 	if errors.Is(err, ErrInvalidInput) {
-		return "❓ Input tidak valid. Periksa kembali perintah Anda."
+		return "❓ Dữ liệu không hợp lệ. Vui lòng kiểm tra lại lệnh."
 	}
 	if errors.Is(err, ErrNetwork) {
-		return "🌐 Terjadi masalah koneksi jaringan. Silakan coba lagi."
+		return "🌐 Có sự cố kết nối mạng. Vui lòng thử lại."
 	}
 	if errors.Is(err, ErrStorage) {
-		return "💾 Terjadi masalah penyimpanan. Disk mungkin penuh."
+		return "💾 Có sự cố lưu trữ. Ổ đĩa có thể đã đầy."
 	}
 	if errors.Is(err, ErrExternal) {
-		return "🔧 Layanan eksternal sedang bermasalah. Coba lagi nanti."
+		return "🔧 Dịch vụ bên ngoài đang gặp sự cố. Vui lòng thử lại sau."
 	}
 
-	return "❌ Terjadi kesalahan internal. Silakan coba lagi nanti."
+	return "❌ Đã xảy ra lỗi nội bộ. Vui lòng thử lại sau."
 }

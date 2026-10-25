@@ -55,9 +55,9 @@ const (
 
 const (
 	MarkdownV2       = "MarkdownV2"
-	StatusHeaderText = "📊 *Status Task Aktif*\n\n"
+	StatusHeaderText = "📊 *Trạng thái Task đang chạy*\n\n"
 	UnknownFile      = "unknown_file"
-	UnlimitedStr     = "Unlimited"
+	UnlimitedStr     = "Không giới hạn"
 
 	ModeLeech  = "leech"
 	CmdRefresh = "refresh"
@@ -69,7 +69,7 @@ const (
 	IconFolder = "📁"
 	IconFile   = "📄"
 	IconOK     = "✅ OK"
-	IconError  = "❌ ERROR"
+	IconError  = "❌ LỖI"
 
 	CleanupInterval = 30 * time.Minute
 )
@@ -387,13 +387,13 @@ func (tm *TaskManager) validateTaskConstraints(url, quality string, userID int64
 		if tm.DB != nil && !tm.isPrivileged(userID) {
 			oldTask, errDB := tm.DB.GetCompletedTaskByURL(context.Background(), url, quality)
 			if errDB == nil && oldTask != nil {
-				return fmt.Errorf("%w: file already exists in cloud/database", domain.ErrDuplicateTask)
+				return fmt.Errorf("%w: file đã có trên cloud/database", domain.ErrDuplicateTask)
 			}
 		}
 	}
 
 	if !tm.RateLimiter.Allow(userID) {
-		return fmt.Errorf("%w: limit 5 tasks/min exceeded", domain.ErrLimitExceeded)
+		return fmt.Errorf("%w: vượt giới hạn 5 task/phút", domain.ErrLimitExceeded)
 	}
 
 	return nil
@@ -861,12 +861,12 @@ func (s *BotService) HandleConfirmCallback(callback *tgbotapi.CallbackQuery, par
 	action := parts[1]
 	switch action {
 	case "yes":
-		text := "✅ *Dikonfirmasi*"
+		text := "✅ *Đã xác nhận*"
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 	case "no":
-		text := "❌ *Dibatalkan*"
+		text := "❌ *Đã hủy*"
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(editMsg)

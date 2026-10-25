@@ -44,7 +44,7 @@ func TestHelpDetailMessage(t *testing.T) {
 
 func TestGetStatusHeader(t *testing.T) {
 	result := service.GetStatusHeader()
-	assert.Contains(t, result, "STATUS TASK AKTIF")
+	assert.Contains(t, result, "TRẠNG THÁI TASK ĐANG CHẠY")
 }
 
 func TestFormatTaskProfessional(t *testing.T) {
@@ -117,7 +117,7 @@ func TestFormatTaskProfessional(t *testing.T) {
 		}
 
 		result := service.FormatTaskProfessional("en", snapshot)
-		assert.Contains(t, result, "Unknown")
+		assert.Contains(t, result, "Không rõ")
 	})
 }
 
@@ -156,5 +156,5 @@ func TestRepoURL(t *testing.T) {
 }
 
 func TestUnknownSize(t *testing.T) {
-	assert.Equal(t, "Unknown", service.UnknownSize)
+	assert.Equal(t, "Không rõ", service.UnknownSize)
 }

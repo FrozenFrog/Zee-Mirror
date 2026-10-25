@@ -69,7 +69,7 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 	case CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Closed"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
 		return
 
 	default:
@@ -110,7 +110,7 @@ func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, te
 	_, err := s.Bot.Send(editMsg)
 	if err != nil {
 		slog.Error("Error editing help message", "error", err)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Error loading menu"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi khi tải menu"))
 	} else {
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	}
@@ -121,7 +121,7 @@ func handleDownloadHelp(s *service.BotService, callback *tgbotapi.CallbackQuery,
 
 	switch action {
 	case "download":
-		text = service.ProfessionalMessage("📥 DOWNLOAD", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("📥 TẢI XUỐNG", "Chọn lệnh để xem chi tiết:")
 	case "cmd_mirror":
 		text = GetHelpMirror()
 	case "cmd_leech":
@@ -152,7 +152,7 @@ func handleMonitorHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 
 	switch action {
 	case "monitor":
-		text = service.ProfessionalMessage("📊 MONITOR", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("📊 THEO DÕI", "Chọn lệnh để xem chi tiết:")
 	case "cmd_status":
 		text = GetHelpStatus()
 	case "cmd_stats":
@@ -179,7 +179,7 @@ func handleFilesHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, ac
 
 	switch action {
 	case "files":
-		text = service.ProfessionalMessage("📁 FILES", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("📁 FILE", "Chọn lệnh để xem chi tiết:")
 	case "cmd_ls":
 		text = GetHelpLs()
 	case "cmd_mkdir":
@@ -204,7 +204,7 @@ func handleMediaHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, ac
 
 	switch action {
 	case "media":
-		text = service.ProfessionalMessage("🎵 MEDIA", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("🎵 MEDIA", "Chọn lệnh để xem chi tiết:")
 	case "cmd_extractaudio":
 		text = GetHelpExtractAudio()
 	case "cmd_compress":
@@ -235,7 +235,7 @@ func handleTaskHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, act
 
 	switch action {
 	case "task":
-		text = service.ProfessionalMessage("📋 TASK", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("📋 TASK", "Chọn lệnh để xem chi tiết:")
 	case "cmd_cancel":
 		text = GetHelpCancel()
 	case "cmd_cancelall":
@@ -252,7 +252,7 @@ func handleStorageHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 
 	switch action {
 	case "storage":
-		text = service.ProfessionalMessage("💾 STORAGE", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("💾 LƯU TRỮ", "Chọn lệnh để xem chi tiết:")
 	case "cmd_storages":
 		text = GetHelpStorages()
 	case "cmd_setstorage":
@@ -269,7 +269,7 @@ func handleAdminHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, ac
 
 	switch action {
 	case "admin":
-		text = service.ProfessionalMessage("👑 ADMIN", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("👑 QUẢN TRỊ", "Chọn lệnh để xem chi tiết:")
 	case "cmd_authorize":
 		text = GetHelpAuthorize()
 	case "cmd_unauthorize":
@@ -292,7 +292,7 @@ func handleRecoveryHelp(s *service.BotService, callback *tgbotapi.CallbackQuery,
 
 	switch action {
 	case "recovery":
-		text = service.ProfessionalMessage("🔧 RECOVERY", "Pilih command untuk melihat detail lengkap:")
+		text = service.ProfessionalMessage("🔧 KHÔI PHỤC", "Chọn lệnh để xem chi tiết:")
 	case "cmd_recover":
 		text = GetHelpRecover()
 	case "cmd_recoverystatus":

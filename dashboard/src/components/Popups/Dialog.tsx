@@ -22,8 +22,8 @@ const Dialog: React.FC<DialogProps> = ({
   title,
   children,
   type = 'info',
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = 'Xác nhận',
+  cancelText = 'Hủy',
   onConfirm,
   showCancel = true,
   loading = false,
@@ -102,7 +102,7 @@ const Dialog: React.FC<DialogProps> = ({
                   !showCancel && 'w-full',
                 )}
               >
-                {loading ? 'Processing...' : confirmText}
+                {loading ? 'Đang xử lý...' : confirmText}
               </button>
             </div>
           </motion.div>

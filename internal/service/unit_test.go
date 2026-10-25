@@ -176,7 +176,7 @@ func TestFormatDriveFileList(t *testing.T) {
 
 	text := bs.FormatDriveFileList("/root", nil)
 	assert.Contains(t, text, "/root")
-	assert.Contains(t, text, "kosong")
+	assert.Contains(t, text, "trống")
 
 	files := []DriveFile{
 		{Name: "Movies", IsDir: true},
@@ -186,8 +186,8 @@ func TestFormatDriveFileList(t *testing.T) {
 	text = bs.FormatDriveFileList("/data", files)
 	assert.Contains(t, text, "Movies")
 	assert.Contains(t, text, "file1.zip")
-	assert.Contains(t, text, "Folders: `1`")
-	assert.Contains(t, text, "Files: `2`")
+	assert.Contains(t, text, "Thư mục: `1`")
+	assert.Contains(t, text, "File: `2`")
 }
 
 func TestGetTaskByGID(t *testing.T) {

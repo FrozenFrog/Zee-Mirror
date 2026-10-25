@@ -81,16 +81,16 @@ func (s *MediaService) GenerateScreenshotsList(inputPath string, count int) ([]s
 		"-of", "default=noprint_wrappers=1:nokey=1", "file:"+cleanInput)
 	durationOutput, err := durationCmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get duration: %w", err)
+		return nil, fmt.Errorf("không lấy được thời lượng video: %w", err)
 	}
 
 	var duration float64
 	if _, err := fmt.Sscanf(strings.TrimSpace(string(durationOutput)), "%f", &duration); err != nil {
-		return nil, fmt.Errorf("failed to parse duration: %w", err)
+		return nil, fmt.Errorf("không đọc được thời lượng video: %w", err)
 	}
 
 	if duration <= 0 {
-		return nil, fmt.Errorf("invalid video duration")
+		return nil, fmt.Errorf("thời lượng video không hợp lệ")
 	}
 
 	interval := duration / float64(count+1)
@@ -128,15 +128,15 @@ func (s *MediaService) FormatMediaInfo(filename string, info FFProbeOutput) stri
 
 	fmt.Fprintf(&content, "📄 *File:* `%s`\n", utils.EscapeMarkdownV2Code(filename))
 	size, _ := strconv.ParseInt(info.Format.Size, 10, 64)
-	fmt.Fprintf(&content, "⚖️ *Size:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(size)))
+	fmt.Fprintf(&content, "⚖️ *Dung lượng:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(size)))
 
 	durationSec, _ := strconv.ParseFloat(info.Format.Duration, 64)
 	duration := time.Duration(durationSec * float64(time.Second))
-	fmt.Fprintf(&content, "🕒 *Duration:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatDuration(duration)))
+	fmt.Fprintf(&content, "🕒 *Thời lượng:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatDuration(duration)))
 
 	bitrate, _ := strconv.ParseInt(info.Format.BitRate, 10, 64)
-	fmt.Fprintf(&content, "📊 *Overall Bitrate:* `%s/s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(bitrate/8)))
-	fmt.Fprintf(&content, "📦 *Format:* `%s`\n", utils.EscapeMarkdownV2Code(info.Format.FormatName))
+	fmt.Fprintf(&content, "📊 *Bitrate tổng:* `%s/s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(bitrate/8)))
+	fmt.Fprintf(&content, "📦 *Định dạng:* `%s`\n", utils.EscapeMarkdownV2Code(info.Format.FormatName))
 
 	videoCount := 0
 	audioCount := 0
@@ -144,28 +144,28 @@ func (s *MediaService) FormatMediaInfo(filename string, info FFProbeOutput) stri
 		switch st.CodecType {
 		case "video":
 			videoCount++
-			fmt.Fprintf(&content, "\n🎬 *VIDEO STREAM \\#%d*\n", videoCount)
+			fmt.Fprintf(&content, "\n🎬 *LUỒNG VIDEO \\#%d*\n", videoCount)
 			fmt.Fprintf(&content, " • *Codec:* `%s`\n", utils.EscapeMarkdownV2Code(st.CodecName))
-			fmt.Fprintf(&content, " • *Resolution:* `%dx%d`\n", st.Width, st.Height)
+			fmt.Fprintf(&content, " • *Độ phân giải:* `%dx%d`\n", st.Width, st.Height)
 			if st.DisplayAspectRatio != "" {
-				fmt.Fprintf(&content, " • *Aspect Ratio:* `%s`\n", utils.EscapeMarkdownV2Code(st.DisplayAspectRatio))
+				fmt.Fprintf(&content, " • *Tỉ lệ khung hình:* `%s`\n", utils.EscapeMarkdownV2Code(st.DisplayAspectRatio))
 			}
-			fmt.Fprintf(&content, " • *Pixel Format:* `%s`\n", utils.EscapeMarkdownV2Code(st.PixFmt))
+			fmt.Fprintf(&content, " • *Định dạng pixel:* `%s`\n", utils.EscapeMarkdownV2Code(st.PixFmt))
 			fpsParts := strings.Split(st.RFrameRate, "/")
 			if len(fpsParts) == 2 {
 				f1, _ := strconv.ParseFloat(fpsParts[0], 64)
 				f2, _ := strconv.ParseFloat(fpsParts[1], 64)
 				if f2 > 0 {
-					fmt.Fprintf(&content, " • *Frame Rate:* `%.2f fps`\n", f1/f2)
+					fmt.Fprintf(&content, " • *Tốc độ khung hình:* `%.2f fps`\n", f1/f2)
 				}
 			}
 		case "audio":
 			audioCount++
-			fmt.Fprintf(&content, "\n🎵 *AUDIO STREAM \\#%d*\n", audioCount)
+			fmt.Fprintf(&content, "\n🎵 *LUỒNG AUDIO \\#%d*\n", audioCount)
 			fmt.Fprintf(&content, " • *Codec:* `%s`\n", utils.EscapeMarkdownV2Code(st.CodecName))
-			fmt.Fprintf(&content, " • *Channels:* `%d` \\(%s\\)\n", st.Channels, utils.EscapeMarkdownV2(st.ChannelLayout))
+			fmt.Fprintf(&content, " • *Kênh:* `%d` \\(%s\\)\n", st.Channels, utils.EscapeMarkdownV2(st.ChannelLayout))
 			sampleRate, _ := strconv.ParseInt(st.SampleRate, 10, 64)
-			fmt.Fprintf(&content, " • *Sample Rate:* `%.1f kHz`\n", float64(sampleRate)/1000.0)
+			fmt.Fprintf(&content, " • *Tần số lấy mẫu:* `%.1f kHz`\n", float64(sampleRate)/1000.0)
 			if st.BitRate != "" {
 				abr, _ := strconv.ParseInt(st.BitRate, 10, 64)
 				fmt.Fprintf(&content, " • *Bitrate:* `%s/s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(abr/8)))
@@ -175,7 +175,7 @@ func (s *MediaService) FormatMediaInfo(filename string, info FFProbeOutput) stri
 
 	content.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")
 
-	return ProfessionalMessage("✨ MEDIA INFORMATION ✨", content.String())
+	return ProfessionalMessage("✨ THÔNG TIN MEDIA ✨", content.String())
 }
 
 func (s *BotService) DownloadTelegramFile(fileID, fileName string) (string, error) {

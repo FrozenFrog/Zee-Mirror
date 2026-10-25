@@ -13,6 +13,7 @@ import (
 	"zee-mirror/internal/forum"
 	"zee-mirror/internal/repository"
 	"zee-mirror/internal/secretfs"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -236,9 +237,9 @@ func (s *BotService) HandleCreateTaskError(chatID int64, messageID int, err erro
 
 	text := ""
 	if errors.Is(err, domain.ErrDuplicateTask) {
-		text = fmt.Sprintf("⚠️ *Download Dibatalkan*\n\n%s", utils.EscapeMarkdownV2(err.Error()))
+		text = fmt.Sprintf("⚠️ *Đã hủy tải xuống*\n\n%s", utils.EscapeMarkdownV2(err.Error()))
 	} else {
-		text = fmt.Sprintf("❌ *Gagal membuat task:*\n%s", utils.EscapeMarkdownV2(err.Error()))
+		text = fmt.Sprintf("❌ *Không tạo được task:*\n%s", utils.EscapeMarkdownV2(err.Error()))
 	}
 
 	msg := tgbotapi.NewMessage(chatID, text)
@@ -305,7 +306,7 @@ func (s *BotService) GetFileWithFallback(fileID string) (tgbotapi.File, bool, er
 	select {
 	case <-time.After(60 * time.Second):
 		slog.Warn("GetFile timed out from official TG API", "fileID", fileID)
-		return tgbotapi.File{}, false, fmt.Errorf("timeout resolving Telegram file: %s", fileID)
+		return tgbotapi.File{}, false, fmt.Errorf("hết thời gian chờ lấy file Telegram: %s", fileID)
 	case offRes := <-offDone:
 		if offRes.err != nil {
 			// The official API cannot serve files above 20MB ("file is too
@@ -329,7 +330,7 @@ func (s *BotService) GetFileWithFallback(fileID string) (tgbotapi.File, bool, er
 func (s *BotService) GetUserLanguage(userID int64) string {
 	user, err := s.DB.GetByID(context.Background(), userID)
 	if err != nil || user.Language == "" {
-		return "id"
+		return i18n.DefaultLang
 	}
 	return user.Language
 }
@@ -351,7 +352,7 @@ func (s *BotService) SyncUser(user *tgbotapi.User) {
 		}
 	}
 
-	lang := "id"
+	lang := i18n.DefaultLang
 	maxTasks := s.Config.DefaultMaxDailyTasks
 	maxBandwidth := s.Config.DefaultMaxDailyBandwidth
 	createdAt := time.Now()
