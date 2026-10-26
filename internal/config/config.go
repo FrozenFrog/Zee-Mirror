@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -14,8 +13,6 @@ import (
 	"unicode"
 	"zee-mirror/internal/crypto"
 	"zee-mirror/pkg/utils"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -45,6 +42,7 @@ type Config struct {
 	IndexURL                 string
 	TelegramAPI              string
 	DashboardURL             string
+	DashboardToken           string
 	OIDCIssuer               string
 	OIDCClientID             string
 	OIDCClientSecret         string
@@ -110,7 +108,7 @@ func LoadConfig() *Config {
 		TelegramAPI:              src.str("TELEGRAM_API"),
 		RcloneDest:               src.str("RCLONE_DEST"),
 		DownloadDir:              src.strOr("DOWNLOAD_DIR", "/app/downloads"),
-		ConfigDir:                src.strOr("CONFIG_DIR", "/app/config"),
+		ConfigDir:                src.strOr("CONFIG_DIR", defaultConfigDir),
 		MaxConcurrentDownloads:   src.int("MAX_CONCURRENT_DOWNLOADS", 3),
 		DashboardPort:            src.int("DASHBOARD_PORT_INTERNAL", 5248),
 		LogLevel:                 src.strOr("LOG_LEVEL", "info"),
@@ -120,6 +118,7 @@ func LoadConfig() *Config {
 		SmartAutoOrganization:    src.bool("SMART_AUTO_ORGANIZATION", false),
 		IndexURL:                 src.str("INDEX_URL"),
 		DashboardURL:             src.strOr("WEB_DASHBOARD_URL", "127.0.0.1"),
+		DashboardToken:           src.str("WEB_DASHBOARD_TOKEN"),
 		DefaultMaxDailyTasks:     src.int("DEFAULT_MAX_DAILY_TASKS", -1),
 		DefaultMaxDailyBandwidth: utils.ParseBytesString(src.strOr("DEFAULT_MAX_DAILY_BANDWIDTH", "-1")),
 		StopDuplicate:            src.bool("STOP_DUPLICATE", false),
@@ -142,7 +141,6 @@ func LoadConfig() *Config {
 		RclonePacerBurst:         src.strOr("RCLONE_PACER_BURST", "200"),
 		RcloneLogLevel:           src.strOr("RCLONE_LOG_LEVEL", "NOTICE"),
 		AutoCleanupDays:          src.int("AUTO_CLEANUP_DAYS", 30),
-		DBDriver:                 src.strOr("DB_DRIVER", "postgres"),
 		DatabaseURL:              src.str("DATABASE_URL"),
 		SecretsDir:               src.strOr("SECRETS_DIR", "/dev/shm"),
 		SecretsSeedDir:           src.str("SECRETS_SEED_DIR"),
@@ -166,6 +164,8 @@ func LoadConfig() *Config {
 			}
 		}
 	}
+
+	cfg.DBDriver = resolveDBDriver(src.str("DB_DRIVER"), cfg.DatabaseURL)
 
 	cfg.AuthorizedChats = ParseAuthorizedChats(src.str("AUTHORIZED_CHATS"))
 
@@ -195,6 +195,24 @@ func LoadConfig() *Config {
 
 var currentConfig atomic.Value
 
+// resolveDBDriver defaults to sqlite. A postgres DATABASE_URL without
+// DB_DRIVER still selects postgres, so older deployments keep their data.
+func resolveDBDriver(driver, dsn string) string {
+	switch d := strings.ToLower(strings.TrimSpace(driver)); d {
+	case "":
+		if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+			return "postgres"
+		}
+		return "sqlite"
+	case "postgresql", "pgx":
+		return "postgres"
+	case "sqlite3":
+		return "sqlite"
+	default:
+		return d
+	}
+}
+
 // SettingsSource returns config values stored in the database, keyed by the
 // same names as the environment variables (BOT_TOKEN, OWNER_ID, ...).
 type SettingsSource func(ctx context.Context) (map[string]string, error)
@@ -202,11 +220,10 @@ type SettingsSource func(ctx context.Context) (map[string]string, error)
 var (
 	dbSettings     atomic.Pointer[map[string]string]
 	settingsSource atomic.Pointer[SettingsSource]
-	settingKeyRe   = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 )
 
 func init() {
-	_ = godotenv.Load()
+	loadDotEnv()
 	currentConfig.Store(LoadConfig())
 }
 
@@ -229,9 +246,9 @@ func loadSettings(ctx context.Context, src SettingsSource) error {
 		return fmt.Errorf("load settings from database: %w", err)
 	}
 	vals := make(map[string]string, len(all))
-	for k, v := range all {
-		if settingKeyRe.MatchString(k) {
-			vals[k] = v
+	for _, k := range settingKeys {
+		if v, ok := all[k.name]; ok {
+			vals[k.name] = v
 		}
 	}
 	dbSettings.Store(&vals)
@@ -239,9 +256,7 @@ func loadSettings(ctx context.Context, src SettingsSource) error {
 }
 
 func Reload() *Config {
-	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
-		slog.Warn("Failed to load .env file", "error", err)
-	}
+	loadDotEnv()
 	if src := settingsSource.Load(); src != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err := loadSettings(ctx, *src)
@@ -265,7 +280,8 @@ func Reload() *Config {
 }
 
 // source resolves a config key: non-empty environment variable first, then
-// the database settings, then the fallback. "enc:" values are decrypted.
+// the database settings, then the fallback. Bootstrap keys never come from
+// the database. "enc:" values are decrypted.
 type source struct {
 	settings map[string]string
 	key      []byte
@@ -292,6 +308,9 @@ func newSource() source {
 func (s source) lookup(name string) (string, bool) {
 	if v := os.Getenv(name); v != "" {
 		return s.decrypt(name, v), true
+	}
+	if isBootstrapKey(name) {
+		return "", false
 	}
 	if v, ok := s.settings[name]; ok && v != "" {
 		return s.decrypt(name, v), true
@@ -364,6 +383,27 @@ func (c *Config) OIDCEnabled() bool {
 	return c.OIDCIssuer != ""
 }
 
+// minDashboardTokenLen keeps WEB_DASHBOARD_TOKEN out of brute-force range.
+const minDashboardTokenLen = 16
+
+// ValidateBootstrap checks the settings needed to open the database. They
+// can only come from the environment.
+func (c *Config) ValidateBootstrap() error {
+	switch c.DBDriver {
+	case "sqlite":
+	case "postgres":
+		if c.DatabaseURL == "" {
+			return fmt.Errorf("DATABASE_URL must be set when DB_DRIVER=postgres")
+		}
+	default:
+		return fmt.Errorf("unsupported DB_DRIVER %q (use sqlite or postgres)", c.DBDriver)
+	}
+	if len(c.EncryptionKey) == 0 {
+		return fmt.Errorf("ENCRYPTION_KEY must be set to 64 hex characters (openssl rand -hex 32)")
+	}
+	return nil
+}
+
 func (c *Config) Validate() error {
 	if len(c.BotTokens) == 0 {
 		return fmt.Errorf("BOT_TOKEN or BOT_TOKENS must be set")
@@ -371,13 +411,17 @@ func (c *Config) Validate() error {
 	if c.OwnerID == 0 {
 		return fmt.Errorf("OWNER_ID must be set")
 	}
+	if c.DashboardToken == "" && !c.OIDCEnabled() {
+		return fmt.Errorf("dashboard sign-in needs WEB_DASHBOARD_TOKEN or OIDC_ISSUER")
+	}
+	if c.DashboardToken != "" && len(c.DashboardToken) < minDashboardTokenLen {
+		return fmt.Errorf("WEB_DASHBOARD_TOKEN must be at least %d characters", minDashboardTokenLen)
+	}
 	if c.OIDCEnabled() && (c.OIDCClientID == "" || c.OIDCRedirectURL == "") {
 		return fmt.Errorf("OIDC_ISSUER needs OIDC_CLIENT_ID and OIDC_REDIRECT_URL (or an http(s) WEB_DASHBOARD_URL)")
 	}
-	if !c.OIDCEnabled() {
-		slog.Warn("OIDC_ISSUER not set: nobody can sign in to the web dashboard")
-	} else if len(c.OIDCAllowedGroups) == 0 {
-		slog.Warn("OIDC_ALLOWED_GROUPS not set: nobody can sign in to the web dashboard")
+	if c.OIDCEnabled() && len(c.OIDCAllowedGroups) == 0 {
+		slog.Warn("OIDC_ALLOWED_GROUPS not set: nobody can sign in to the web dashboard through OIDC")
 	}
 	if c.UseWebhook && c.WebhookSecret == "" {
 		return fmt.Errorf("WEBHOOK_SECRET must be set when USE_WEBHOOK=true (webhook endpoint is unauthenticated without it)")

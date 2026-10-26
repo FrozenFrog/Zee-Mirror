@@ -119,12 +119,13 @@ func (s *Server) oauth2Config(provider *oidc.Provider) *oauth2.Config {
 	}
 }
 
-// handleAuthConfig tells the login page whether sign-in is configured.
+// handleAuthConfig tells the login page which sign-in methods are configured.
 func (s *Server) handleAuthConfig(w http.ResponseWriter, _ *http.Request) {
 	cfg := s.Service.Config
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"oidc":         cfg.OIDCEnabled(),
+		"token":        cfg.DashboardToken != "",
 		"providerName": cfg.OIDCProviderName,
 	})
 }

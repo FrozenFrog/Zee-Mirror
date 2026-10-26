@@ -43,8 +43,8 @@ const (
 
 // settingKeys maps each managed file to its row in the settings table.
 var settingKeys = map[string]string{
-	RcloneConfig: "rclone_config",
-	Cookies:      "cookies",
+	RcloneConfig: repository.SettingRcloneConfig,
+	Cookies:      repository.SettingCookies,
 }
 
 // allowDiskFallback lets dev machines without tmpfs (macOS) run on a regular

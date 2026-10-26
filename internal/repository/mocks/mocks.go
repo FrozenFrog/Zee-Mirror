@@ -163,6 +163,17 @@ func (m *MockRepository) Set(ctx context.Context, key, value string) error {
 	return args.Error(0)
 }
 
+func (m *MockRepository) AllSettings(ctx context.Context) (map[string]string, error) {
+	args := m.Called(ctx)
+	vals, _ := args.Get(0).(map[string]string)
+	return vals, args.Error(1)
+}
+
+func (m *MockRepository) DeleteSetting(ctx context.Context, key string) error {
+	args := m.Called(ctx, key)
+	return args.Error(0)
+}
+
 func (m *MockRepository) SetLanguage(ctx context.Context, id int64, lang string) error {
 	args := m.Called(ctx, id, lang)
 	return args.Error(0)

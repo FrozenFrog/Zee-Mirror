@@ -85,10 +85,17 @@ const vi = {
   'login.header': 'Đăng nhập hệ thống',
   'login.hello': 'Xin chào.',
   'login.notConfigured':
-    'Chưa cấu hình đăng nhập. Hãy đặt OIDC_ISSUER và OIDC_CLIENT_ID trong env của bot.',
+    'Chưa cấu hình đăng nhập. Hãy đặt WEB_DASHBOARD_TOKEN hoặc OIDC_ISSUER và OIDC_CLIENT_ID.',
   'login.verifyIdentity': 'Hãy xác minh danh tính để kết nối.',
   'login.signInWith': 'Đăng nhập bằng {provider}',
   'login.viaOidc': 'Xác thực qua OpenID Connect',
+  'login.tokenLabel': 'Token dashboard',
+  'login.signInWithToken': 'Đăng nhập',
+  'login.tokenInvalid': 'Token không đúng.',
+  'login.tooManyAttempts': 'Sai quá nhiều lần. Hãy thử lại sau 15 phút.',
+  'login.loginFailed': 'Đăng nhập thất bại. Kiểm tra bot có đang chạy không.',
+  'login.or': 'hoặc',
+  'login.viaToken': 'Xác thực bằng token dashboard',
   'login.footer': 'Xây dựng cho hệ thống phân phối bền vững',
   // OIDC error codes sent by the backend in /#oidc_error=<code>
   'oidcError.provider_unreachable': 'Không kết nối được {provider}',
@@ -243,7 +250,7 @@ const vi = {
   'settings.readWriteOk': 'Đọc/Ghi OK',
   'settings.saveConfig': 'Lưu cấu hình',
   'settings.restartNote':
-    'Lưu ý: Một số biến môi trường có thể cần khởi động lại Node để áp dụng các tham số mới.',
+    'Lưu vào database. Dòng đánh dấu (env) lấy từ biến môi trường và được ưu tiên hơn. Một số thay đổi cần khởi động lại bot.',
   'settings.synced': 'Đã đồng bộ cấu hình',
   'settings.systemError': 'Lỗi hệ thống',
   'settings.syncFailed': 'Không thể đồng bộ cài đặt hệ thống.',

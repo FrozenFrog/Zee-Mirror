@@ -18,24 +18,30 @@ ingress:
     secretName: zee-mirror-tls
 
 config:
+  # Required: 64 hex chars (openssl rand -hex 32). Encrypts secrets in the
+  # settings table and signs dashboard sessions.
+  encryptionKey: ""
+  # Everything below is saved to the settings table on start; values left
+  # empty are taken from the database.
   botToken: ""
   ownerID: ""
-  # Web dashboard sign-in through OpenID Connect (e.g. Pocket-ID).
+  # Web dashboard sign-in: dashboardToken (16+ chars), OIDC, or both.
+  dashboardToken: ""
   oidc:
     issuer: ""
     clientID: ""
     clientSecret: ""
     redirectURL: ""     # default: <WEB_DASHBOARD_URL>/api/auth/oidc/callback
-    allowedGroups: ""   # comma separated, empty = any group
+    allowedGroups: ""   # comma separated, required for OIDC sign-in
   logLevel: info
   logFormat: json
   rcloneDest: "gdrive:/Zee-Mirror"
   rcloneConf: ""
   downloadDir: /app/downloads
   configDir: /app/config
-  dbDriver: postgres
+  # sqlite (default, stored in configDir) or postgres (needs databaseURL).
+  dbDriver: ""
   databaseURL: ""
-  redisURL: ""
   sentryDSN: ""
   maxConcurrentDownloads: 3
   stopDuplicate: false

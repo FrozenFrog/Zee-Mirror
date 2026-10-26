@@ -95,13 +95,13 @@ func NewBotService(bot *tgbotapi.BotAPI, cfg *config.Config, db repository.FullR
 	go s.startPathCacheCleanup()
 
 	ctx := context.Background()
-	if val, err := db.Get(ctx, "auto_delete_messages"); err == nil {
+	if val, err := db.Get(ctx, repository.SettingAutoDeleteMessages); err == nil {
 		s.Settings.AutoDeleteMessages = (val == "true")
 	}
-	if val, err := db.Get(ctx, "default_mode"); err == nil {
+	if val, err := db.Get(ctx, repository.SettingDefaultMode); err == nil {
 		s.Settings.DefaultMode = val
 	}
-	if val, err := db.Get(ctx, "ytdlp_quality"); err == nil {
+	if val, err := db.Get(ctx, repository.SettingYtdlpQuality); err == nil {
 		s.Settings.YTDLPQuality = val
 	}
 
@@ -118,7 +118,7 @@ func NewBotService(bot *tgbotapi.BotAPI, cfg *config.Config, db repository.FullR
 	s.TaskManager = tm
 
 	var alertChannelID int64
-	if alertCh, err := db.Get(ctx, "alert_channel_id"); err == nil {
+	if alertCh, err := db.Get(ctx, repository.SettingAlertChannelID); err == nil {
 		_, _ = fmt.Sscanf(alertCh, "%d", &alertChannelID)
 	}
 	s.Notifications = NewNotificationService(bot, alertChannelID, cfg.OwnerID)

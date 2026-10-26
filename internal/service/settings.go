@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"zee-mirror/internal/repository"
 	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
@@ -68,10 +69,10 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 	ctx := context.Background()
 	action := parts[1]
 	s.Settings.Mu.Lock()
-	if val, err := s.DB.Get(ctx, "auto_delete_messages"); err == nil {
+	if val, err := s.DB.Get(ctx, repository.SettingAutoDeleteMessages); err == nil {
 		s.Settings.AutoDeleteMessages = (val == "true")
 	}
-	if val, err := s.DB.Get(ctx, "default_mode"); err == nil {
+	if val, err := s.DB.Get(ctx, repository.SettingDefaultMode); err == nil {
 		s.Settings.DefaultMode = val
 	}
 	s.Settings.Mu.Unlock()
@@ -88,7 +89,7 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 		status := s.Settings.AutoDeleteMessages
 		s.Settings.Mu.Unlock()
 
-		_ = s.DB.Set(ctx, "auto_delete_messages", fmt.Sprintf("%v", status))
+		_ = s.DB.Set(ctx, repository.SettingAutoDeleteMessages, fmt.Sprintf("%v", status))
 
 		if status {
 			toast(i18n.T(lang, "settings_toast_auto_delete_on"))
@@ -100,35 +101,35 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 		s.Settings.Mu.Lock()
 		s.Settings.DefaultMode = string(TypeMirror)
 		s.Settings.Mu.Unlock()
-		_ = s.DB.Set(ctx, "default_mode", string(TypeMirror))
+		_ = s.DB.Set(ctx, repository.SettingDefaultMode, string(TypeMirror))
 		toast(i18n.T(lang, "settings_toast_default_mode", "📥", "Mirror"))
 
 	case "default_leech":
 		s.Settings.Mu.Lock()
 		s.Settings.DefaultMode = string(TypeLeech)
 		s.Settings.Mu.Unlock()
-		_ = s.DB.Set(ctx, "default_mode", string(TypeLeech))
+		_ = s.DB.Set(ctx, repository.SettingDefaultMode, string(TypeLeech))
 		toast(i18n.T(lang, "settings_toast_default_mode", "🔗", "Leech"))
 
 	case "quality_720":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "720p"
 		s.Settings.Mu.Unlock()
-		_ = s.DB.Set(ctx, "ytdlp_quality", "720p")
+		_ = s.DB.Set(ctx, repository.SettingYtdlpQuality, "720p")
 		toast(i18n.T(lang, "settings_toast_quality", "720p"))
 
 	case "quality_1080":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "1080p"
 		s.Settings.Mu.Unlock()
-		_ = s.DB.Set(ctx, "ytdlp_quality", "1080p")
+		_ = s.DB.Set(ctx, repository.SettingYtdlpQuality, "1080p")
 		toast(i18n.T(lang, "settings_toast_quality", "1080p"))
 
 	case "quality_2160":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "2160p"
 		s.Settings.Mu.Unlock()
-		_ = s.DB.Set(ctx, "ytdlp_quality", "2160p")
+		_ = s.DB.Set(ctx, repository.SettingYtdlpQuality, "2160p")
 		toast(i18n.T(lang, "settings_toast_quality", "4K (2160p)"))
 
 	default:

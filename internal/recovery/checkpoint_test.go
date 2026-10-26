@@ -24,8 +24,18 @@ func newTestDB(t *testing.T) *database.DB {
 	return db
 }
 
+// newTestDBWithTask also stores the task row a checkpoint references.
+func newTestDBWithTask(t *testing.T, id string) *database.DB {
+	t.Helper()
+	db := newTestDB(t)
+	if err := db.Save(context.Background(), domain.TaskRecord{ID: id, Status: "downloading"}); err != nil {
+		t.Fatalf("save task: %v", err)
+	}
+	return db
+}
+
 func TestCheckpointLifecycle(t *testing.T) {
-	cm := NewCheckpointManager(newTestDB(t))
+	cm := NewCheckpointManager(newTestDBWithTask(t, "task-1"))
 	task := &domain.Task{ID: "task-1", DownloadedSize: 100, TotalSize: 200, Progress: 50}
 
 	assert.NoError(t, cm.SaveCheckpoint(task))
@@ -57,7 +67,7 @@ func TestCheckpointLifecycle(t *testing.T) {
 }
 
 func TestStartPeriodicCheckpoint_FinalSaveOnCancel(t *testing.T) {
-	cm := NewCheckpointManager(newTestDB(t))
+	cm := NewCheckpointManager(newTestDBWithTask(t, "task-2"))
 	task := &domain.Task{ID: "task-2", DownloadedSize: 10, TotalSize: 20, Progress: 5}
 
 	ctx, cancel := context.WithCancel(context.Background())

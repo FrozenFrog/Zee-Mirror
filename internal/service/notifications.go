@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"zee-mirror/internal/repository"
 	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
@@ -108,7 +109,7 @@ func (s *BotService) HandleSetAlertChannel(message *tgbotapi.Message, args strin
 	}
 
 	ctx := context.Background()
-	_ = s.DB.Set(ctx, "alert_channel_id", fmt.Sprintf("%d", channelID))
+	_ = s.DB.Set(ctx, repository.SettingAlertChannelID, fmt.Sprintf("%d", channelID))
 
 	s.reply(message, i18n.T(lang, "notify_channel_set", channelID))
 }

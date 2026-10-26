@@ -69,7 +69,10 @@ func (rl *UserRateLimiter) loadFromDB() {
 		if newTokens > float64(rl.burst) {
 			newTokens = float64(rl.burst)
 		}
-		_ = newTokens
+		// A new limiter starts full; spend what the user had used up.
+		if used := rl.burst - int(newTokens); used > 0 {
+			limiter.AllowN(time.Now(), used)
+		}
 		rl.limiters[rec.UserID] = limiter
 		count++
 	}

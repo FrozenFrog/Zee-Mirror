@@ -9,19 +9,17 @@ services:
     ports:
       - "${DASHBOARD_PORT:-80}:5248"
 
-    # Every other setting (bot token, owner, rclone config, cookies, ...) is
-    # read from the `settings` table of this database. The local Telegram Bot
-    # API server is bundled in the image and started by the bot.
+    # Settings come from .env (copy .env.example) and are saved to the
+    # `settings` table on start, encrypted where secret. Once saved, .env can
+    # shrink to DB_DRIVER (+ DATABASE_URL for postgres), ENCRYPTION_KEY and
+    # the dashboard sign-in (WEB_DASHBOARD_TOKEN or OIDC_*). The local
+    # Telegram Bot API server is bundled in the image and started by the bot.
+    env_file:
+      - path: .env
+        required: false
+    # DB_DRIVER defaults to sqlite (CONFIG_DIR/zee-mirror.db, i.e. ./config).
     environment:
-      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-      # Web dashboard sign-in (OpenID Connect, e.g. Pocket-ID).
-      - WEB_DASHBOARD_URL=${WEB_DASHBOARD_URL:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_REDIRECT_URL=${OIDC_REDIRECT_URL:-}
-      - OIDC_ALLOWED_GROUPS=${OIDC_ALLOWED_GROUPS:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set (openssl rand -hex 32)}
 
     volumes:
       - downloads:/app/downloads

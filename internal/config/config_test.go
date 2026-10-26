@@ -10,6 +10,8 @@ import (
 	"zee-mirror/internal/crypto"
 )
 
+const testDashboardToken = "0123456789abcdef0123"
+
 func TestValidate_MissingBotTokens(t *testing.T) {
 	cfg := &Config{
 		OwnerID:    12345,
@@ -42,8 +44,9 @@ func TestValidate_MissingOwnerID(t *testing.T) {
 
 func TestValidate_EmptyRcloneDest_Defaults(t *testing.T) {
 	cfg := &Config{
-		BotTokens: []string{"token1"},
-		OwnerID:   12345,
+		BotTokens:      []string{"token1"},
+		OwnerID:        12345,
+		DashboardToken: testDashboardToken,
 	}
 
 	err := cfg.Validate()
@@ -57,9 +60,10 @@ func TestValidate_EmptyRcloneDest_Defaults(t *testing.T) {
 
 func TestValidate_AllFieldsPresent(t *testing.T) {
 	cfg := &Config{
-		BotTokens:  []string{"token1"},
-		OwnerID:    12345,
-		RcloneDest: "gdrive:/MyFolder",
+		BotTokens:      []string{"token1"},
+		OwnerID:        12345,
+		RcloneDest:     "gdrive:/MyFolder",
+		DashboardToken: testDashboardToken,
 	}
 
 	err := cfg.Validate()
@@ -73,8 +77,9 @@ func TestValidate_AllFieldsPresent(t *testing.T) {
 
 func TestValidate_SingleBotToken(t *testing.T) {
 	cfg := &Config{
-		BotTokens: []string{"single-token"},
-		OwnerID:   111,
+		BotTokens:      []string{"single-token"},
+		OwnerID:        111,
+		DashboardToken: testDashboardToken,
 	}
 
 	err := cfg.Validate()
@@ -85,8 +90,9 @@ func TestValidate_SingleBotToken(t *testing.T) {
 
 func TestValidate_MultipleBotTokens(t *testing.T) {
 	cfg := &Config{
-		BotTokens: []string{"token1", "token2", "token3"},
-		OwnerID:   111,
+		BotTokens:      []string{"token1", "token2", "token3"},
+		OwnerID:        111,
+		DashboardToken: testDashboardToken,
 	}
 
 	err := cfg.Validate()
@@ -102,7 +108,9 @@ func TestValidate_OIDC(t *testing.T) {
 		mutate  func(c *Config)
 		wantErr bool
 	}{
-		{"disabled", func(*Config) {}, false},
+		{"no sign-in method", func(*Config) {}, true},
+		{"token only", func(c *Config) { c.DashboardToken = testDashboardToken }, false},
+		{"short token", func(c *Config) { c.DashboardToken = "short" }, true},
 		{"complete", func(c *Config) {
 			c.OIDCIssuer, c.OIDCClientID, c.OIDCRedirectURL = "https://id.example", "client", "https://bot.example/cb"
 		}, false},
@@ -148,11 +156,12 @@ func TestLoadConfig_OIDCFromEnv(t *testing.T) {
 
 func TestValidate_WebhookRequiresSecret(t *testing.T) {
 	cfg := &Config{
-		BotTokens:  []string{"token1"},
-		OwnerID:    12345,
-		UseWebhook: true,
-		WebhookURL: "https://example.com/hook",
-		RcloneDest: "gdrive:/test",
+		BotTokens:      []string{"token1"},
+		OwnerID:        12345,
+		DashboardToken: testDashboardToken,
+		UseWebhook:     true,
+		WebhookURL:     "https://example.com/hook",
+		RcloneDest:     "gdrive:/test",
 	}
 	err := cfg.Validate()
 	if err == nil || !strings.Contains(err.Error(), "WEBHOOK_SECRET") {
@@ -176,6 +185,8 @@ func TestUseSettingsLayersDatabaseUnderEnvironment(t *testing.T) {
 	t.Setenv("BOT_TOKEN", "")
 	t.Setenv("OWNER_ID", "") // empty env must not hide the database value
 	t.Setenv("RCLONE_DEST", "env:/dest")
+	t.Setenv("DB_DRIVER", "")
+	t.Setenv("DATABASE_URL", "")
 	t.Cleanup(func() {
 		dbSettings.Store(nil)
 		settingsSource.Store(nil)
@@ -187,7 +198,8 @@ func TestUseSettingsLayersDatabaseUnderEnvironment(t *testing.T) {
 			"OWNER_ID":    "42",
 			"RCLONE_DEST": "db:/dest",
 			"MAX_RETRIES": "7",
-			"cookies":     "not a config key",
+			"COOKIES":     "not a config key",
+			"DB_DRIVER":   "postgres",
 		}, nil
 	})
 	if err != nil {
@@ -205,6 +217,9 @@ func TestUseSettingsLayersDatabaseUnderEnvironment(t *testing.T) {
 	}
 	if cfg.MaxRetries != 7 {
 		t.Errorf("MaxRetries = %d, want 7 from database", cfg.MaxRetries)
+	}
+	if cfg.DBDriver != "sqlite" {
+		t.Errorf("DBDriver = %q, bootstrap keys must not come from the database", cfg.DBDriver)
 	}
 }
 

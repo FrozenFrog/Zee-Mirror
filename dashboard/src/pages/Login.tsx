@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, Bot, Activity, ShieldCheck, Lock } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowRight, Bot, Activity, ShieldCheck, Lock, KeyRound } from 'lucide-react'
 import api, { AuthRedirectError } from '../api'
 import { useI18n } from '../hooks/useI18n'
 import { isMessageKey } from '../i18n'
@@ -12,6 +12,7 @@ interface LoginScreenProps {
 
 interface AuthConfig {
     oidc: boolean
+    token: boolean
     providerName: string
 }
 
@@ -21,19 +22,47 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
     useEffect(() => {
         api.get<AuthConfig>('/api/auth/config')
             .then((res) => setAuthConfig(res.data))
-            .catch(() => setAuthConfig({ oidc: false, providerName: '' }))
+            .catch(() => setAuthConfig({ oidc: false, token: false, providerName: '' }))
     }, [])
+
+    const [token, setToken] = useState('')
+    const [tokenError, setTokenError] = useState<string | null>(null)
+    const [submitting, setSubmitting] = useState(false)
 
     const { t } = useI18n()
     const providerName = authConfig?.providerName || 'OIDC'
     // The backend sends a stable code; older backends sent a ready-made
     // (Vietnamese) message, which is shown as is.
     const errorKey = authError ? `oidcError.${authError.code}` : ''
-    const errorText = !authError
+    const redirectError = !authError
         ? null
         : isMessageKey(errorKey)
           ? t(errorKey, { provider: authError.provider || providerName })
           : authError.code
+    const errorText = tokenError || redirectError
+    const configured = !authConfig || authConfig.oidc || authConfig.token
+
+    const handleTokenLogin = async (e: FormEvent) => {
+        e.preventDefault()
+        if (!token || submitting) return
+        setSubmitting(true)
+        setTokenError(null)
+        try {
+            const res = await api.post<{ token: string }>('/api/auth/login', { token })
+            localStorage.setItem('api_token', res.data.token)
+            window.location.assign('/')
+        } catch (err: unknown) {
+            const status = (err as { response?: { status?: number } }).response?.status
+            setTokenError(
+                status === 401
+                    ? t('login.tokenInvalid')
+                    : status === 429
+                      ? t('login.tooManyAttempts')
+                      : t('login.loginFailed'),
+            )
+            setSubmitting(false)
+        }
+    }
 
     return (
         <div className="min-h-screen w-full bg-white dark:bg-[#050505] flex flex-col md:flex-row font-sans overflow-hidden">
@@ -126,7 +155,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                                 {t('login.hello')}
                             </h3>
                             <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[320px] mx-auto md:mx-0">
-                                {authConfig && !authConfig.oidc
+                                {!configured
                                     ? t('login.notConfigured')
                                     : t('login.verifyIdentity')}
                             </p>
@@ -139,21 +168,60 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                                 {errorText}
                             </div>
                         )}
-                        <button
-                            disabled={!authConfig?.oidc}
-                            onClick={() => window.location.assign('/api/auth/oidc/login')}
-                            className="w-full p-10 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.3em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group disabled:opacity-40 disabled:pointer-events-none"
-                        >
-                            <span>{t('login.signInWith', { provider: providerName })}</span>
-                            <ArrowRight
-                                size={28}
-                                className="ml-6 group-hover:translate-x-3 transition-transform"
-                            />
-                        </button>
+                        {authConfig?.token && (
+                            <form onSubmit={handleTokenLogin} className="space-y-6">
+                                <label className="block space-y-3">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-zinc-500">
+                                        {t('login.tokenLabel')}
+                                    </span>
+                                    <input
+                                        type="password"
+                                        autoComplete="current-password"
+                                        autoFocus
+                                        value={token}
+                                        onChange={(e) => setToken(e.target.value)}
+                                        className="w-full px-8 py-6 rounded-[2rem] bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold text-lg outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all"
+                                    />
+                                </label>
+                                <button
+                                    type="submit"
+                                    disabled={!token || submitting}
+                                    className="w-full p-8 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.3em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group disabled:opacity-40 disabled:pointer-events-none"
+                                >
+                                    <span>{t('login.signInWithToken')}</span>
+                                    <KeyRound
+                                        size={24}
+                                        className="ml-6 group-hover:translate-x-3 transition-transform"
+                                    />
+                                </button>
+                            </form>
+                        )}
+                        {authConfig?.token && authConfig.oidc && (
+                            <div className="flex items-center space-x-4 text-slate-300 dark:text-zinc-700">
+                                <div className="h-px flex-1 bg-current" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.6em]">
+                                    {t('login.or')}
+                                </span>
+                                <div className="h-px flex-1 bg-current" />
+                            </div>
+                        )}
+                        {(!authConfig?.token || authConfig.oidc) && (
+                            <button
+                                disabled={!authConfig?.oidc}
+                                onClick={() => window.location.assign('/api/auth/oidc/login')}
+                                className="w-full p-10 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.3em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                                <span>{t('login.signInWith', { provider: providerName })}</span>
+                                <ArrowRight
+                                    size={28}
+                                    className="ml-6 group-hover:translate-x-3 transition-transform"
+                                />
+                            </button>
+                        )}
                         <div className="flex items-center justify-center space-x-4 text-slate-300 dark:text-zinc-700">
                             <Lock size={16} />
                             <p className="text-[10px] font-black uppercase tracking-[0.6em] italic">
-                                {t('login.viaOidc')}
+                                {authConfig?.token && !authConfig.oidc ? t('login.viaToken') : t('login.viaOidc')}
                             </p>
                         </div>
                     </div>

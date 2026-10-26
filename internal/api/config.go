@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 	"zee-mirror/internal/config"
+	"zee-mirror/internal/repository"
 )
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -30,8 +28,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		s.Service.Settings.DefaultMode = settingsUpdate.DefaultMode
 		s.Service.Settings.Mu.Unlock()
 
-		_ = s.Service.SettingsRepo.Set(ctx, "auto_delete_messages", fmt.Sprintf("%v", settingsUpdate.AutoDeleteMessages))
-		_ = s.Service.SettingsRepo.Set(ctx, "default_mode", settingsUpdate.DefaultMode)
+		_ = s.Service.SettingsRepo.Set(ctx, repository.SettingAutoDeleteMessages, fmt.Sprintf("%v", settingsUpdate.AutoDeleteMessages))
+		_ = s.Service.SettingsRepo.Set(ctx, repository.SettingDefaultMode, settingsUpdate.DefaultMode)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -44,64 +42,49 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleConfig shows and edits the settings table as KEY=value lines.
+// Secrets are redacted, and the bootstrap keys (DB_DRIVER, DATABASE_URL,
+// ENCRYPTION_KEY, CONFIG_DIR) stay environment-only.
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
 	case http.MethodGet:
-		data, readErr := os.ReadFile(".env")
-		if readErr != nil {
-			data, readErr = os.ReadFile(filepath.Join(".", ".env"))
-			if readErr != nil {
-				http.Error(w, "Failed to read .env", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		sensitiveKeys := map[string]bool{
-			"BOT_TOKEN": true, "OWNER_ID": true, "TELEGRAM_API_HASH": true,
-			"TELEGRAM_API_ID": true, "USER_SESSION_STRING": true, "APP_HASH": true,
-			"VIKING_USER_HASH": true, "OIDC_CLIENT_SECRET": true,
-		}
-		lines := strings.Split(string(data), "\n")
-		for i, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-				continue
-			}
-			parts := strings.SplitN(trimmed, "=", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				if sensitiveKeys[key] {
-					lines[i] = key + "=***REDACTED***"
-				}
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"config": strings.Join(lines, "\n")}); encodeErr != nil {
-			slog.Error("Failed to encode config response", "error", encodeErr)
+		if err := json.NewEncoder(w).Encode(map[string]string{"config": config.FormatSettings()}); err != nil {
+			slog.Error("Failed to encode config response", "error", err)
 		}
 	case http.MethodPost:
 		var req struct {
 			Config string `json:"config"`
 		}
-		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 			return
 		}
 
-		if writeErr := os.WriteFile(".env", []byte(req.Config), 0600); writeErr != nil {
-			http.Error(w, "Failed to write .env", http.StatusInternalServerError)
+		changed, overridden, err := config.SaveSettings(r.Context(), s.Service.SettingsRepo, req.Config)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
-
-		slog.Info("Configuration updated from dashboard", "by", r.RemoteAddr)
-		w.WriteHeader(http.StatusOK)
-		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"status": "Configuration updated. Restart may be required for some changes."}); encodeErr != nil {
-			slog.Error("Failed to encode config update response", "error", encodeErr)
-		}
+		slog.Info("Settings updated from dashboard", "keys", changed, "overriddenByEnv", overridden, "ip", getClientIP(r))
+		s.applyConfig(config.Reload())
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":     "Settings saved. Some changes need a restart.",
+			"changed":    changed,
+			"overridden": overridden,
+		})
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) applyConfig(newCfg *config.Config) {
+	s.Service.TaskManager.Mu.Lock()
+	s.Service.TaskManager.Config = newCfg
+	s.Service.TaskManager.MaxConcurrent = newCfg.MaxConcurrentDownloads
+	s.Service.TaskManager.StopDuplicate = newCfg.StopDuplicate
+	s.Service.TaskManager.Mu.Unlock()
 }
 
 func (s *Server) handleConfigReload(w http.ResponseWriter, r *http.Request) {
@@ -111,11 +94,7 @@ func (s *Server) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newCfg := config.Reload()
-	s.Service.TaskManager.Mu.Lock()
-	s.Service.TaskManager.Config = newCfg
-	s.Service.TaskManager.MaxConcurrent = newCfg.MaxConcurrentDownloads
-	s.Service.TaskManager.StopDuplicate = newCfg.StopDuplicate
-	s.Service.TaskManager.Mu.Unlock()
+	s.applyConfig(newCfg)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{

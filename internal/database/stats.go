@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 	"zee-mirror/internal/domain"
@@ -40,7 +41,7 @@ type UserStats = domain.UserStats
 func (db *DB) GetUserStats(ctx context.Context, userID int64) (*UserStats, error) {
 	stats := &UserStats{UserID: userID}
 
-	if err := db.QueryRowContext(ctx, "SELECT COALESCE(username, '') FROM users WHERE id = $1", userID).Scan(&stats.Username); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT COALESCE(username, '') FROM users WHERE id = $1", userID).Scan(&stats.Username); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.Error("Database error in GetUserStats username", "error", err)
 	}
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tasks WHERE user_id = $1", userID).Scan(&stats.TotalDownloads); err != nil {
@@ -55,12 +56,12 @@ func (db *DB) GetUserStats(ctx context.Context, userID int64) (*UserStats, error
 	if err := db.QueryRowContext(ctx, "SELECT COALESCE(SUM(total_size), 0) FROM tasks WHERE user_id = $1 AND status = 'completed'", userID).Scan(&stats.TotalBandwidth); err != nil {
 		slog.Error("Database error in GetUserStats bandwidth", "error", err)
 	}
-	var lastActiveStr sql.NullString
-	if err := db.QueryRowContext(ctx, "SELECT MAX(created_at) FROM tasks WHERE user_id = $1", userID).Scan(&lastActiveStr); err != nil {
+	var lastActive sql.NullTime
+	if err := db.QueryRowContext(ctx, "SELECT created_at FROM tasks WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", userID).Scan(&lastActive); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.Error("Database error in GetUserStats last active", "error", err)
 	}
-	if lastActiveStr.Valid {
-		stats.LastActive, _ = time.Parse("2006-01-02 15:04:05", lastActiveStr.String)
+	if lastActive.Valid {
+		stats.LastActive = db.fromDB(lastActive.Time)
 	}
 	if stats.LastActive.IsZero() {
 		stats.LastActive = time.Now()
@@ -71,16 +72,17 @@ func (db *DB) GetUserStats(ctx context.Context, userID int64) (*UserStats, error
 
 type DailyStats = domain.DailyStats
 
-func todayRange() (string, string) {
-	now := time.Now()
-	start := now.Format("2006-01-02 00:00:00")
-	end := now.AddDate(0, 0, 1).Format("2006-01-02 00:00:00")
-	return start, end
+// todayRange returns the start of today and of tomorrow in local time,
+// converted for comparison with created_at.
+func (db *DB) todayRange() (time.Time, time.Time) {
+	y, m, d := time.Now().Date()
+	start := time.Date(y, m, d, 0, 0, 0, 0, time.Local)
+	return db.timeArg(start), db.timeArg(start.AddDate(0, 0, 1))
 }
 
 func (db *DB) GetTodayStats(ctx context.Context) (*DailyStats, error) {
 	stats := &DailyStats{Date: time.Now()}
-	start, end := todayRange()
+	start, end := db.todayRange()
 
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tasks WHERE created_at >= $1 AND created_at < $2", start, end).Scan(&stats.TotalTasks); err != nil {
 		slog.Error("Database error in GetTodayStats total", "error", err)
@@ -100,7 +102,7 @@ func (db *DB) GetTodayStats(ctx context.Context) (*DailyStats, error) {
 
 func (db *DB) GetUserTodayStats(ctx context.Context, userID int64) (*DailyStats, error) {
 	stats := &DailyStats{Date: time.Now()}
-	start, end := todayRange()
+	start, end := db.todayRange()
 
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND created_at >= $2 AND created_at < $3", userID, start, end).Scan(&stats.TotalTasks); err != nil {
 		slog.Error("Database error in GetUserTodayStats total", "error", err)
@@ -119,107 +121,61 @@ func (db *DB) GetUserTodayStats(ctx context.Context, userID int64) (*DailyStats,
 }
 
 func (db *DB) GetWeeklyStats(ctx context.Context) ([]DailyStats, error) {
-	now := time.Now()
-	start := now.AddDate(0, 0, -6).Format("2006-01-02")
-	end := now.AddDate(0, 0, 1).Format("2006-01-02")
-
-	rows, err := db.QueryContext(ctx, `
-		SELECT CAST(DATE(created_at) AS TEXT) as day,
-			COUNT(*) as total,
-			COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-			COALESCE(SUM(CASE WHEN status = 'completed' THEN total_size ELSE 0 END), 0) as bandwidth
-		FROM tasks WHERE created_at >= $1 AND created_at < $2
-		GROUP BY DATE(created_at) ORDER BY day
-	`, start, end)
-	if err != nil {
-		slog.Error("Database error in GetWeeklyStats", "error", err)
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	resultMap := make(map[string]*DailyStats)
-	for i := 6; i >= 0; i-- {
-		d := now.AddDate(0, 0, -i)
-		dateStr := d.Format("2006-01-02")
-		resultMap[dateStr] = &DailyStats{Date: d}
-	}
-
-	for rows.Next() {
-		var day string
-		var ds DailyStats
-		if err := rows.Scan(&day, &ds.TotalTasks, &ds.CompletedTasks, &ds.FailedTasks, &ds.TotalBandwidth); err != nil {
-			slog.Error("Database error scanning weekly stats row", "error", err)
-			continue
-		}
-		if existing, ok := resultMap[day]; ok {
-			existing.TotalTasks = ds.TotalTasks
-			existing.CompletedTasks = ds.CompletedTasks
-			existing.FailedTasks = ds.FailedTasks
-			existing.TotalBandwidth = ds.TotalBandwidth
-		}
-	}
-
-	var stats []DailyStats
-	for i := 6; i >= 0; i-- {
-		d := now.AddDate(0, 0, -i)
-		dateStr := d.Format("2006-01-02")
-		stats = append(stats, *resultMap[dateStr])
-	}
-
-	return stats, nil
+	return db.dailyStats(ctx, 7)
 }
 
 func (db *DB) GetMonthlyStats(ctx context.Context) ([]DailyStats, error) {
-	now := time.Now()
-	start := now.AddDate(0, 0, -29).Format("2006-01-02")
-	end := now.AddDate(0, 0, 1).Format("2006-01-02")
+	return db.dailyStats(ctx, 30)
+}
+
+// dailyStats returns one entry per local calendar day for the last `days`
+// days, oldest first. Rows are bucketed in Go: SQL DATE() would use UTC on
+// SQLite and the wall clock on Postgres.
+func (db *DB) dailyStats(ctx context.Context, days int) ([]DailyStats, error) {
+	y, m, d := time.Now().Date()
+	tomorrow := time.Date(y, m, d, 0, 0, 0, 0, time.Local).AddDate(0, 0, 1)
+	first := tomorrow.AddDate(0, 0, -days)
+
+	stats := make([]DailyStats, days)
+	index := make(map[string]int, days)
+	for i := range stats {
+		day := first.AddDate(0, 0, i)
+		stats[i].Date = day
+		index[day.Format("2006-01-02")] = i
+	}
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT CAST(DATE(created_at) AS TEXT) as day,
-			COUNT(*) as total,
-			COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-			COALESCE(SUM(CASE WHEN status = 'completed' THEN total_size ELSE 0 END), 0) as bandwidth
+		SELECT created_at, status, COALESCE(total_size, 0)
 		FROM tasks WHERE created_at >= $1 AND created_at < $2
-		GROUP BY DATE(created_at) ORDER BY day
-	`, start, end)
+	`, db.timeArg(first), db.timeArg(tomorrow))
 	if err != nil {
-		slog.Error("Database error in GetMonthlyStats", "error", err)
+		slog.Error("Database error in dailyStats", "days", days, "error", err)
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	resultMap := make(map[string]*DailyStats)
-	for i := 29; i >= 0; i-- {
-		d := now.AddDate(0, 0, -i)
-		dateStr := d.Format("2006-01-02")
-		resultMap[dateStr] = &DailyStats{Date: d}
-	}
-
 	for rows.Next() {
-		var day string
-		var ds DailyStats
-		if err := rows.Scan(&day, &ds.TotalTasks, &ds.CompletedTasks, &ds.FailedTasks, &ds.TotalBandwidth); err != nil {
-			slog.Error("Database error scanning monthly stats row", "error", err)
+		var createdAt time.Time
+		var status string
+		var size int64
+		if err := rows.Scan(&createdAt, &status, &size); err != nil {
+			slog.Error("Database error scanning daily stats row", "error", err)
 			continue
 		}
-		if existing, ok := resultMap[day]; ok {
-			existing.TotalTasks = ds.TotalTasks
-			existing.CompletedTasks = ds.CompletedTasks
-			existing.FailedTasks = ds.FailedTasks
-			existing.TotalBandwidth = ds.TotalBandwidth
+		i, ok := index[db.fromDB(createdAt).Format("2006-01-02")]
+		if !ok {
+			continue
+		}
+		stats[i].TotalTasks++
+		switch status {
+		case "completed":
+			stats[i].CompletedTasks++
+			stats[i].TotalBandwidth += size
+		case "failed":
+			stats[i].FailedTasks++
 		}
 	}
-
-	var stats []DailyStats
-	for i := 29; i >= 0; i-- {
-		d := now.AddDate(0, 0, -i)
-		dateStr := d.Format("2006-01-02")
-		stats = append(stats, *resultMap[dateStr])
-	}
-
-	return stats, nil
+	return stats, rows.Err()
 }
 
 func boolToInt(b bool) int {

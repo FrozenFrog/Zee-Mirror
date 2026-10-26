@@ -208,18 +208,22 @@ cd Zee-Mirror
 cp .env.example .env
 ```
 
-Docker Compose only passes two variables to the container:
+Settings are read from the environment, from `.env` (in the working directory
+or `CONFIG_DIR/.env`) and from the `settings` table of the database, in that
+order of priority. On every start, each non-empty variable from the environment
+or `.env` is saved to the `settings` table (key = variable name, uppercase);
+secrets such as `BOT_TOKEN`, `APP_HASH` or `USER_SESSION_STRING` are stored
+encrypted with `ENCRYPTION_KEY`. After the first start `.env` can shrink to:
 
 ```env
-DATABASE_URL=postgres://user:pass@host:5432/zee-mirror?sslmode=disable
-ENCRYPTION_KEY=                         # openssl rand -hex 32 (for enc: values)
+DB_DRIVER=sqlite                        # default; or postgres
+# DATABASE_URL=postgres://user:pass@host:5432/zee-mirror?sslmode=disable
+ENCRYPTION_KEY=                         # required: openssl rand -hex 32
+WEB_DASHBOARD_TOKEN=                    # dashboard sign-in (16+ chars), or OIDC_* below
 ```
 
-Every other setting is read from the `settings` table of that database: one row
-per variable, with `key` = the variable name (`BOT_TOKEN`, `OWNER_ID`, `APP_ID`,
-`APP_HASH`, `RCLONE_DEST`, ...). Values prefixed with `enc:` are decrypted with
-`ENCRYPTION_KEY`. A non-empty environment variable still overrides the database
-value, which is handy for local development with `.env`:
+Everything else is then taken from the database and can be edited on the
+dashboard Settings page. A first `.env` looks like:
 
 ```env
 # ─── REQUIRED ──────────────────────────────────────────
@@ -231,9 +235,10 @@ APP_HASH=your_api_hash                  # From my.telegram.org
 # ─── RECOMMENDED ───────────────────────────────────────
 RCLONE_DEST=gdrive:/Zee-Mirror          # Default upload destination
 WEB_DASHBOARD_URL=https://your-domain   # Your server's public IP/domain
-OIDC_ISSUER=https://pocketid.example.com  # Dashboard sign-in (OpenID Connect)
-OIDC_CLIENT_ID=your_client_id
-OIDC_ALLOWED_GROUPS=zee-admin           # Provider group allowed to sign in
+WEB_DASHBOARD_TOKEN=long_random_token  # Dashboard sign-in, or OIDC below
+# OIDC_ISSUER=https://pocketid.example.com  # Dashboard sign-in (OpenID Connect)
+# OIDC_CLIENT_ID=your_client_id
+# OIDC_ALLOWED_GROUPS=zee-admin         # Provider group allowed to sign in
 ```
 
 > 📝 See the [Full Configuration Reference](#%EF%B8%8F-configuration-reference) for all available variables.
@@ -336,7 +341,10 @@ The binary reads configuration from `.env` in the current directory. Make sure `
 
 Each variable below can be set in the environment (`.env`) or stored as a row in
 the database `settings` table (key = variable name). Non-empty environment values
-win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environment.
+win and are saved to the database on start. `DB_DRIVER`, `DATABASE_URL`,
+`ENCRYPTION_KEY` and `CONFIG_DIR` are only read from the environment and never
+stored. The bot refuses to start without `ENCRYPTION_KEY` and a dashboard
+sign-in method (`WEB_DASHBOARD_TOKEN` or `OIDC_ISSUER`).
 
 <details open>
 <summary><b>🔴 Required Settings</b></summary>
@@ -361,7 +369,8 @@ win; `DATABASE_URL`, `DB_DRIVER` and `ENCRYPTION_KEY` must come from the environ
 | `DASHBOARD_PORT` | `80` | External port for the web dashboard (the port you access in your browser) |
 | `DASHBOARD_PORT_INTERNAL` | `5248` | Internal container listen port (typically unchanged) |
 | `WEB_DASHBOARD_URL` | `http://localhost` | Public URL of the dashboard. Used for generating links in bot messages |
-| `OIDC_ISSUER` | — | OpenID Connect issuer used to sign in to the dashboard (e.g. Pocket-ID). The dashboard has no other login |
+| `WEB_DASHBOARD_TOKEN` | — | Static dashboard sign-in token (at least 16 characters). Changing it ends existing token sessions |
+| `OIDC_ISSUER` | — | OpenID Connect issuer used to sign in to the dashboard (e.g. Pocket-ID). Either this or `WEB_DASHBOARD_TOKEN` is required |
 | `OIDC_CLIENT_ID` | — | OIDC client ID |
 | `OIDC_CLIENT_SECRET` | — | OIDC client secret. Leave empty for a public client (PKCE only) |
 | `OIDC_REDIRECT_URL` | `<WEB_DASHBOARD_URL>/api/auth/oidc/callback` | Callback URL registered at the provider |
@@ -433,10 +442,9 @@ Log output is written to both **stdout** and the file `config/zee-mirror.log` si
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_DRIVER` | `sqlite` | Database driver: `sqlite` or `postgres` |
-| `DATABASE_URL` | — | PostgreSQL connection string (required when `DB_DRIVER=postgres`) |
-| `REDIS_URL` | — | Redis connection URL for caching. Leave empty to disable |
-| `ENCRYPTION_KEY` | — | 32-byte hex key. Values in `.env` prefixed with `enc:` are AES-decrypted at load (tokens, session strings) |
+| `DB_DRIVER` | `sqlite` | Database driver: `sqlite` or `postgres`. When unset, a `postgres://` `DATABASE_URL` selects postgres |
+| `DATABASE_URL` | `CONFIG_DIR/zee-mirror.db` | PostgreSQL connection string (required when `DB_DRIVER=postgres`), or the SQLite file path |
+| `ENCRYPTION_KEY` | — | Required. 32-byte hex key (`openssl rand -hex 32`). Encrypts secrets in the `settings` table and signs dashboard sessions; values prefixed with `enc:` are decrypted at load |
 | `AUTO_CLEANUP_DAYS` | `30` | Days before old completed tasks are cleaned up |
 
 </details>
@@ -487,8 +495,8 @@ Log output is written to both **stdout** and the file `config/zee-mirror.log` si
 <summary><b>🐳 Docker Compose Services</b></summary>
 <br>
 
-The `docker-compose.yml` defines a single `zee-mirror` service, configured only
-through `DATABASE_URL` (+ `ENCRYPTION_KEY`). PostgreSQL is external.
+The `docker-compose.yml` defines a single `zee-mirror` service that reads `.env`
+(`env_file`). SQLite is stored in `./config`; PostgreSQL, when used, is external.
 
 The image bundles the self-hosted Telegram Bot API server (`telegram-bot-api`,
 built from source). The bot starts it on `127.0.0.1:8081` with `APP_ID`/`APP_HASH`
@@ -708,7 +716,7 @@ All media commands use **ffmpeg** under the hood. Reply to a video/audio message
 | | |
 |---|---|
 | **URL** | `http://your-server-ip:DASHBOARD_PORT` (default port `80`) |
-| **Login** | OpenID Connect (e.g. Pocket-ID), authorization code flow with PKCE. Any provider account in one of `OIDC_ALLOWED_GROUPS` may sign in; bot users are not involved. Sessions last 24 hours and are signed with a key derived from `ENCRYPTION_KEY` |
+| **Login** | `WEB_DASHBOARD_TOKEN`, and/or OpenID Connect (e.g. Pocket-ID, authorization code flow with PKCE: any provider account in one of `OIDC_ALLOWED_GROUPS` may sign in). Bot users are not involved. Sessions last 24 hours and are signed with a key derived from `ENCRYPTION_KEY` |
 
 <br>
 
@@ -915,7 +923,7 @@ Zee-Mirror/
 ├── config/                            # Runtime directory (Docker volume): rclone.conf,
 │                                      # zee-mirror.db, zee-mirror.log
 ├── Dockerfile                         # Multi-stage build bundling aria2, yt-dlp, rclone, ffmpeg, 7zz
-├── docker-compose.yml                 # zee-mirror service (config from DATABASE_URL)
+├── docker-compose.yml                 # zee-mirror service (config from .env + database)
 ├── Taskfile.yml                       # Dev task runner (build/test/lint/security)
 ├── .golangci.yml                      # GolangCI-Lint configuration
 └── go.mod                             # Go module definition (Go 1.26.6)
@@ -929,7 +937,7 @@ Zee-Mirror/
 
 ## 🗄️ Database Schema
 
-The bot uses **SQLite** by default (`DB_DRIVER=sqlite`, pure-Go driver — no CGO). PostgreSQL is also supported (`DB_DRIVER=postgres` + `DATABASE_URL` via pgx), with a dedicated migration set under `migrations/postgres/`. Migrations run automatically on startup — eight versioned migrations define the schema, adding task quality tracking, per-user rate limits, scheduled tasks, MD5 duplicate detection, and audit logs on top of the base schema. An optional Redis instance (`REDIS_URL`) provides caching.
+The bot uses **SQLite** by default (`DB_DRIVER=sqlite`, pure-Go driver — no CGO). PostgreSQL is also supported (`DB_DRIVER=postgres` + `DATABASE_URL` via pgx), with a dedicated migration set under `migrations/postgres/`. Migrations run automatically on startup — eight versioned migrations define the schema, adding task quality tracking, per-user rate limits, scheduled tasks, MD5 duplicate detection, and audit logs on top of the base schema.
 
 <details>
 <summary><b>View Database Tables</b></summary>
@@ -978,7 +986,7 @@ The bot uses **SQLite** by default (`DB_DRIVER=sqlite`, pure-Go driver — no CG
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `key` | `TEXT` (PK) | Setting name |
+| `key` | `TEXT` (PK) | Setting name, uppercase (`BOT_TOKEN`, `RCLONE_CONFIG`, `COOKIES`, `DEFAULT_MODE`, ...) |
 | `value` | `TEXT` | Setting value |
 | `updated_at` | `DATETIME` | Last modification timestamp |
 
@@ -1164,7 +1172,7 @@ Three **GitHub Actions** workflows ensure code quality on every push and PR:
 <details>
 <summary><b>📦 Files larger than 2GB not working</b></summary>
 
-1. Verify `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` are set in `.env`
+1. Verify `APP_ID` and `APP_HASH` are set (in `.env` or the database)
 2. Ensure the `telegram-bot-api` container is running: `docker ps | grep telegram-bot-api`
 3. Check local bot API logs: `docker compose logs telegram-bot-api`
 </details>

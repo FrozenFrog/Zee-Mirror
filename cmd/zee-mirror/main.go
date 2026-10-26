@@ -34,14 +34,28 @@ import (
 )
 
 func main() {
-	// Only DB_DRIVER, DATABASE_URL and ENCRYPTION_KEY have to come from the
-	// environment; everything else may live in the settings table.
+	// Only DB_DRIVER (+ DATABASE_URL for postgres) and ENCRYPTION_KEY have to
+	// come from the environment or .env; everything else may live in the
+	// settings table. Settings declared in the environment are saved there.
 	cfg := config.LoadConfig()
+	if err := cfg.ValidateBootstrap(); err != nil {
+		slog.Error("Invalid configuration", "error", err)
+		os.Exit(1)
+	}
 
 	db, err := database.NewDB(cfg.DBDriver, cfg.ConfigDir, cfg.DatabaseURL, "migrations")
 	if err != nil {
 		slog.Error("Failed to initialize database", "error", err)
 		os.Exit(1)
+	}
+
+	saved, err := config.SyncEnv(context.Background(), db)
+	if err != nil {
+		slog.Error("Failed to save environment settings to the database", "error", err)
+		os.Exit(1)
+	}
+	if len(saved) > 0 {
+		slog.Info("Saved environment settings to the database", "keys", saved)
 	}
 
 	cfg, err = config.UseSettings(context.Background(), db.AllSettings)

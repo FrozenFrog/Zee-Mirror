@@ -3,44 +3,45 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 	"zee-mirror/internal/domain"
 )
 
 type TaskRecord = domain.TaskRecord
 
-const taskColumns = "id, gid, type, status, url, file_name, local_path, remote_path, remote_url, total_size, downloaded_size, uploaded_size, chat_id, user_id, created_at, completed_at, zip, unzip, password, error, retries, quality, md5, notify_url"
+// taskColumns is the SELECT list scanned by scanTask. Nullable text columns
+// are wrapped in COALESCE: a NULL (for example quality on rows created before
+// migration 000004) cannot be scanned into a string and would drop the row.
+const taskColumns = "id, COALESCE(gid, ''), type, status, COALESCE(url, ''), COALESCE(file_name, ''), " +
+	"COALESCE(local_path, ''), COALESCE(remote_path, ''), COALESCE(remote_url, ''), " +
+	"COALESCE(total_size, 0), COALESCE(downloaded_size, 0), COALESCE(uploaded_size, 0), chat_id, user_id, created_at, " +
+	"completed_at, COALESCE(zip, FALSE), COALESCE(unzip, FALSE), COALESCE(password, ''), COALESCE(error, ''), " +
+	"COALESCE(retries, 0), COALESCE(quality, ''), COALESCE(md5, ''), notify_url"
 
-func (db *DB) ListTasks(ctx context.Context, filter domain.TaskFilter) ([]TaskRecord, error) {
-	query := "SELECT " + taskColumns + " FROM tasks WHERE 1=1"
-	var args []interface{}
-	paramIdx := 1
+type rowScanner interface {
+	Scan(dest ...any) error
+}
 
-	if filter.UserID > 0 {
-		query += fmt.Sprintf(" AND user_id = $%d", paramIdx)
-		args = append(args, filter.UserID)
-		paramIdx++
+func (db *DB) scanTask(row rowScanner) (TaskRecord, error) {
+	var t TaskRecord
+	err := row.Scan(
+		&t.ID, &t.GID, &t.Type, &t.Status, &t.URL, &t.FileName, &t.LocalPath, &t.RemotePath, &t.RemoteURL,
+		&t.TotalSize, &t.DownloadedSize, &t.UploadedSize, &t.ChatID, &t.UserID, &t.CreatedAt,
+		&t.CompletedAt, &t.Zip, &t.Unzip, &t.Password, &t.Error, &t.RetryCount, &t.Quality, &t.MD5, &t.NotifyURL,
+	)
+	if err != nil {
+		return t, err
 	}
-	if filter.Status != "" {
-		query += fmt.Sprintf(" AND status = $%d", paramIdx)
-		args = append(args, filter.Status)
-		paramIdx++
-	}
+	t.CreatedAt = db.fromDB(t.CreatedAt)
+	t.CompletedAt = db.fromDBNull(t.CompletedAt)
+	return t, nil
+}
 
-	query += " ORDER BY created_at DESC"
-
-	if filter.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT $%d", paramIdx)
-		args = append(args, filter.Limit)
-		paramIdx++
-	}
-	if filter.Offset > 0 {
-		query += fmt.Sprintf(" OFFSET $%d", paramIdx)
-		args = append(args, filter.Offset)
-	}
-
+func (db *DB) queryTasks(ctx context.Context, caller, query string, args ...any) ([]TaskRecord, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -49,38 +50,63 @@ func (db *DB) ListTasks(ctx context.Context, filter domain.TaskFilter) ([]TaskRe
 
 	var tasks []TaskRecord
 	for rows.Next() {
-		var t TaskRecord
-		err := rows.Scan(
-			&t.ID, &t.GID, &t.Type, &t.Status, &t.URL, &t.FileName, &t.LocalPath, &t.RemotePath, &t.RemoteURL,
-			&t.TotalSize, &t.DownloadedSize, &t.UploadedSize, &t.ChatID, &t.UserID, &t.CreatedAt,
-			&t.CompletedAt, &t.Zip, &t.Unzip, &t.Password, &t.Error, &t.RetryCount, &t.Quality, &t.MD5, &t.NotifyURL,
-		)
+		t, err := db.scanTask(rows)
 		if err != nil {
-			slog.Error("Error scanning task in ListTasks", "error", err)
+			slog.Error("Error scanning task", "caller", caller, "error", err)
 			continue
 		}
 		tasks = append(tasks, t)
 	}
-	return tasks, nil
+	return tasks, rows.Err()
+}
+
+func (db *DB) ListTasks(ctx context.Context, filter domain.TaskFilter) ([]TaskRecord, error) {
+	query := "SELECT " + taskColumns + " FROM tasks WHERE 1=1"
+	var args []any
+	arg := func(v any) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	if filter.UserID > 0 {
+		query += " AND user_id = " + arg(filter.UserID)
+	}
+	if filter.Status != "" {
+		query += " AND status = " + arg(filter.Status)
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	switch {
+	case filter.Limit > 0:
+		query += " LIMIT " + arg(filter.Limit)
+	case filter.Offset > 0:
+		// SQLite rejects OFFSET without LIMIT; -1 and ALL mean "no limit".
+		if db.driver == driverPostgres {
+			query += " LIMIT ALL"
+		} else {
+			query += " LIMIT -1"
+		}
+	}
+	if filter.Offset > 0 {
+		query += " OFFSET " + arg(filter.Offset)
+	}
+
+	return db.queryTasks(ctx, "ListTasks", query, args...)
 }
 
 func (db *DB) GetCompletedTaskByURL(ctx context.Context, url, quality string) (*TaskRecord, error) {
-	tr := &TaskRecord{}
-	err := db.QueryRowContext(ctx, `
-		SELECT `+taskColumns+` FROM tasks WHERE url = $1 AND quality = $2 AND status = 'completed'
+	tr, err := db.scanTask(db.QueryRowContext(ctx, `
+		SELECT `+taskColumns+` FROM tasks WHERE url = $1 AND COALESCE(quality, '') = $2 AND status = 'completed'
 		ORDER BY created_at DESC LIMIT 1
-	`, url, quality).Scan(
-		&tr.ID, &tr.GID, &tr.Type, &tr.Status, &tr.URL, &tr.FileName, &tr.LocalPath, &tr.RemotePath, &tr.RemoteURL,
-		&tr.TotalSize, &tr.DownloadedSize, &tr.UploadedSize, &tr.ChatID, &tr.UserID,
-		&tr.CreatedAt, &tr.CompletedAt, &tr.Zip, &tr.Unzip, &tr.Password, &tr.Error, &tr.RetryCount, &tr.Quality, &tr.MD5, &tr.NotifyURL,
-	)
+	`, url, quality))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return tr, nil
+	return &tr, nil
 }
 
 func (db *DB) Save(ctx context.Context, t TaskRecord) error {
@@ -105,53 +131,25 @@ func (db *DB) Save(ctx context.Context, t TaskRecord) error {
 			retries = excluded.retries,
 			quality = excluded.quality
 	`, t.ID, t.GID, t.Type, t.Status, t.URL, t.FileName, t.LocalPath, t.RemotePath, t.RemoteURL,
-		t.TotalSize, t.DownloadedSize, t.UploadedSize, t.ChatID, t.UserID, t.CreatedAt,
-		t.CompletedAt, t.Zip, t.Unzip, t.Password, t.Error, t.RetryCount, t.Quality, t.NotifyURL)
+		t.TotalSize, t.DownloadedSize, t.UploadedSize, t.ChatID, t.UserID, db.timeArg(t.CreatedAt),
+		db.nullTimeArg(t.CompletedAt), t.Zip, t.Unzip, t.Password, t.Error, t.RetryCount, t.Quality, t.NotifyURL)
 	return err
 }
 
-const allTaskColumns = "id, gid, type, status, url, file_name, local_path, remote_path, remote_url, total_size, downloaded_size, uploaded_size, chat_id, user_id, created_at, completed_at, zip, unzip, password, error, retries, quality, md5, notify_url"
-
 func (db *DB) GetActive(ctx context.Context) ([]TaskRecord, error) {
-	rows, err := db.QueryContext(ctx, "SELECT "+allTaskColumns+" FROM tasks WHERE status NOT IN ('completed', 'failed', 'cancelled')")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var tasks []TaskRecord
-	for rows.Next() {
-		var t TaskRecord
-		err := rows.Scan(
-			&t.ID, &t.GID, &t.Type, &t.Status, &t.URL, &t.FileName, &t.LocalPath, &t.RemotePath, &t.RemoteURL,
-			&t.TotalSize, &t.DownloadedSize, &t.UploadedSize, &t.ChatID, &t.UserID, &t.CreatedAt,
-			&t.CompletedAt, &t.Zip, &t.Unzip, &t.Password, &t.Error, &t.RetryCount, &t.Quality, &t.MD5, &t.NotifyURL,
-		)
-		if err != nil {
-			slog.Error("Error scanning task", "error", err)
-			continue
-		}
-		tasks = append(tasks, t)
-	}
-	return tasks, nil
+	return db.queryTasks(ctx, "GetActive",
+		"SELECT "+taskColumns+" FROM tasks WHERE status NOT IN ('completed', 'failed', 'cancelled')")
 }
 
 func (db *DB) GetTaskByID(ctx context.Context, id string) (*TaskRecord, error) {
-	tr := &TaskRecord{}
-	err := db.QueryRowContext(ctx, `
-		SELECT `+taskColumns+` FROM tasks WHERE id = $1
-	`, id).Scan(
-		&tr.ID, &tr.GID, &tr.Type, &tr.Status, &tr.URL, &tr.FileName, &tr.LocalPath, &tr.RemotePath, &tr.RemoteURL,
-		&tr.TotalSize, &tr.DownloadedSize, &tr.UploadedSize, &tr.ChatID, &tr.UserID,
-		&tr.CreatedAt, &tr.CompletedAt, &tr.Zip, &tr.Unzip, &tr.Password, &tr.Error, &tr.RetryCount, &tr.Quality, &tr.MD5, &tr.NotifyURL,
-	)
+	tr, err := db.scanTask(db.QueryRowContext(ctx, "SELECT "+taskColumns+" FROM tasks WHERE id = $1", id))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	return tr, nil
+	return &tr, nil
 }
 
 func (db *DB) UpdateStatus(ctx context.Context, taskID, status, errorMsg string) error {
@@ -163,13 +161,37 @@ func (db *DB) UpdateMD5(ctx context.Context, id, md5 string) error {
 	_, err := db.ExecContext(ctx, "UPDATE tasks SET md5=$1 WHERE id=$2", md5, id)
 	return err
 }
+
 func (db *DB) SetNotifyURLByUser(ctx context.Context, userID int64, url string) error {
 	_, err := db.ExecContext(ctx, "UPDATE tasks SET notify_url=$1 WHERE user_id=$2 AND status NOT IN ('completed','failed','cancelled')", url, userID)
 	return err
 }
 
+// parseLocalTime parses a caller-supplied time string. Strings without a zone
+// are taken as time.Local.
+func parseLocalTime(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999-07:00"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	for _, layout := range []string{"2006-01-02 15:04:05.999999999", "2006-01-02T15:04:05.999999999", "2006-01-02 15:04", "2006-01-02"} {
+		if t, err := time.ParseInLocation(layout, s, time.Local); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unrecognised time %q", s)
+}
+
+// DeleteOld removes finished tasks created before the given time
+// ("2006-01-02 15:04:05" in local time, or RFC 3339).
 func (db *DB) DeleteOld(ctx context.Context, before string) (int, error) {
-	result, err := db.ExecContext(ctx, "DELETE FROM tasks WHERE status IN ('completed', 'failed', 'cancelled') AND created_at < $1", before)
+	cutoff, err := parseLocalTime(before)
+	if err != nil {
+		return 0, err
+	}
+	result, err := db.ExecContext(ctx, "DELETE FROM tasks WHERE status IN ('completed', 'failed', 'cancelled') AND created_at < $1", db.timeArg(cutoff))
 	if err != nil {
 		return 0, err
 	}
@@ -179,9 +201,9 @@ func (db *DB) DeleteOld(ctx context.Context, before string) (int, error) {
 
 func (db *DB) GetRecentLogs(ctx context.Context, limit int) ([]map[string]interface{}, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT id, type, status, file_name, created_at, error 
-		FROM tasks 
-		ORDER BY created_at DESC 
+		SELECT id, type, status, COALESCE(file_name, ''), created_at, COALESCE(error, '')
+		FROM tasks
+		ORDER BY created_at DESC
 		LIMIT $1
 	`, limit)
 	if err != nil {
@@ -194,6 +216,7 @@ func (db *DB) GetRecentLogs(ctx context.Context, limit int) ([]map[string]interf
 		var id, taskType, status, fileName, errorStr string
 		var createdAt time.Time
 		if err := rows.Scan(&id, &taskType, &status, &fileName, &createdAt, &errorStr); err != nil {
+			slog.Error("Error scanning task in GetRecentLogs", "error", err)
 			continue
 		}
 
@@ -210,8 +233,8 @@ func (db *DB) GetRecentLogs(ctx context.Context, limit int) ([]map[string]interf
 		logs = append(logs, map[string]interface{}{
 			"level":     level,
 			"message":   message,
-			"timestamp": createdAt,
+			"timestamp": db.fromDB(createdAt),
 		})
 	}
-	return logs, nil
+	return logs, rows.Err()
 }

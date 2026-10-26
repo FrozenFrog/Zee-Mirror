@@ -14,7 +14,8 @@ import (
 )
 
 // Web dashboard sessions are HS256 JWTs issued after an OIDC sign-in
-// (oidc.go). API clients can instead send a user's personal API key.
+// (oidc.go) or a WEB_DASHBOARD_TOKEN sign-in (token_login.go). API clients
+// can instead send a user's personal API key.
 
 const dashboardTokenTTL = 24 * time.Hour
 
@@ -51,6 +52,9 @@ func (s *Server) validSession(tokenStr string) bool {
 		return false
 	}
 	sub, _ := claims["sub"].(string)
+	if sub == tokenSubject {
+		return s.validTokenSession(claims)
+	}
 	return strings.HasPrefix(sub, oidcSubjectPrefix)
 }
 

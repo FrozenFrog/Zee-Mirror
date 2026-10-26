@@ -13,24 +13,25 @@ func (db *DB) GetByID(ctx context.Context, id int64) (*domain.User, error) {
 	var expiresAt sql.NullTime
 
 	err := db.QueryRowContext(ctx, `
-		SELECT username, role, language, max_daily_tasks, max_daily_bandwidth, expires_at, created_at 
+		SELECT COALESCE(username, ''), role, COALESCE(language, ''), COALESCE(max_daily_tasks, -1), COALESCE(max_daily_bandwidth, -1), expires_at, created_at
 		FROM users WHERE id = $1
 	`, id).Scan(&u.Username, &u.Role, &u.Language, &u.MaxDailyTasks, &u.MaxDailyBandwidth, &expiresAt, &u.CreatedAt)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	u.ExpiresAt = expiresAt
-
-	u.IsActive = true
-	if u.ExpiresAt.Valid && u.ExpiresAt.Time.Before(time.Now()) {
-		u.IsActive = false
-	}
-
+	db.finishUser(u, expiresAt)
 	return u, nil
+}
+
+// finishUser converts the times read for u and derives IsActive.
+func (db *DB) finishUser(u *domain.User, expiresAt sql.NullTime) {
+	u.CreatedAt = db.fromDB(u.CreatedAt)
+	u.ExpiresAt = db.fromDBNull(expiresAt)
+	u.IsActive = !u.ExpiresAt.Valid || u.ExpiresAt.Time.After(time.Now())
 }
 
 func (db *DB) Upsert(ctx context.Context, u domain.User) error {
@@ -44,7 +45,7 @@ func (db *DB) Upsert(ctx context.Context, u domain.User) error {
 			max_daily_tasks = excluded.max_daily_tasks,
 			max_daily_bandwidth = excluded.max_daily_bandwidth,
 			expires_at = excluded.expires_at
-	`, u.ID, u.Username, u.Role, u.Language, u.CreatedAt, u.MaxDailyTasks, u.MaxDailyBandwidth, u.ExpiresAt)
+	`, u.ID, u.Username, u.Role, u.Language, db.timeArg(u.CreatedAt), u.MaxDailyTasks, u.MaxDailyBandwidth, db.nullTimeArg(u.ExpiresAt))
 	return err
 }
 
@@ -56,7 +57,7 @@ func (db *DB) EnsureUser(ctx context.Context, u domain.User) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT(id) DO UPDATE SET
 			role = CASE WHEN users.role = 'user' THEN excluded.role ELSE users.role END
-	`, u.ID, u.Username, u.Role, u.Language, u.CreatedAt, u.MaxDailyTasks, u.MaxDailyBandwidth)
+	`, u.ID, u.Username, u.Role, u.Language, db.timeArg(u.CreatedAt), u.MaxDailyTasks, u.MaxDailyBandwidth)
 	return err
 }
 
@@ -71,7 +72,7 @@ func (db *DB) SetLimits(ctx context.Context, id int64, maxTasks int, maxBandwidt
 }
 
 func (db *DB) SetExpiration(ctx context.Context, id int64, expiresAt time.Time) error {
-	_, err := db.ExecContext(ctx, "UPDATE users SET expires_at = $1 WHERE id = $2", expiresAt, id)
+	_, err := db.ExecContext(ctx, "UPDATE users SET expires_at = $1 WHERE id = $2", db.timeArg(expiresAt), id)
 	return err
 }
 
@@ -80,12 +81,12 @@ func (db *DB) SetLanguage(ctx context.Context, id int64, lang string) error {
 		INSERT INTO users (id, language, created_at, role, max_daily_tasks, max_daily_bandwidth)
 		VALUES ($1, $2, $3, 'user', 0, 0)
 		ON CONFLICT(id) DO UPDATE SET language = excluded.language
-	`, id, lang, time.Now())
+	`, id, lang, db.timeArg(time.Now()))
 	return err
 }
 
 func (db *DB) GetAll(ctx context.Context) ([]domain.User, error) {
-	rows, err := db.QueryContext(ctx, "SELECT id, username, role, language, max_daily_tasks, max_daily_bandwidth, expires_at, created_at, COALESCE(api_key, '') FROM users")
+	rows, err := db.QueryContext(ctx, "SELECT id, COALESCE(username, ''), role, COALESCE(language, ''), COALESCE(max_daily_tasks, -1), COALESCE(max_daily_bandwidth, -1), expires_at, created_at, COALESCE(api_key, '') FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +99,10 @@ func (db *DB) GetAll(ctx context.Context) ([]domain.User, error) {
 		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Language, &u.MaxDailyTasks, &u.MaxDailyBandwidth, &expiresAt, &u.CreatedAt, &u.APIKey); err != nil {
 			return nil, err
 		}
-		u.ExpiresAt = expiresAt
-		u.IsActive = true
-		if u.ExpiresAt.Valid && u.ExpiresAt.Time.Before(time.Now()) {
-			u.IsActive = false
-		}
+		db.finishUser(&u, expiresAt)
 		users = append(users, u)
 	}
-	return users, nil
+	return users, rows.Err()
 }
 
 func (db *DB) GetCount(ctx context.Context) (int, error) {
@@ -121,7 +118,7 @@ func (db *DB) GetUserByAPIKey(ctx context.Context, apiKey string) (*domain.User,
 	u := &domain.User{}
 	var expiresAt sql.NullTime
 	err := db.QueryRowContext(ctx, `
-		SELECT id, username, role, language, max_daily_tasks, max_daily_bandwidth, expires_at, created_at 
+		SELECT id, COALESCE(username, ''), role, COALESCE(language, ''), COALESCE(max_daily_tasks, -1), COALESCE(max_daily_bandwidth, -1), expires_at, created_at
 		FROM users WHERE api_key = $1
 	`, apiKey).Scan(&u.ID, &u.Username, &u.Role, &u.Language, &u.MaxDailyTasks, &u.MaxDailyBandwidth, &expiresAt, &u.CreatedAt)
 	if err != nil {
@@ -130,8 +127,7 @@ func (db *DB) GetUserByAPIKey(ctx context.Context, apiKey string) (*domain.User,
 		}
 		return nil, err
 	}
-	u.ExpiresAt = expiresAt
-	u.IsActive = !u.ExpiresAt.Valid || u.ExpiresAt.Time.After(time.Now())
+	db.finishUser(u, expiresAt)
 	return u, nil
 }
 

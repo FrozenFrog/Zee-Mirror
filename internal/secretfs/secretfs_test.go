@@ -3,12 +3,15 @@ package secretfs
 import (
 	"context"
 	"database/sql"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"zee-mirror/internal/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +41,19 @@ func (r *memRepo) Set(_ context.Context, key, value string) error {
 	return nil
 }
 
+func (r *memRepo) AllSettings(_ context.Context) (map[string]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return maps.Clone(r.data), nil
+}
+
+func (r *memRepo) DeleteSetting(_ context.Context, key string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.data, key)
+	return nil
+}
+
 func (r *memRepo) value(key string) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -61,7 +77,7 @@ func TestOpenImportsLegacyFileAndLinksIt(t *testing.T) {
 	s := openTest(t, repo, configDir, nil)
 	defer s.Close()
 
-	assert.Equal(t, "[gdrive]\ntype = drive\n", repo.value("rclone_config"))
+	assert.Equal(t, "[gdrive]\ntype = drive\n", repo.value(repository.SettingRcloneConfig))
 
 	info, err := os.Lstat(legacy)
 	require.NoError(t, err)
@@ -78,7 +94,7 @@ func TestOpenImportsLegacyFileAndLinksIt(t *testing.T) {
 
 func TestExternalRewriteIsSavedToDatabase(t *testing.T) {
 	repo := newMemRepo()
-	require.NoError(t, repo.Set(context.Background(), "rclone_config", "token = old\n"))
+	require.NoError(t, repo.Set(context.Background(), repository.SettingRcloneConfig, "token = old\n"))
 	configDir := t.TempDir()
 
 	s := openTest(t, repo, configDir, nil)
@@ -92,12 +108,12 @@ func TestExternalRewriteIsSavedToDatabase(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmp, []byte("token = new\n"), 0o600))
 	require.NoError(t, os.Rename(tmp, target))
 
-	assert.Eventually(t, func() bool { return repo.value("rclone_config") == "token = new\n" },
+	assert.Eventually(t, func() bool { return repo.value(repository.SettingRcloneConfig) == "token = new\n" },
 		3*time.Second, 20*time.Millisecond)
 
 	// In-place writes through the symlink (yt-dlp cookie save) are caught too.
 	require.NoError(t, os.WriteFile(filepath.Join(configDir, Cookies), []byte("# Netscape HTTP Cookie File\n"), 0o600))
-	assert.Eventually(t, func() bool { return repo.value("cookies") == "# Netscape HTTP Cookie File\n" },
+	assert.Eventually(t, func() bool { return repo.value(repository.SettingCookies) == "# Netscape HTTP Cookie File\n" },
 		3*time.Second, 20*time.Millisecond)
 }
 
@@ -108,7 +124,7 @@ func TestEncryptedRoundTrip(t *testing.T) {
 
 	s := openTest(t, repo, configDir, key)
 	require.NoError(t, s.Set(context.Background(), Cookies, []byte("secret-cookie")))
-	stored := repo.value("cookies")
+	stored := repo.value(repository.SettingCookies)
 	assert.True(t, strings.HasPrefix(stored, encPrefix))
 	assert.NotContains(t, stored, "secret-cookie")
 	s.Close()
@@ -122,7 +138,7 @@ func TestEncryptedRoundTrip(t *testing.T) {
 
 func TestCloseWipesRAMButKeepsDatabase(t *testing.T) {
 	repo := newMemRepo()
-	require.NoError(t, repo.Set(context.Background(), "cookies", "c=1"))
+	require.NoError(t, repo.Set(context.Background(), repository.SettingCookies, "c=1"))
 	configDir := t.TempDir()
 
 	s := openTest(t, repo, configDir, nil)
@@ -133,7 +149,7 @@ func TestCloseWipesRAMButKeepsDatabase(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 	_, err = os.Lstat(filepath.Join(configDir, Cookies))
 	assert.True(t, os.IsNotExist(err))
-	assert.Equal(t, "c=1", repo.value("cookies"))
+	assert.Equal(t, "c=1", repo.value(repository.SettingCookies))
 }
 
 func TestSeedOnlyUsedWhenDatabaseEmpty(t *testing.T) {
@@ -146,7 +162,7 @@ func TestSeedOnlyUsedWhenDatabaseEmpty(t *testing.T) {
 
 	s, err := Open(context.Background(), repo, opts)
 	require.NoError(t, err)
-	assert.Equal(t, "token = seed\n", repo.value("rclone_config"))
+	assert.Equal(t, "token = seed\n", repo.value(repository.SettingRcloneConfig))
 	require.NoError(t, s.Set(context.Background(), RcloneConfig, []byte("token = refreshed\n")))
 	s.Close()
 
@@ -154,7 +170,7 @@ func TestSeedOnlyUsedWhenDatabaseEmpty(t *testing.T) {
 	s, err = Open(context.Background(), repo, opts)
 	require.NoError(t, err)
 	defer s.Close()
-	assert.Equal(t, "token = refreshed\n", repo.value("rclone_config"))
+	assert.Equal(t, "token = refreshed\n", repo.value(repository.SettingRcloneConfig))
 	_, err = os.Stat(filepath.Join(seedDir, RcloneConfig))
 	assert.NoError(t, err, "seed files are never deleted")
 }

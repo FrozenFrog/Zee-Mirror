@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"zee-mirror/internal/repository"
 	"zee-mirror/internal/service"
 	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
@@ -313,7 +314,7 @@ func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args str
 
 	s.TaskManager.RcloneDest = args
 	ctx := context.Background()
-	_ = s.DB.Set(ctx, "rclone_dest", args)
+	_ = s.DB.Set(ctx, repository.SettingRcloneDest, args)
 
 	s.Reply(message, i18n.T(lang, "storage_set_ok", utils.EscapeMarkdownV2Code(args)))
 }

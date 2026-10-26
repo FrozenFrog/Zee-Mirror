@@ -203,5 +203,5 @@ func TestOIDC_DisabledAndConfig(t *testing.T) {
 
 	rec = httptest.NewRecorder()
 	s.handleAuthConfig(rec, httptest.NewRequest("GET", "/api/auth/config", nil))
-	assert.JSONEq(t, `{"oidc":false,"providerName":""}`, rec.Body.String())
+	assert.JSONEq(t, `{"oidc":false,"token":false,"providerName":""}`, rec.Body.String())
 }

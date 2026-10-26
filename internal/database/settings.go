@@ -7,7 +7,7 @@ import (
 
 func (db *DB) Get(ctx context.Context, key string) (string, error) {
 	var value string
-	err := db.QueryRowContext(ctx, "SELECT value FROM settings WHERE key = $1", key).Scan(&value)
+	err := db.QueryRowContext(ctx, "SELECT COALESCE(value, '') FROM settings WHERE key = $1", key).Scan(&value)
 	return value, err
 }
 
@@ -15,7 +15,7 @@ func (db *DB) Set(ctx context.Context, key, value string) error {
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, $3)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-	`, key, value, time.Now())
+	`, key, value, db.timeArg(time.Now()))
 	return err
 }
 
@@ -36,4 +36,10 @@ func (db *DB) AllSettings(ctx context.Context) (map[string]string, error) {
 		out[key] = value
 	}
 	return out, rows.Err()
+}
+
+// DeleteSetting removes a row from the settings table.
+func (db *DB) DeleteSetting(ctx context.Context, key string) error {
+	_, err := db.ExecContext(ctx, "DELETE FROM settings WHERE key = $1", key)
+	return err
 }

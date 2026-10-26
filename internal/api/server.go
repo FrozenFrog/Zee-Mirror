@@ -52,6 +52,7 @@ func (s *Server) Start() {
 
 	mux.HandleFunc("/api/stats", auth(s.handleStats))
 	mux.HandleFunc("/api/auth/config", s.handleAuthConfig)
+	mux.HandleFunc("/api/auth/login", s.handleTokenLogin)
 	mux.HandleFunc("/api/auth/oidc/login", s.handleOIDCLogin)
 	mux.HandleFunc(config.OIDCCallbackPath, s.handleOIDCCallback)
 	mux.HandleFunc("/api/audit-logs", auth(s.handleAuditLogs))
@@ -129,6 +130,7 @@ func (s *Server) Start() {
 		defer ticker.Stop()
 		for range ticker.C {
 			globalRateLimiter.Cleanup()
+			loginFailures.Cleanup()
 		}
 	}()
 

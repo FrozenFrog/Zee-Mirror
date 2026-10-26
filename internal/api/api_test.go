@@ -3,8 +3,6 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -173,28 +171,17 @@ func TestPathTraversal_ExplorerValid(t *testing.T) {
 
 func TestConfigEndpoint_RedactsSecrets(t *testing.T) {
 	s := newTestServer(t)
-
-	tmpDir := t.TempDir()
-	envPath := filepath.Join(tmpDir, ".env")
-	envContent := "BOT_TOKEN=abc123secret\nOWNER_ID=12345\nOIDC_CLIENT_SECRET=zee343212\nLOG_LEVEL=info\n"
-	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	origDir, _ := os.Getwd()
-	_ = os.Chdir(tmpDir)
-	defer func() { _ = os.Chdir(origDir) }()
+	t.Setenv("BOT_TOKEN", "abc123secret")
+	t.Setenv("OIDC_CLIENT_SECRET", "zee343212")
+	t.Setenv("LOG_LEVEL", "info")
 
 	req := httptest.NewRequest("GET", "/api/config", nil)
-	req.Header.Set("X-API-Key", "secret123")
 	rec := httptest.NewRecorder()
-
 	s.handleConfig(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-
 	body := rec.Body.String()
 	if strings.Contains(body, "abc123secret") {
 		t.Error("BOT_TOKEN should be redacted")
@@ -202,11 +189,41 @@ func TestConfigEndpoint_RedactsSecrets(t *testing.T) {
 	if strings.Contains(body, "zee343212") {
 		t.Error("OIDC_CLIENT_SECRET should be redacted")
 	}
-	if !strings.Contains(body, "***REDACTED***") {
-		t.Error("response should contain REDACTED markers")
+	if !strings.Contains(body, "BOT_TOKEN=***") {
+		t.Error("response should contain redaction markers")
 	}
 	if !strings.Contains(body, "LOG_LEVEL=info") {
 		t.Error("non-sensitive values should not be redacted")
+	}
+	if strings.Contains(body, "DATABASE_URL") || strings.Contains(body, "ENCRYPTION_KEY") {
+		t.Error("bootstrap keys must not be listed")
+	}
+}
+
+func TestConfigEndpoint_SavesToDatabase(t *testing.T) {
+	s := newTestServer(t)
+	t.Setenv("OWNER_ID", "")
+	t.Setenv("WEB_DASHBOARD_TOKEN", "")
+	t.Setenv("ENCRYPTION_KEY", strings.Repeat("ab", 32))
+	repo := s.Service.SettingsRepo.(*mocks.MockRepository)
+	repo.On("AllSettings", mock.Anything).Return(map[string]string{}, nil)
+	repo.On("Set", mock.Anything, "OWNER_ID", "42").Return(nil).Once()
+	repo.On("Set", mock.Anything, "WEB_DASHBOARD_TOKEN", mock.MatchedBy(func(v string) bool {
+		return strings.HasPrefix(v, "enc:")
+	})).Return(nil).Once()
+
+	body := `{"config":"OWNER_ID=42\nWEB_DASHBOARD_TOKEN=0123456789abcdefXYZ\n"}`
+	rec := httptest.NewRecorder()
+	s.handleConfig(rec, httptest.NewRequest("POST", "/api/config", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	repo.AssertExpectations(t)
+
+	rec = httptest.NewRecorder()
+	s.handleConfig(rec, httptest.NewRequest("POST", "/api/config", strings.NewReader(`{"config":"DATABASE_URL=x"}`)))
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("bootstrap key accepted: %d", rec.Code)
 	}
 }
 

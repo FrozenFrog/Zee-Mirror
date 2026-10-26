@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"zee-mirror/internal/repository"
 	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
@@ -61,7 +62,7 @@ func (s *BotService) UpdateSharedDashboardNonBlocking(chatID int64, forceNew boo
 		lastMsgID, exists := tm.LastStatusMsg[chatID]
 
 		if !exists {
-			key := fmt.Sprintf("dashboard_msg_%d", chatID)
+			key := repository.DashboardMessageKey(chatID)
 			if val, err := s.SettingsRepo.Get(context.Background(), key); err == nil && val != "" {
 				var storedID int
 				if n, _ := fmt.Sscanf(val, "%d", &storedID); n > 0 && storedID != 0 {
@@ -77,7 +78,7 @@ func (s *BotService) UpdateSharedDashboardNonBlocking(chatID int64, forceNew boo
 			delete(lastStatusText, chatID)
 			delete(tm.LastDashUpdateAt, chatID)
 			delete(tm.LastDashProgressSum, chatID)
-			_ = s.SettingsRepo.Set(context.Background(), fmt.Sprintf("dashboard_msg_%d", chatID), "")
+			_ = s.SettingsRepo.Set(context.Background(), repository.DashboardMessageKey(chatID), "")
 		}
 		tm.Mu.Unlock()
 		s.TaskManager.StatusMu.Unlock()
@@ -334,7 +335,7 @@ func (s *BotService) sendStatusMessage(chatID int64, text string, keyboard tgbot
 	s.TaskManager.Mu.RUnlock()
 
 	if !exists {
-		key := fmt.Sprintf("dashboard_msg_%d", chatID)
+		key := repository.DashboardMessageKey(chatID)
 		if val, err := s.SettingsRepo.Get(context.Background(), key); err == nil && val != "" {
 			var storedID int
 			if n, _ := fmt.Sscanf(val, "%d", &storedID); n > 0 && storedID != 0 {
@@ -393,7 +394,7 @@ func (s *BotService) sendStatusMessage(chatID int64, text string, keyboard tgbot
 	s.TaskManager.Mu.Unlock()
 	lastStatusText[chatID] = text
 
-	key := fmt.Sprintf("dashboard_msg_%d", chatID)
+	key := repository.DashboardMessageKey(chatID)
 	_ = s.SettingsRepo.Set(context.Background(), key, fmt.Sprintf("%d", sentMsg.MessageID))
 }
 

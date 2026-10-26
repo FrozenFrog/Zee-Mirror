@@ -3,38 +3,17 @@ package database
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"time"
 	"zee-mirror/internal/domain"
 )
 
 func (db *DB) GetRecoverable(ctx context.Context) ([]TaskRecord, error) {
-	query := fmt.Sprintf(`
-		SELECT `+allTaskColumns+` FROM tasks 
+	return db.queryTasks(ctx, "GetRecoverable", `
+		SELECT `+taskColumns+` FROM tasks
 		WHERE status IN ('downloading', 'uploading', 'queued', 'processing')
-		AND created_at > %s
-	`, db.nowMinusExpr("24 hours"))
-
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var tasks []TaskRecord
-	for rows.Next() {
-		var t TaskRecord
-		err := rows.Scan(
-			&t.ID, &t.GID, &t.Type, &t.Status, &t.URL, &t.FileName, &t.LocalPath, &t.RemotePath, &t.RemoteURL,
-			&t.TotalSize, &t.DownloadedSize, &t.UploadedSize, &t.ChatID, &t.UserID, &t.CreatedAt,
-			&t.CompletedAt, &t.Zip, &t.Unzip, &t.Password, &t.Error, &t.RetryCount, &t.Quality, &t.MD5, &t.NotifyURL,
-		)
-		if err != nil {
-			continue
-		}
-		tasks = append(tasks, t)
-	}
-	return tasks, nil
+		AND created_at > $1
+	`, db.timeArg(time.Now().Add(-24*time.Hour)))
 }
 
 func (db *DB) SaveCheckpoint(ctx context.Context, cp domain.TaskCheckpoint) error {
@@ -59,7 +38,7 @@ func (db *DB) GetCheckpoint(ctx context.Context, taskID string) (*domain.TaskChe
 	`, taskID).Scan(&cp.TaskID, &cp.DownloadedBytes, &cp.TotalBytes, &cp.Progress, &lastUpdate)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

@@ -65,8 +65,13 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
       // The response carries an English status line; show our own text instead.
       await api.post('/api/config', { config: rawConfig })
       showToast(t('settings.configUpdated'), 'success')
-    } catch {
-      showAlert(t('settings.configError'), t('settings.configUpdateFailed'), { type: 'error' })
+      fetchRawConfig()
+    } catch (err: unknown) {
+      // A rejected line comes back as {"error": "line 3: unknown setting ..."}.
+      const detail = (err as { response?: { data?: { error?: string } } }).response?.data?.error
+      showAlert(t('settings.configError'), detail || t('settings.configUpdateFailed'), {
+        type: 'error',
+      })
     }
   }
 
