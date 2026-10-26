@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, AlertCircle, HelpCircle, Info, CheckCircle2 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { ReactNode } from 'react'
+import { useI18n } from '../../hooks/useI18n'
 
 interface DialogProps {
   isOpen: boolean
@@ -22,12 +23,13 @@ const Dialog: React.FC<DialogProps> = ({
   title,
   children,
   type = 'info',
-  confirmText = 'Xác nhận',
-  cancelText = 'Hủy',
+  confirmText,
+  cancelText,
   onConfirm,
   showCancel = true,
   loading = false,
 }) => {
+  const { t } = useI18n()
   const icons = {
     info: <Info className="text-blue-500" size={24} />,
     confirm: <HelpCircle className="text-primary" size={24} />,
@@ -88,7 +90,7 @@ const Dialog: React.FC<DialogProps> = ({
                   onClick={onClose}
                   className="flex-1 px-6 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-transparent hover:border-slate-300 dark:hover:border-white/10"
                 >
-                  {cancelText}
+                  {cancelText ?? t('common.cancel')}
                 </button>
               )}
               <button
@@ -102,7 +104,7 @@ const Dialog: React.FC<DialogProps> = ({
                   !showCancel && 'w-full',
                 )}
               >
-                {loading ? 'Đang xử lý...' : confirmText}
+                {loading ? t('common.processing') : (confirmText ?? t('common.confirm'))}
               </button>
             </div>
           </motion.div>

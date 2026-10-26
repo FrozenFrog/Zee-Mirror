@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -75,6 +76,11 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 	}
 	s.Settings.Mu.Unlock()
 
+	lang := s.GetUserLanguage(callback.From.ID)
+	toast := func(text string) {
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, text))
+	}
+
 	switch action {
 	case "auto_delete":
 		s.Settings.Mu.Lock()
@@ -85,9 +91,9 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 		_ = s.DB.Set(ctx, "auto_delete_messages", fmt.Sprintf("%v", status))
 
 		if status {
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Tự động xóa: BẬT"))
+			toast(i18n.T(lang, "settings_toast_auto_delete_on"))
 		} else {
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Tự động xóa: TẮT"))
+			toast(i18n.T(lang, "settings_toast_auto_delete_off"))
 		}
 
 	case "default_mirror":
@@ -95,58 +101,44 @@ func (s *BotService) HandleSettingsCallback(callback *tgbotapi.CallbackQuery, pa
 		s.Settings.DefaultMode = string(TypeMirror)
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "default_mode", string(TypeMirror))
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📥 Mặc định: Mirror"))
+		toast(i18n.T(lang, "settings_toast_default_mode", "📥", "Mirror"))
 
 	case "default_leech":
 		s.Settings.Mu.Lock()
 		s.Settings.DefaultMode = string(TypeLeech)
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "default_mode", string(TypeLeech))
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔗 Mặc định: Leech"))
+		toast(i18n.T(lang, "settings_toast_default_mode", "🔗", "Leech"))
 
 	case "quality_720":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "720p"
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "ytdlp_quality", "720p")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Chất lượng: 720p"))
+		toast(i18n.T(lang, "settings_toast_quality", "720p"))
 
 	case "quality_1080":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "1080p"
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "ytdlp_quality", "1080p")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Chất lượng: 1080p"))
+		toast(i18n.T(lang, "settings_toast_quality", "1080p"))
 
 	case "quality_2160":
 		s.Settings.Mu.Lock()
 		s.Settings.YTDLPQuality = "2160p"
 		s.Settings.Mu.Unlock()
 		_ = s.DB.Set(ctx, "ytdlp_quality", "2160p")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📺 Chất lượng: 4K (2160p)"))
-
-	case "lang_vi":
-		_ = s.DB.SetLanguage(ctx, callback.From.ID, "vi")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🇻🇳 Ngôn ngữ: Tiếng Việt"))
-
-	case "lang_id":
-		_ = s.DB.SetLanguage(ctx, callback.From.ID, "id")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🇮🇩 Bahasa: Indonesia"))
-
-	case "lang_en":
-		_ = s.DB.SetLanguage(ctx, callback.From.ID, "en")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🇺🇸 Language: English"))
-
-	case "lang_ja":
-		_ = s.DB.SetLanguage(ctx, callback.From.ID, "ja")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🇯🇵 言語: 日本語"))
-
-	case "lang_zh":
-		_ = s.DB.SetLanguage(ctx, callback.From.ID, "zh")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🇨🇳 语言: 简体中文"))
+		toast(i18n.T(lang, "settings_toast_quality", "4K (2160p)"))
 
 	default:
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+		l, ok := languageFromAction(action)
+		if !ok {
+			toast("")
+			break
+		}
+		_ = s.DB.SetLanguage(ctx, callback.From.ID, l.Code)
+		toast(languageSetToast(l))
 	}
 
 	text := s.formatSettingsMessage(callback.From.ID)
@@ -164,9 +156,9 @@ func (s *BotService) formatSettingsMessage(userID int64) string {
 
 	lang := s.GetUserLanguage(userID)
 
-	autoDeleteStatus := "❌ TẮT"
+	autoDeleteStatus := i18n.T(lang, "settings_off")
 	if s.Settings.AutoDeleteMessages {
-		autoDeleteStatus = "✅ BẬT"
+		autoDeleteStatus = i18n.T(lang, "settings_on")
 	}
 
 	defaultModeEmoji := "📥"
@@ -174,22 +166,8 @@ func (s *BotService) formatSettingsMessage(userID int64) string {
 		defaultModeEmoji = "🔗"
 	}
 
-	langFlag := "🇻🇳"
-	langName := "Tiếng Việt"
-	switch lang {
-	case "id":
-		langFlag = "🇮🇩"
-		langName = "Indonesia"
-	case "en":
-		langFlag = "🇺🇸"
-		langName = "English"
-	case "ja":
-		langFlag = "🇯🇵"
-		langName = "日本語"
-	case "zh":
-		langFlag = "🇨🇳"
-		langName = "简体中文"
-	}
+	current := languageInfo(lang)
+	langFlag, langName := current.Flag, utils.EscapeMarkdownV2(current.Name)
 
 	cookiesStatus := i18n.T(lang, "settings_cookies_missing")
 	if _, err := os.Stat(filepath.Join(s.Config.ConfigDir, "cookies.txt")); err == nil {
@@ -250,18 +228,58 @@ func (s *BotService) getSettingsKeyboard(userID int64) tgbotapi.InlineKeyboardMa
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+// languageKeyboard lists i18n.Languages with callback data
+// "settings:lang_<code>": the first (default) language on its own row, the
+// rest two per row. Names are native, so the picker is the same for everyone.
 func languageKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🇻🇳 Tiếng Việt", "settings:lang_vi"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🇺🇸 English", "settings:lang_en"),
-			tgbotapi.NewInlineKeyboardButtonData("🇮🇩 Indonesia", "settings:lang_id"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🇯🇵 日本語", "settings:lang_ja"),
-			tgbotapi.NewInlineKeyboardButtonData("🇨🇳 简体中文", "settings:lang_zh"),
-		),
-	)
+	button := func(l i18n.Language) tgbotapi.InlineKeyboardButton {
+		return tgbotapi.NewInlineKeyboardButtonData(l.Flag+" "+l.Name, "settings:lang_"+l.Code)
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	if len(i18n.Languages) > 0 {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button(i18n.Languages[0])))
+	}
+	for i := 1; i < len(i18n.Languages); i += 2 {
+		row := tgbotapi.NewInlineKeyboardRow(button(i18n.Languages[i]))
+		if i+1 < len(i18n.Languages) {
+			row = append(row, button(i18n.Languages[i+1]))
+		}
+		rows = append(rows, row)
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// languageFromAction maps a "lang_<code>" settings action to its language.
+func languageFromAction(action string) (i18n.Language, bool) {
+	code, ok := strings.CutPrefix(action, "lang_")
+	if !ok {
+		return i18n.Language{}, false
+	}
+	for _, l := range i18n.Languages {
+		if l.Code == code {
+			return l, true
+		}
+	}
+	return i18n.Language{}, false
+}
+
+// languageInfo describes code, falling back to DefaultLang.
+func languageInfo(code string) i18n.Language {
+	var def i18n.Language
+	for _, l := range i18n.Languages {
+		if l.Code == code {
+			return l
+		}
+		if l.Code == i18n.DefaultLang {
+			def = l
+		}
+	}
+	return def
+}
+
+// languageSetToast confirms a language change, in the new language (plain
+// text for a callback toast).
+func languageSetToast(l i18n.Language) string {
+	return i18n.T(l.Code, "lang_set_toast", l.Flag, l.Name)
 }

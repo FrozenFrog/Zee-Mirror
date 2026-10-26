@@ -82,7 +82,8 @@ func (s *Server) handleTorrentFiles(w http.ResponseWriter, r *http.Request) {
 		"loading":  true,
 		"fetching": session.IsFetching,
 		"logs":     session.StatusMessages,
-		"message":  "Mengambil metadata torrent di background...",
+		// Not shown by the dashboard (it has its own translated text).
+		"message": "Fetching torrent metadata in the background...",
 	})
 }
 

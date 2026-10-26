@@ -18,6 +18,7 @@ import (
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/downloader"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 	"zee-mirror/plugins/registry"
 )
@@ -49,7 +50,7 @@ func (e *Engine) CanHandle(url string) bool {
 func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir string, onProgress func(downloader.ProgressUpdate)) error {
 	driveID, isFolderHint := ExtractDriveID(task.URL)
 	if driveID == "" {
-		return fmt.Errorf("không tìm thấy ID Google Drive trong URL: %s", task.URL)
+		return i18n.NewError("plugin_drive_no_id", task.URL)
 	}
 
 	configPath := filepath.Join(e.Config.ConfigDir, "rclone.conf")
@@ -86,7 +87,7 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	stderr, _ := cmd.StderrPipe()
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("không khởi động được rclone: %w", err)
+		return i18n.WrapError(err, "plugin_rclone_start", err)
 	}
 
 	scanner := bufio.NewScanner(stderr)
@@ -104,7 +105,7 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("rclone tải xuống thất bại: %w", err)
+		return i18n.WrapError(err, "plugin_drive_failed", err)
 	}
 
 	return nil

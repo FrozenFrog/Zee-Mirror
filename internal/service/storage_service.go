@@ -2,10 +2,10 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"zee-mirror/internal/domain"
+	"zee-mirror/pkg/i18n"
 )
 
 type StorageProvider struct {
@@ -18,7 +18,7 @@ func (s *BotService) GetAvailableStorages() ([]StorageProvider, error) {
 	cmd := execCommand(context.Background(), "rclone", "listremotes")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("%w: không liệt kê được remote rclone: %v", domain.ErrExternal, err)
+		return nil, i18n.WrapError(domain.ErrExternal, "storage_err_list_remotes", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")

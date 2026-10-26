@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { RefreshCcw, Sun, Moon } from 'lucide-react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from '../components/Sidebar/Sidebar'
-
+import { useI18n } from '../hooks/useI18n'
+import { isMessageKey } from '../i18n'
+import { rich } from '../i18n/rich'
 
 interface DashboardLayoutProps {
     tasksCount: number
@@ -10,16 +12,6 @@ interface DashboardLayoutProps {
     toggleTheme: () => void
     loading: boolean
     onLogout: () => void
-}
-
-const PAGE_TITLES: Record<string, [string, string]> = {
-    overview: ['Tổng quan', 'hệ thống'],
-    tasks: ['Quản lý', 'Task'],
-    files: ['Trình duyệt', 'file'],
-    analytics: ['Thống kê', 'hệ thống'],
-    logs: ['Nhật ký', 'hệ thống'],
-    users: ['Quản lý', 'người dùng'],
-    settings: ['Cài đặt', 'hệ thống'],
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -37,7 +29,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         setActiveTab(path.split('/')[0])
     }, [location])
 
-    const pageTitle = PAGE_TITLES[activeTab] ?? [activeTab, 'Engine']
+    const { t } = useI18n()
+    const titleKey = `page.${activeTab}.title`
+    const accentKey = `page.${activeTab}.accent`
+    const pageTitle =
+        isMessageKey(titleKey) && isMessageKey(accentKey)
+            ? [t(titleKey), t(accentKey)]
+            : [activeTab, 'Engine']
 
 
 
@@ -59,18 +57,20 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         <div className="flex items-center space-x-4 mb-4">
                             <div className="h-1.5 w-12 bg-primary rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
                             <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary opacity-80">
-                                Ma trận hạ tầng đám mây
+                                {t('layout.eyebrow')}
                             </span>
                         </div>
                         <h2 className="text-6xl font-black text-slate-900 dark:text-white tracking-[-0.04em] mb-3 capitalize leading-[0.9]">
                             {pageTitle[0]} <span className="text-primary italic">{pageTitle[1]}</span>
                         </h2>
                         <p className="text-sm font-bold text-slate-400 max-w-lg leading-relaxed tracking-tight group">
-                            Giám sát các cụm phân phối hiệu năng cao và tài nguyên điện toán biên theo{' '}
-                            <span className="text-slate-600 dark:text-slate-200 transition-colors">
-                                thời gian thực trên toàn cầu
-                            </span>
-                            .
+                            {rich(t('layout.subtitle'), {
+                                highlight: (
+                                    <span className="text-slate-600 dark:text-slate-200 transition-colors">
+                                        {t('layout.subtitleHighlight')}
+                                    </span>
+                                ),
+                            })}
                         </p>
                     </div>
 
@@ -90,7 +90,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                         : 'group-hover:rotate-180 transition-transform duration-700'
                                 }
                             />
-                            <span>{loading ? 'Đang làm mới...' : 'Cụm đang hoạt động'}</span>
+                            <span>{loading ? t('layout.refreshing') : t('layout.clusterActive')}</span>
                         </div>
                     </div>
                 </header>

@@ -117,7 +117,8 @@ func TestFormatTaskProfessional(t *testing.T) {
 		}
 
 		result := service.FormatTaskProfessional("en", snapshot)
-		assert.Contains(t, result, "Không rõ")
+		assert.Contains(t, result, "Unknown")
+		assert.Contains(t, service.FormatTaskProfessional("vi", snapshot), "Không rõ")
 	})
 }
 
@@ -156,5 +157,5 @@ func TestRepoURL(t *testing.T) {
 }
 
 func TestUnknownSize(t *testing.T) {
-	assert.Equal(t, "Không rõ", service.UnknownSize)
+	assert.Equal(t, "Không rõ", service.UnknownSizeLang("vi"))
 }

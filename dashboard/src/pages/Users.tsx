@@ -1,7 +1,8 @@
 import { useState, SyntheticEvent } from 'react'
 import { useUsers } from '../hooks/useUsers'
-import { formatBytes, roleLabel } from '../utils/format'
+import { formatBytes, formatDate, roleLabel } from '../utils/format'
 import { usePopups } from '../hooks/usePopups'
+import { useI18n } from '../hooks/useI18n'
 import { UserPlus, RefreshCw, Edit2, Trash2, X, Activity, Calendar, KeyRound } from 'lucide-react'
 import { User } from '../types'
 
@@ -12,6 +13,7 @@ interface UsersProps {
 const Users: React.FC<UsersProps> = ({ apiToken }) => {
   const { users, loading, error, updateUser, deleteUser, addUser, fetchUsers } = useUsers(apiToken)
   const { showConfirm, showAlert, showToast } = usePopups()
+  const { t, locale } = useI18n()
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const [isAdding, setIsAdding] = useState<boolean>(false)
@@ -57,7 +59,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
     let result
     if (isAdding) {
       if (!newID) {
-        showAlert('Thiếu thông tin', 'Vui lòng nhập ID người dùng Telegram.', { type: 'error' })
+        showAlert(t('users.missingInfoTitle'), t('users.missingIdBody'), { type: 'error' })
         return
       }
       result = await addUser({
@@ -80,15 +82,21 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
       if (result.apiKey) {
         showAlert('API Key', `X-API-Key: ${result.apiKey}`, { type: 'success' })
       } else {
-        showToast(isAdding ? 'Đã thêm người dùng' : 'Đã cập nhật quyền truy cập', 'success')
+        showToast(isAdding ? t('users.added') : t('users.accessUpdated'), 'success')
       }
     } else {
-      showAlert('Thao tác thất bại', result?.error || 'Lỗi không xác định', { type: 'error' })
+      showAlert(t('users.actionFailed'), result?.error || t('common.unknownError'), { type: 'error' })
     }
   }
 
   const handleRotateKey = async (user: User) => {
-    if (!(await showConfirm('Đổi API Key', `Cấp API Key mới cho ${user.username || user.id}? Key cũ sẽ ngừng hoạt động.`))) return
+    if (
+      !(await showConfirm(
+        t('users.rotateTitle'),
+        t('users.rotateBody', { name: user.username || user.id }),
+      ))
+    )
+      return
     const result = await updateUser({
       id: user.id,
       role: user.role,
@@ -98,19 +106,19 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
       rotateApiKey: true,
     })
     if (result.success && result.apiKey) {
-      showAlert('API Key mới', `X-API-Key: ${result.apiKey}`, { type: 'success' })
+      showAlert(t('users.newKeyTitle'), `X-API-Key: ${result.apiKey}`, { type: 'success' })
     } else if (!result.success) {
-      showAlert('Đổi Key thất bại', result.error || 'Lỗi không xác định', { type: 'error' })
+      showAlert(t('users.rotateFailed'), result.error || t('common.unknownError'), { type: 'error' })
     }
   }
 
   const handleDelete = async (id: number) => {
-    if (await showConfirm('Thu hồi quyền truy cập', 'Xóa vĩnh viễn người dùng này?')) {
+    if (await showConfirm(t('users.revokeTitle'), t('users.revokeBody'))) {
       const result = await deleteUser(id)
       if (result.success) {
-        showToast('Đã thu hồi quyền truy cập', 'success')
+        showToast(t('users.revoked'), 'success')
       } else {
-        showAlert('Thu hồi thất bại', result.error || 'Lỗi không xác định', { type: 'error' })
+        showAlert(t('users.revokeFailed'), result.error || t('common.unknownError'), { type: 'error' })
       }
     }
   }
@@ -123,14 +131,14 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
           <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
             <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/80">
-              Giao thức bảo mật
+              {t('common.securityProtocol')}
             </span>
           </div>
           <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
-            Quản lý người dùng
+            {t('nav.users')}
           </h1>
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            Quản lý quyền truy cập và hạn mức tài nguyên của người dùng.
+            {t('users.subtitle')}
           </p>
         </div>
 
@@ -140,7 +148,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
             className="px-8 py-4 bg-primary text-white rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 group"
           >
             <UserPlus size={18} className="group-hover:rotate-12 transition-transform" />
-            Thêm người dùng
+            {t('users.add')}
           </button>
           <button
             onClick={fetchUsers}
@@ -165,19 +173,19 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
             <thead>
               <tr className="border-b border-slate-100 dark:border-white/5">
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Người dùng
+                  {t('users.colUser')}
                 </th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
-                  Vai trò
+                  {t('users.colRole')}
                 </th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">
-                  Hạn mức
+                  {t('users.colQuota')}
                 </th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Hết hạn
+                  {t('users.colExpires')}
                 </th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">
-                  Thao tác
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
@@ -188,7 +196,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     <div className="flex flex-col items-center gap-4 opacity-40">
                       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                       <span className="text-[10px] font-black uppercase tracking-widest">
-                        Đang đồng bộ...
+                        {t('users.syncing')}
                       </span>
                     </div>
                   </td>
@@ -199,7 +207,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     colSpan={5}
                     className="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic opacity-50"
                   >
-                    Chưa có người dùng
+                    {t('users.empty')}
                   </td>
                 </tr>
               ) : (
@@ -215,7 +223,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
-                            {user.username || 'Ẩn danh'}
+                            {user.username || t('users.anonymous')}
                           </p>
                           <p className="text-[10px] font-mono text-slate-400">ID:{user.id}</p>
                           {user.apiKey && (
@@ -234,7 +242,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                                 : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
                             }`}
                         >
-                          {roleLabel(user.role)}
+                          {roleLabel(user.role, t)}
                         </span>
                       </div>
                     </td>
@@ -242,12 +250,12 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                       <div className="flex flex-col items-center gap-1">
                         {user.maxDailyTasks === -1 ? (
                           <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            Task: {user.usedTasks ?? 0} / ∞
+                            {t('quota.tasks', { used: user.usedTasks ?? 0, max: '∞' })}
                           </span>
                         ) : (
                           <div className="flex flex-col items-center gap-0.5 w-full">
                             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                              Task: {user.usedTasks ?? 0} / {user.maxDailyTasks}
+                              {t('quota.tasks', { used: user.usedTasks ?? 0, max: user.maxDailyTasks })}
                             </span>
                             <div className="w-24 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                               <div
@@ -259,12 +267,18 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                         )}
                         {user.maxDailyBandwidth === -1 ? (
                           <span className="text-[10px] font-bold text-slate-400">
-                            Băng thông: {formatBytes(user.usedBandwidth ?? 0)} / ∞
+                            {t('quota.bandwidth', {
+                              used: formatBytes(user.usedBandwidth ?? 0),
+                              max: '∞',
+                            })}
                           </span>
                         ) : (
                           <div className="flex flex-col items-center gap-0.5 w-full">
                             <span className="text-[10px] font-bold text-slate-400">
-                              Băng thông: {formatBytes(user.usedBandwidth ?? 0)} / {formatBytes(user.maxDailyBandwidth)}
+                              {t('quota.bandwidth', {
+                                used: formatBytes(user.usedBandwidth ?? 0),
+                                max: formatBytes(user.maxDailyBandwidth),
+                              })}
                             </span>
                             <div className="w-24 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                               <div
@@ -280,8 +294,8 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                       <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400">
                         <Calendar size={12} className="text-primary/60" />
                         {user.expiresAt?.Valid
-                          ? new Date(user.expiresAt.Time).toLocaleDateString('vi-VN')
-                          : 'Vĩnh viễn'}
+                          ? formatDate(user.expiresAt.Time, locale)
+                          : t('users.permanent')}
                       </div>
                     </td>
                     <td className="px-8 py-6 text-right">
@@ -323,10 +337,10 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
             <div className="px-8 py-6 bg-slate-50 dark:bg-white/[0.03] border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">
-                  {isAdding ? 'Thêm người dùng' : 'Chỉnh sửa người dùng'}
+                  {isAdding ? t('users.add') : t('users.edit')}
                 </h2>
                 <p className="text-[10px] font-bold text-primary uppercase tracking-[0.3em] mt-1">
-                  {isAdding ? 'Yêu cầu cấp quyền mới' : `ID: ${editingUser?.id}`}
+                  {isAdding ? t('users.newRequest') : `ID: ${editingUser?.id}`}
                 </p>
               </div>
               <button
@@ -354,7 +368,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                      Tên hiển thị (tùy chọn)
+                      {t('users.displayName')}
                     </label>
                     <input
                       type="text"
@@ -369,7 +383,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Vai trò
+                    {t('users.colRole')}
                   </label>
                   <select
                     value={role}
@@ -377,14 +391,14 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     disabled={!isAdding && editingUser?.role === 'owner'}
                     className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3 text-xs font-bold uppercase transition-all"
                   >
-                    <option value="user">Người dùng</option>
-                    <option value="authorized">Được cấp quyền</option>
-                    <option value="admin">Quản trị viên</option>
+                    <option value="user">{roleLabel('user', t)}</option>
+                    <option value="authorized">{roleLabel('authorized', t)}</option>
+                    <option value="admin">{roleLabel('admin', t)}</option>
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Giới hạn Task
+                    {t('users.taskLimit')}
                   </label>
                   <div className="relative">
                     <input
@@ -396,7 +410,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       {maxTasks === '-1' || maxTasks === -1 ? (
                         <span className="text-[8px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase">
-                          Không giới hạn
+                          {t('users.unlimited')}
                         </span>
                       ) : (
                         <span className="text-[8px] font-black text-slate-400 uppercase">
@@ -411,7 +425,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Giới hạn băng thông
+                    {t('users.bandwidthLimit')}
                   </label>
                   <div className="relative">
                     <input
@@ -435,7 +449,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Ngày hết hạn
+                    {t('users.expiryDate')}
                   </label>
                   <input
                     type="date"
@@ -450,7 +464,7 @@ const Users: React.FC<UsersProps> = ({ apiToken }) => {
                 type="submit"
                 className="w-full py-4 bg-primary text-white rounded-xl font-black uppercase text-[10px] tracking-[0.3em] shadow-lg shadow-primary/20 hover:brightness-110 transition-all mt-4"
               >
-                {isAdding ? 'Thêm người dùng' : 'Lưu thay đổi'}
+                {isAdding ? t('users.add') : t('users.saveChanges')}
               </button>
             </form>
           </div>

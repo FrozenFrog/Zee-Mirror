@@ -13,6 +13,7 @@ import (
 
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/downloader"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -121,22 +122,23 @@ func parseBatchArguments(args string) *BatchOptions {
 }
 
 func (s *BotService) HandleBatch(message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if args == "" {
-		s.sendBatchHelp(message.Chat.ID)
+		s.sendBatchHelp(message.Chat.ID, lang)
 		return
 	}
 
 	options := parseBatchArguments(args)
 
 	if len(options.URLs) == 0 {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nKhông tìm thấy URL hợp lệ nào\\.\n\nGõ `/batch` để xem cách dùng\\.")
+		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "batchmgr_no_urls"))
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
 	}
 
 	if !options.ZipAll {
-		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔄 *Đang tạo %d task thường\\.\\.\\.*", len(options.URLs)))
+		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "batchmgr_creating", len(options.URLs)))
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 
@@ -171,37 +173,8 @@ func (s *BotService) updateBatchStatus(batch *BatchTask) {
 	s.UpdateSharedDashboard(batch.ChatID, false)
 }
 
-func (s *BotService) sendBatchHelp(chatID int64) {
-	helpText := `📦 *Hệ thống tải Batch*
-
-*Cách dùng:*
-` + "```" + `
-/batch
-URL1
-URL2
-URL3
-` + "```" + `
-
-*Flag tùy chọn:*
-• ` + "`-name <tên\\>`" + ` \- Tên batch
-• ` + "`-z`" + ` hoặc ` + "`-zip`" + ` \- Nén zip toàn bộ kết quả
-• ` + "`-p <password\\>`" + ` \- Mật khẩu cho file zip
-• ` + "`-priority <1\\-10\\>`" + ` \- Độ ưu tiên \(mặc định: 5\)
-
-*Ví dụ:*
-` + "```" + `
-/batch -name MyDownloads -z
-[https://example.com/file1.zip](https://example.com/file1.zip)
-[https://example.com/file2.mp4](https://example.com/file2.mp4)
-[https://example.com/file3.rar](https://example.com/file3.rar)
-` + "```" + `
-
-*Tính năng:*
-✅ Tải nhiều URL cùng lúc
-✅ Nén toàn bộ kết quả vào một file zip
-✅ Quản lý hàng đợi theo độ ưu tiên
-✅ Theo dõi tiến độ từng file và tổng thể`
-	msg := tgbotapi.NewMessage(chatID, helpText)
+func (s *BotService) sendBatchHelp(chatID int64, lang string) {
+	msg := tgbotapi.NewMessage(chatID, i18n.T(lang, "batchmgr_help"))
 	msg.ParseMode = MarkdownV2
 	_, _ = s.Bot.Send(msg)
 }
@@ -248,9 +221,10 @@ func (s *BotService) createBatchTask(name string, urls []string, chatID int64, m
 
 func (s *BotService) processBatchTask(batch *BatchTask) {
 	slog.Info("Processing batch task", "batchID", batch.ID, "count", len(batch.URLs))
+	lang := s.GetUserLanguage(batch.UserID)
 
 	if err := os.MkdirAll(batch.DownloadDir, 0750); err != nil {
-		batch.SetError(fmt.Sprintf("Không tạo được thư mục batch: %v", err))
+		batch.SetError(i18n.T(lang, "batchmgr_err_dir", err))
 		s.updateBatchStatus(batch)
 		return
 	}
@@ -284,7 +258,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 
 			if err != nil {
 				batch.Mu.Lock()
-				subTask.SetError(err.Error())
+				subTask.SetError(i18n.Message(lang, err))
 				batch.Failed++
 				slog.Error("Batch sub-task failed", "batchID", batch.ID, "taskID", subTask.ID, "error", err)
 				batch.Progress = float64(batch.Completed+batch.Failed) / float64(len(batch.URLs)) * 100
@@ -298,7 +272,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 
 					batch.Mu.Lock()
 					if upErr != nil {
-						subTask.SetError(upErr.Error())
+						subTask.SetError(i18n.Message(lang, upErr))
 						batch.Failed++
 						slog.Error("Batch sub-task upload failed", "batchID", batch.ID, "taskID", subTask.ID, "error", upErr)
 					} else {
@@ -341,7 +315,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 
 		err := s.zipBatchResults(batch)
 		if err != nil {
-			batch.SetError(fmt.Sprintf("Nén zip thất bại: %v", err))
+			batch.SetError(i18n.T(lang, "batchmgr_err_zip", err))
 			s.updateBatchStatus(batch)
 			s.cleanupBatch(batch)
 			return
@@ -352,7 +326,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 
 		err = s.uploadBatchResults(batch)
 		if err != nil {
-			batch.SetError(fmt.Sprintf("Tải lên thất bại: %v", err))
+			batch.SetError(i18n.T(lang, "batchmgr_err_upload", i18n.Message(lang, err)))
 			s.updateBatchStatus(batch)
 			s.cleanupBatch(batch)
 			return
@@ -363,7 +337,7 @@ func (s *BotService) processBatchTask(batch *BatchTask) {
 	batch.CompletedAt = time.Now()
 	s.updateBatchStatus(batch)
 
-	s.sendBatchCompletionMessage(batch)
+	s.sendBatchCompletionMessage(batch, lang)
 	s.cleanupBatch(batch)
 }
 
@@ -402,7 +376,7 @@ func (s *BotService) downloadBatchItem(batch *BatchTask, task *Task) error {
 
 	taskDir := filepath.Join(batch.DownloadDir, task.ID)
 	if err := os.MkdirAll(taskDir, 0750); err != nil {
-		return fmt.Errorf("%w: không tạo được thư mục task: %v", domain.ErrStorage, err)
+		return i18n.WrapError(domain.ErrStorage, "batchmgr_err_task_dir", err)
 	}
 
 	noRange := downloader.IsNonRangeURL(task.URL)
@@ -442,12 +416,12 @@ func (s *BotService) downloadBatchItem(batch *BatchTask, task *Task) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%w: aria2c thất bại: %v, output: %s", domain.ErrExternal, err, string(output))
+		return i18n.WrapError(domain.ErrExternal, "batchmgr_err_aria2", err, string(output))
 	}
 
 	downloadedFile := findDownloadedFile(taskDir, task.Quality)
 	if downloadedFile == "" {
-		return fmt.Errorf("%w: không có file nào được tải xuống", domain.ErrNotFound)
+		return i18n.WrapError(domain.ErrNotFound, "batchmgr_err_no_file")
 	}
 
 	task.LocalPath = downloadedFile
@@ -580,17 +554,10 @@ func (s *BotService) uploadBatchResults(batch *BatchTask) error {
 	return nil
 }
 
-func (s *BotService) sendBatchCompletionMessage(batch *BatchTask) {
+func (s *BotService) sendBatchCompletionMessage(batch *BatchTask, lang string) {
 	duration := batch.CompletedAt.Sub(batch.CreatedAt)
 
-	text := fmt.Sprintf(`✅ *Tải Batch hoàn tất\!*
-
-🏷️ *Tên:* %s
-📊 *Tổng số file:* %d
-✅ *Thành công:* %d
-❌ *Thất bại:* %d
-📦 *Tổng dung lượng:* %s
-⏱️ *Thời gian:* %s`,
+	text := i18n.T(lang, "batchmgr_complete",
 		utils.EscapeMarkdownV2(batch.Name),
 		len(batch.URLs),
 		batch.Completed,
@@ -600,14 +567,14 @@ func (s *BotService) sendBatchCompletionMessage(batch *BatchTask) {
 	)
 
 	if batch.RemoteURL != "" {
-		text += fmt.Sprintf("\n\n🔗 *Link:* [Tải xuống](%s)", batch.RemoteURL)
+		text += i18n.T(lang, "batchmgr_link", batch.RemoteURL)
 	}
 
 	msg := tgbotapi.NewMessage(batch.ChatID, text)
 	msg.ParseMode = MarkdownV2
 	if strings.HasPrefix(batch.RemoteURL, "http") {
 		msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("📥 Tải xuống", batch.RemoteURL),
+			tgbotapi.NewInlineKeyboardButtonURL(i18n.T(lang, "batchmgr_btn_download"), batch.RemoteURL),
 		))
 	}
 
@@ -641,6 +608,7 @@ func (s *BotService) HandleBatchCallback(callback *tgbotapi.CallbackQuery, parts
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		return
 	}
+	lang := s.GetUserLanguage(callback.From.ID)
 
 	action := parts[1]
 	batchID := parts[2]
@@ -650,24 +618,24 @@ func (s *BotService) HandleBatchCallback(callback *tgbotapi.CallbackQuery, parts
 	s.BatchManager.Mu.RUnlock()
 
 	if !exists {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không tìm thấy batch"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "batchmgr_not_found")))
 		return
 	}
 
 	switch action {
 	case CmdRefresh:
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã làm mới"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "batchmgr_refreshed")))
 		s.updateBatchStatus(batch)
 
 	case "cancel":
 		batch.Cancel()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🚫 Đã hủy batch"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "batchmgr_cancelled")))
 		s.updateBatchStatus(batch)
 
 	case CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "batchmgr_closed")))
 		return
 	}
 }

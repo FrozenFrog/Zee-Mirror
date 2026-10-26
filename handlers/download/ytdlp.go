@@ -16,48 +16,28 @@ import (
 )
 
 func HandleYTDLP(s *service.BotService, message *tgbotapi.Message, args string) {
-	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
-		return
-	}
-
-	url, zip, unzip, password, quality, name, subs, hardsub := utils.ParseFlags(args)
-	_ = unzip
-
-	if url == "" {
-		url = utils.ExtractURLFromText(args)
-	}
-
-	if url == "" {
-		lang := s.GetUserLanguage(message.From.ID)
-		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "invalid_url"))
-		msg.ParseMode = tgbotapi.ModeMarkdownV2
-		_, _ = s.Bot.Send(msg)
-		return
-	}
-
-	if isYTDLPPlaylist(url) {
-		go handleYTDLPPlaylist(s, message, url, name, zip, password, quality, subs, hardsub, service.TypeYTDLP)
-		return
-	}
-
-	handleYTDLPGeneric(s, message, args, service.TypeYTDLP)
+	handleYTDLPCommand(s, message, args, service.TypeYTDLP)
 }
 
 func HandleYTDLPLeech(s *service.BotService, message *tgbotapi.Message, args string) {
+	handleYTDLPCommand(s, message, args, service.TypeYTDLPLeech)
+}
+
+func handleYTDLPCommand(s *service.BotService, message *tgbotapi.Message, args string, taskType service.TaskType) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
+		s.Reply(message, service.QuotaErrorMessage(s.GetUserLanguage(message.From.ID), err))
 		return
 	}
+	lang := s.GetUserLanguage(message.From.ID)
 
 	url, zip, unzip, password, quality, name, subs, hardsub := utils.ParseFlags(args)
 	_ = unzip
+
 	if url == "" {
 		url = utils.ExtractURLFromText(args)
 	}
 
 	if url == "" {
-		lang := s.GetUserLanguage(message.From.ID)
 		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "invalid_url"))
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(msg)
@@ -65,16 +45,16 @@ func HandleYTDLPLeech(s *service.BotService, message *tgbotapi.Message, args str
 	}
 
 	if isYTDLPPlaylist(url) {
-		go handleYTDLPPlaylist(s, message, url, name, zip, password, quality, subs, hardsub, service.TypeYTDLPLeech)
+		go handleYTDLPPlaylist(s, message, lang, url, name, zip, password, quality, subs, hardsub, taskType)
 		return
 	}
 
-	handleYTDLPGeneric(s, message, args, service.TypeYTDLPLeech)
+	handleYTDLPGeneric(s, message, lang, args, taskType)
 }
 
-func handleYTDLPGeneric(s *service.BotService, message *tgbotapi.Message, args string, taskType service.TaskType) {
+func handleYTDLPGeneric(s *service.BotService, message *tgbotapi.Message, lang, args string, taskType service.TaskType) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
+		s.Reply(message, service.QuotaErrorMessage(lang, err))
 		return
 	}
 
@@ -92,7 +72,6 @@ func handleYTDLPGeneric(s *service.BotService, message *tgbotapi.Message, args s
 	}
 
 	if url == "" {
-		lang := s.GetUserLanguage(message.From.ID)
 		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "invalid_url"))
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
 		if sentMsg, err := s.Bot.Send(msg); err == nil {
@@ -110,7 +89,7 @@ func handleYTDLPGeneric(s *service.BotService, message *tgbotapi.Message, args s
 
 	task, err := s.TaskManager.CreateTask(taskType, url, fileName, message.Chat.ID, message.MessageID, replyID, message.From.ID, zip, false, password, quality, 0, subs, hardsub)
 	if err != nil {
-		s.HandleCreateTaskError(message.Chat.ID, message.MessageID, err)
+		s.HandleCreateTaskErrorLang(lang, message.Chat.ID, message.MessageID, err)
 		return
 	}
 	s.UpdateSharedDashboard(message.Chat.ID, true)
@@ -130,8 +109,9 @@ func isYTDLPPlaylist(url string) bool {
 // YTDLPQualityCallbackHandler serves quality buttons on messages sent before
 // downloads defaulted to the best quality (pick one with -q instead).
 func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
+	lang := s.GetUserLanguage(callback.From.ID)
 	if len(parts) < 3 {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên đã hết hạn"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "ytdlp_session_expired")))
 		return
 	}
 
@@ -150,11 +130,11 @@ func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.Callb
 	s.TaskManager.Mu.Unlock()
 
 	if !exists {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không tìm thấy phiên"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "ytdlp_session_not_found")))
 		return
 	}
 
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Bắt đầu tải xuống..."))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "dl_toast_download_starting")))
 
 	s.TaskManager.Mu.Lock()
 	s.TaskManager.LastStatusMsg[callback.Message.Chat.ID] = callback.Message.MessageID
@@ -167,21 +147,20 @@ func YTDLPQualityCallbackHandler(s *service.BotService, callback *tgbotapi.Callb
 	fileName := session.FileName
 
 	if err := s.CheckQuota(callback.From.ID); err != nil {
-		_, _ = s.Bot.Send(tgbotapi.NewMessage(callback.Message.Chat.ID, GetErrorMessage("VƯỢT HẠN MỨC", err.Error())))
+		_, _ = s.Bot.Send(tgbotapi.NewMessage(callback.Message.Chat.ID, service.QuotaErrorMessage(s.GetUserLanguage(callback.From.ID), err)))
 		return
 	}
 
 	task, err := s.TaskManager.CreateTask(session.Type, session.URL, fileName, callback.Message.Chat.ID, callback.Message.MessageID, replyID, callback.From.ID, session.Zip, false, session.Password, quality, 0, "", false)
 	if err != nil {
-		s.HandleCreateTaskError(callback.Message.Chat.ID, callback.Message.MessageID, err)
+		s.HandleCreateTaskErrorLang(s.GetUserLanguage(callback.From.ID), callback.Message.Chat.ID, callback.Message.MessageID, err)
 		return
 	}
 	s.UpdateSharedDashboard(callback.Message.Chat.ID, false)
 	slog.Info("YTDLP task created from callback", "taskID", task.ID, "type", session.Type, "quality", quality)
 }
 
-func handleYTDLPPlaylist(s *service.BotService, message *tgbotapi.Message, url, name string, zip bool, password, quality, subs string, hardsub bool, taskType service.TaskType) {
-	lang := s.GetUserLanguage(message.From.ID)
+func handleYTDLPPlaylist(s *service.BotService, message *tgbotapi.Message, lang, url, name string, zip bool, password, quality, subs string, hardsub bool, taskType service.TaskType) {
 	statusMsg, _ := s.Bot.Send(tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "ytdlp_analysis")))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -190,17 +169,17 @@ func handleYTDLPPlaylist(s *service.BotService, message *tgbotapi.Message, url, 
 	metadata, err := s.TaskManager.YTDLPEngine.GetPlaylistMetadata(ctx, url)
 	if err != nil {
 		slog.Error("Playlist analysis failed", "error", err)
-		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, i18n.T(lang, "ytdlp_analysis_failed", utils.EscapeMarkdownV2(err.Error())))
+		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, i18n.T(lang, "ytdlp_analysis_failed", utils.EscapeMarkdownV2(i18n.Message(lang, err))))
 		return
 	}
 
 	if len(metadata.Entries) == 0 {
-		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, "❌ *Lỗi*\n\nPlaylist trống hoặc không tìm thấy video nào\\.")
+		s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, i18n.T(lang, "dl_playlist_empty"))
 		return
 	}
 
 	totalItems := len(metadata.Entries)
-	s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, fmt.Sprintf("✅ *Đã nhận Playlist*\n\n🏷️ *Tiêu đề:* %s\n📦 *Số mục:* %d\n\nĐang xử lý các mục trong Playlist\\.\\.\\.", utils.EscapeMarkdownV2(metadata.Title), totalItems))
+	s.EditMessage(statusMsg.Chat.ID, statusMsg.MessageID, i18n.T(lang, "dl_playlist_received", utils.EscapeMarkdownV2(metadata.Title), totalItems))
 
 	go handlePlaylistDownload(s, message, metadata, name, zip, password, quality, subs, hardsub, taskType)
 }

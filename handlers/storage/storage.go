@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -30,7 +31,7 @@ func GetAvailableStorages(s *service.BotService) ([]Provider, error) {
 	output, err := cmd.Output()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list remotes: %v", err)
+		return nil, i18n.WrapError(err, "storage_err_list_remotes", err)
 	}
 
 	var providers []Provider
@@ -84,27 +85,28 @@ func HandleStorages(s *service.BotService, message *tgbotapi.Message) {
 		return
 	}
 
+	lang := s.GetUserLanguage(message.From.ID)
 	providers, err := GetAvailableStorages(s)
 	if err != nil {
-		s.Reply(message, fmt.Sprintf("❌ *Không lấy được danh sách lưu trữ*\n\n%s", utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, i18n.T(lang, "storage_list_failed", utils.EscapeMarkdownV2(i18n.Message(lang, err))))
 		return
 	}
 
 	if len(providers) == 0 {
-		s.Reply(message, "📭 *Chưa cấu hình lưu trữ nào*\n\nHãy thêm Remote vào rclone\\.conf")
+		s.Reply(message, i18n.T(lang, "storage_none"))
 		return
 	}
 
-	text, keyboard := storageListMessage(s, providers)
+	text, keyboard := storageListMessage(s, lang, providers)
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	msg.ReplyMarkup = keyboard
 	_, _ = s.Bot.Send(msg)
 }
 
-func storageListMessage(s *service.BotService, providers []Provider) (string, tgbotapi.InlineKeyboardMarkup) {
+func storageListMessage(s *service.BotService, lang string, providers []Provider) (string, tgbotapi.InlineKeyboardMarkup) {
 	var text strings.Builder
-	text.WriteString("💾 *Các nhà cung cấp lưu trữ khả dụng*\n")
+	text.WriteString(i18n.T(lang, "storage_list_title") + "\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	var rows [][]tgbotapi.InlineKeyboardButton
@@ -116,20 +118,20 @@ func storageListMessage(s *service.BotService, providers []Provider) (string, tg
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	text.WriteString("*Hiện tại:* `" + utils.EscapeMarkdownV2Code(s.TaskManager.RcloneDest) + "`\n\n")
-	text.WriteString("Chọn nơi lưu trữ để xem\\:")
+	text.WriteString(i18n.T(lang, "storage_current", utils.EscapeMarkdownV2Code(s.TaskManager.RcloneDest)) + "\n\n")
+	text.WriteString(i18n.T(lang, "storage_pick"))
 
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "storage:"+service.CmdClose),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "storage:"+service.CmdClose),
 	))
 	return text.String(), tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 // storageBackKeyboard returns to the actions of one storage.
-func storageBackKeyboard(storageName string) tgbotapi.InlineKeyboardMarkup {
+func storageBackKeyboard(lang, storageName string) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", "storage:select:"+storageName),
-		tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "storage:"+service.CmdClose),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_back"), "storage:select:"+storageName),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "storage:"+service.CmdClose),
 	))
 }
 
@@ -145,42 +147,44 @@ func HandleStorageCallback(s *service.BotService, callback *tgbotapi.CallbackQue
 		storageName = parts[2]
 	}
 
+	lang := s.GetUserLanguage(callback.From.ID)
+
 	switch action {
 	case "list":
 		providers, err := GetAvailableStorages(s)
 		if err != nil {
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "storage_toast_error")))
 			return
 		}
-		text, keyboard := storageListMessage(s, providers)
+		text, keyboard := storageListMessage(s, lang, providers)
 		editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, keyboard)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case "select":
-		handleStorageSelect(s, callback, storageName)
+		handleStorageSelect(s, lang, callback, storageName)
 	case "browse":
-		handleStorageBrowse(s, callback, storageName, "")
+		handleStorageBrowse(s, lang, callback, storageName, "")
 	case "info":
-		handleStorageInfo(s, callback, storageName)
+		handleStorageInfo(s, lang, callback, storageName)
 	case service.CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "drive_toast_closed")))
 	}
 }
 
-func handleStorageSelect(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName string) {
-	text := fmt.Sprintf("💾 *Lưu trữ: %s*\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nChọn thao tác:", utils.EscapeMarkdownV2(storageName))
+func handleStorageSelect(s *service.BotService, lang string, callback *tgbotapi.CallbackQuery, storageName string) {
+	text := i18n.T(lang, "storage_select_text", utils.EscapeMarkdownV2(storageName))
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📂 Duyệt", "storage:browse:"+storageName),
-			tgbotapi.NewInlineKeyboardButtonData("ℹ️ Thông tin", "storage:info:"+storageName),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "storage_btn_browse"), "storage:browse:"+storageName),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "storage_btn_info"), "storage:info:"+storageName),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔙 Quay lại", "storage:list"),
-			tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "storage:"+service.CmdClose),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_back"), "storage:list"),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "storage:"+service.CmdClose),
 		),
 	)
 
@@ -190,7 +194,7 @@ func handleStorageSelect(s *service.BotService, callback *tgbotapi.CallbackQuery
 	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
-func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName, path string) {
+func handleStorageBrowse(s *service.BotService, lang string, callback *tgbotapi.CallbackQuery, storageName, path string) {
 	remotePath := storageName + ":"
 	if path != "" {
 		remotePath = storageName + ":" + path
@@ -205,7 +209,7 @@ func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery
 	output, err := cmd.Output()
 
 	if err != nil {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không duyệt được"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "storage_toast_browse_fail")))
 		return
 	}
 
@@ -223,7 +227,7 @@ func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery
 
 	for i, f := range files {
 		if i >= 15 {
-			fmt.Fprintf(&text, "\n_\\.\\.\\. và %d mục khác_", len(files)-15)
+			text.WriteString("\n" + i18n.T(lang, "storage_browse_more", len(files)-15))
 			break
 		}
 		icon := "📄"
@@ -233,13 +237,13 @@ func handleStorageBrowse(s *service.BotService, callback *tgbotapi.CallbackQuery
 		fmt.Fprintf(&text, "%s `%s`\n", icon, utils.EscapeMarkdownV2Code(utils.TruncateString(f.Name, 40)))
 	}
 
-	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), storageBackKeyboard(storageName))
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), storageBackKeyboard(lang, storageName))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
 	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
-func handleStorageInfo(s *service.BotService, callback *tgbotapi.CallbackQuery, storageName string) {
+func handleStorageInfo(s *service.BotService, lang string, callback *tgbotapi.CallbackQuery, storageName string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -249,47 +253,48 @@ func handleStorageInfo(s *service.BotService, callback *tgbotapi.CallbackQuery, 
 	output, err := cmd.Output()
 
 	var text strings.Builder
-	fmt.Fprintf(&text, "ℹ️ *Thông tin lưu trữ: %s*\n", utils.EscapeMarkdownV2(storageName))
+	text.WriteString(i18n.T(lang, "storage_info_title", utils.EscapeMarkdownV2(storageName)) + "\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	if err != nil {
-		text.WriteString("_Không có thông tin_\n")
+		text.WriteString(i18n.T(lang, "storage_info_none") + "\n")
 	} else {
 		var info map[string]interface{}
 		if jsonErr := json.Unmarshal(output, &info); jsonErr == nil {
 			if total, ok := info["total"].(float64); ok {
-				fmt.Fprintf(&text, "📊 *Tổng:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(total))))
+				text.WriteString(i18n.T(lang, "storage_info_total", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(total)))) + "\n")
 			}
 			if used, ok := info["used"].(float64); ok {
-				fmt.Fprintf(&text, "💾 *Đã dùng:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(used))))
+				text.WriteString(i18n.T(lang, "storage_info_used", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(used)))) + "\n")
 			}
 			if free, ok := info["free"].(float64); ok {
-				fmt.Fprintf(&text, "✅ *Còn trống:* `%s`\n", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(free))))
+				text.WriteString(i18n.T(lang, "storage_info_free", utils.EscapeMarkdownV2Code(utils.FormatBytes(int64(free)))) + "\n")
 			}
 		}
 	}
 
-	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), storageBackKeyboard(storageName))
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), storageBackKeyboard(lang, storageName))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
 	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
 func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, "❌ *Truy cập bị từ chối*")
+		s.Reply(message, i18n.T(lang, "storage_set_denied"))
 		return
 	}
 
 	if args == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/setstorage remote:/path`\n\nVí dụ: `/setstorage gdrive:/MyMirror`")
+		s.Reply(message, i18n.T(lang, "storage_usage_set"))
 		return
 	}
 
 	remoteName := strings.Split(args, ":")[0]
 	providers, err := GetAvailableStorages(s)
 	if err != nil {
-		s.Reply(message, "❌ *Xác thực lưu trữ thất bại*")
+		s.Reply(message, i18n.T(lang, "storage_set_verify_failed"))
 		return
 	}
 
@@ -302,7 +307,7 @@ func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args str
 	}
 
 	if !found {
-		s.Reply(message, fmt.Sprintf("❌ *Không tìm thấy Remote:* `%s`", utils.EscapeMarkdownV2(remoteName)))
+		s.Reply(message, i18n.T(lang, "storage_set_not_found", utils.EscapeMarkdownV2(remoteName)))
 		return
 	}
 
@@ -310,5 +315,5 @@ func HandleSetStorage(s *service.BotService, message *tgbotapi.Message, args str
 	ctx := context.Background()
 	_ = s.DB.Set(ctx, "rclone_dest", args)
 
-	s.Reply(message, fmt.Sprintf("✅ *Đã cập nhật lưu trữ*\n\n📂 Đích: `%s`", utils.EscapeMarkdownV2Code(args)))
+	s.Reply(message, i18n.T(lang, "storage_set_ok", utils.EscapeMarkdownV2Code(args)))
 }

@@ -3,8 +3,8 @@ package router
 import (
 	"testing"
 
-	"zee-mirror/handlers/download"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -29,18 +29,26 @@ func TestRouter_HandleMessage(t *testing.T) {
 	}
 }
 
-func TestIsWizardPromptReply(t *testing.T) {
-	if !isWizardPromptReply(stripMarkdownV2(download.PromptMirrorURL)) {
-		t.Error("plain-text mirror URL prompt was not recognised")
+func TestCommandDescriptions(t *testing.T) {
+	if got := i18n.CommandKey("ytdlp-Leech.2"); got != "cmd_ytdlp_leech_2" {
+		t.Errorf("CommandKey = %q", got)
 	}
-	if !isWizardPromptReply(stripMarkdownV2(download.PromptRename)) {
-		t.Error("plain-text rename prompt was not recognised")
+	r := NewRouter(nil)
+	noop := func(_ *service.BotService, _ *tgbotapi.Message) {}
+	r.RegisterCommandWithInfo(CommandInfo{Name: "mirror"}, noop)
+	r.RegisterCommandWithInfo(CommandInfo{Name: "custom", Description: "Custom"}, noop)
+	infos := map[string]CommandInfo{}
+	for _, c := range r.GetAllCommandsFlat() {
+		infos[c.Name] = c
 	}
-	if isWizardPromptReply("some unrelated bot message") {
-		t.Error("unrelated text was recognised as a wizard prompt")
+	if want := i18n.T(i18n.DefaultLang, "cmd_mirror"); infos["mirror"].Description != want {
+		t.Errorf("mirror Description = %q, want %q", infos["mirror"].Description, want)
 	}
-	if got := stripMarkdownV2("🔗 Gửi *URL* \\(http\\)\\."); got != "🔗 Gửi URL (http)." {
-		t.Errorf("stripMarkdownV2 = %q", got)
+	if got := infos["mirror"].LocalizedDescription("en"); got != i18n.T("en", "cmd_mirror") {
+		t.Errorf("mirror en = %q", got)
+	}
+	if got := infos["custom"].LocalizedDescription("ja"); got != "Custom" {
+		t.Errorf("custom fallback = %q", got)
 	}
 }
 

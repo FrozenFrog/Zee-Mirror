@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"zee-mirror/pkg/i18n"
 )
 
 // checkMarkdownV2 reports the first construct Telegram would reject in a
@@ -71,36 +73,90 @@ func TestCheckMarkdownV2(t *testing.T) {
 	}
 }
 
-func TestHelpPagesAreValidMarkdownV2(t *testing.T) {
-	pages := map[string]func() string{
-		"mirror": GetHelpMirror, "leech": GetHelpLeech, "ytdlp": GetHelpYTDLP,
-		"ytdlpleech": GetHelpYTDLPLeech, "viking": GetHelpViking, "torrent": GetHelpTorrent,
-		"clone": GetHelpClone, "batch": GetHelpBatch, "search": GetHelpSearch,
-		"status": GetHelpStatus, "stats": GetHelpStats, "system": GetHelpSystem,
-		"health": GetHelpHealth, "logs": GetHelpLogs, "ping": GetHelpPing,
-		"speed": GetHelpSpeed, "ls": GetHelpLs, "mkdir": GetHelpMkdir, "rm": GetHelpRm,
-		"mv": GetHelpMv, "share": GetHelpShare, "find": GetHelpFind,
-		"extractaudio": GetHelpExtractAudio, "compress": GetHelpCompress,
-		"thumbnail": GetHelpThumbnail, "screenshots": GetHelpScreenshots,
-		"subtitle": GetHelpSubtitle, "hardsub": GetHelpHardsub, "rescale": GetHelpRescale,
-		"convert": GetHelpConvert, "mediainfo": GetHelpMediaInfo, "cancel": GetHelpCancel,
-		"cancelall": GetHelpCancelAll, "storages": GetHelpStorages,
-		"setstorage": GetHelpSetStorage, "authorize": GetHelpAuthorize,
-		"unauthorize": GetHelpUnauthorize, "users": GetHelpUsers,
-		"setalertchannel": GetHelpSetAlertChannel, "setlogchannel": GetHelpSetLogChannel,
-		"recover": GetHelpRecover, "recoverystatus": GetHelpRecoveryStatus,
+// allHelpPages returns every help page renderer, keyed by name.
+func allHelpPages() map[string]func(lang string) string {
+	pages := map[string]func(string) string{
 		"settings": GetHelpSettings, "notify": GetHelpNotify,
-		"all_empty": func() string { return GenerateAllCommandsHelp(nil) },
-		"all": func() string {
-			return GenerateAllCommandsHelp([]HelpCommandEntry{
+		"all_empty": func(lang string) string { return GenerateAllCommandsHelp(lang, nil) },
+		"all": func(lang string) string {
+			return GenerateAllCommandsHelp(lang, []HelpCommandEntry{
 				{Name: "ytdlp_leech", Description: "Tải (YT-DLP) về Telegram.", Category: "download", Aliases: []string{"yl", "y_l"}},
 				{Name: "stats", Description: "Thống kê", Category: "monitor"},
+				{Name: "mirror", Category: "download", Aliases: []string{"m"}},
 			})
 		},
 	}
-	for name, page := range pages {
-		if err := checkMarkdownV2(page()); err != nil {
-			t.Errorf("help page %s: %v", name, err)
+	for action, page := range helpCommandPages {
+		pages[action] = page.render
+	}
+	for cat, buttons := range helpCategoryButtons {
+		pages["category_"+cat] = func(lang string) string {
+			var sb strings.Builder
+			for _, b := range buttons {
+				sb.WriteString(b.label(lang))
+			}
+			return sb.String()
 		}
+	}
+	return pages
+}
+
+func TestHelpPagesAreValidMarkdownV2(t *testing.T) {
+	for _, l := range i18n.Languages {
+		for name, page := range allHelpPages() {
+			if strings.HasPrefix(name, "category_") {
+				continue // button labels are plain text
+			}
+			text := page(l.Code)
+			if err := checkMarkdownV2(text); err != nil {
+				t.Errorf("%s help page %s: %v", l.Code, name, err)
+			}
+		}
+	}
+}
+
+// Every help page and button must be translated, never falling back to a
+// raw catalog key or an empty section.
+func TestHelpPagesTranslated(t *testing.T) {
+	pageNames := []string{"settings", "notify"}
+	for action := range helpCommandPages {
+		pageNames = append(pageNames, strings.TrimPrefix(action, "cmd_"))
+	}
+	for _, l := range i18n.Languages {
+		for _, page := range pageNames {
+			for _, part := range []string{"title", "desc", "usage"} {
+				if s, ok := i18n.Lookup(l.Code, "helptext_"+page+"_"+part); !ok || s == "" {
+					t.Errorf("%s: helptext_%s_%s missing", l.Code, page, part)
+				}
+			}
+		}
+		for name, page := range allHelpPages() {
+			if text := page(l.Code); text == "" || strings.Contains(text, "helptext_") {
+				t.Errorf("%s help page %s renders %q", l.Code, name, text)
+			}
+		}
+	}
+	if GetHelpMirror("en") == GetHelpMirror("vi") {
+		t.Error("English mirror help equals Vietnamese")
+	}
+	if !strings.Contains(GetHelpMirror("vi"), "Tải file từ URL rồi upload thẳng lên Google Drive") {
+		t.Error("Vietnamese mirror help changed")
+	}
+}
+
+func TestAllCommandsHelpLocalizesDescriptions(t *testing.T) {
+	cmds := []HelpCommandEntry{
+		{Name: "mirror", Description: "fallback", Category: "download"},
+		{Name: "nokey", Description: "Plain fallback", Category: "download"},
+	}
+	en := GenerateAllCommandsHelp("en", cmds)
+	if !strings.Contains(en, "Upload a file from a URL to Google Drive") {
+		t.Errorf("en description not localized: %s", en)
+	}
+	if !strings.Contains(en, "Plain fallback") {
+		t.Errorf("missing fallback description: %s", en)
+	}
+	if !strings.Contains(GenerateAllCommandsHelp("vi", cmds), "Upload file từ URL lên Google Drive") {
+		t.Error("vi description not localized")
 	}
 }

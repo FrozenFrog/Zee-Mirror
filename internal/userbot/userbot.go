@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 	"zee-mirror/internal/config"
+	"zee-mirror/pkg/i18n"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -142,7 +143,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	u.Mu.RLock()
 	if !u.Started {
 		u.Mu.RUnlock()
-		return "", fmt.Errorf("userbot chưa được khởi động")
+		return "", i18n.NewError("userbot_not_started")
 	}
 	u.Mu.RUnlock()
 
@@ -162,7 +163,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	media := msg.Media
 
 	if media == nil {
-		return "", fmt.Errorf("không tìm thấy media trong tin nhắn")
+		return "", i18n.NewError("userbot_no_media")
 	}
 
 	dl := downloader.NewDownloader()
@@ -184,7 +185,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 
 	f, err := os.Create(outPath)
 	if err != nil {
-		return "", fmt.Errorf("không tạo được file: %v", err)
+		return "", i18n.WrapError(err, "userbot_create_file_failed", err)
 	}
 	defer f.Close()
 
@@ -202,7 +203,7 @@ func (u *UserBot) DownloadFile(link string, outputDir string, onProgress func(do
 	}
 
 	if _, err := dl.Download(u.Client.API(), location).Stream(dlCtx, pw); err != nil {
-		return "", fmt.Errorf("tải xuống thất bại: %v", err)
+		return "", i18n.WrapError(err, "userbot_download_failed", err)
 	}
 
 	return outPath, nil
@@ -227,11 +228,11 @@ func parseMessageLink(link string) (messageRef, error) {
 	}
 	idx := strings.Index(link, "t.me/")
 	if idx < 0 {
-		return ref, fmt.Errorf("định dạng link không hợp lệ")
+		return ref, i18n.NewError("userbot_invalid_link")
 	}
 	parts := strings.Split(strings.Trim(link[idx+len("t.me/"):], "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
-		return ref, fmt.Errorf("định dạng link không hợp lệ")
+		return ref, i18n.NewError("userbot_invalid_link")
 	}
 	if parts[0] == "s" {
 		parts = parts[1:]
@@ -241,24 +242,27 @@ func parseMessageLink(link string) (messageRef, error) {
 	case len(parts) >= 3 && parts[0] == "c":
 		id, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil {
-			return ref, fmt.Errorf("ID channel không hợp lệ")
+			return ref, i18n.WrapError(err, "userbot_invalid_channel_id")
 		}
 		ref.ChannelID = id
 	case len(parts) >= 2:
 		ref.Username = parts[0]
 	default:
-		return ref, fmt.Errorf("link thiếu ID tin nhắn")
+		return ref, i18n.NewError("userbot_missing_msg_id")
 	}
 
 	msgID, err := strconv.Atoi(parts[len(parts)-1])
 	if err != nil || msgID <= 0 {
-		return ref, fmt.Errorf("ID tin nhắn không hợp lệ")
+		return ref, i18n.NewError("userbot_invalid_msg_id")
 	}
 	ref.MsgID = msgID
 	return ref, nil
 }
 
-var errDialogFound = errors.New("dialog found")
+var (
+	errDialogFound = errors.New("dialog found")
+	errNotJoined   = errors.New("userbot has not joined this channel/group")
+)
 
 // resolvePrivateChannel finds a channel by its numeric id. The peer cache is
 // in memory, so after a restart the access hash is only known once the
@@ -280,7 +284,7 @@ func (u *UserBot) resolvePrivateChannel(ctx context.Context, id int64) (peers.Ch
 		return peers.Channel{}, err
 	}
 	if input == nil {
-		return peers.Channel{}, fmt.Errorf("userbot chưa tham gia channel/nhóm này")
+		return peers.Channel{}, errNotJoined
 	}
 	return u.Manager.GetChannel(ctx, input)
 }
@@ -294,13 +298,16 @@ func (u *UserBot) fetchMessage(ctx context.Context, ref messageRef) (*tg.Message
 	if ref.ChannelID != 0 {
 		ch, err := u.resolvePrivateChannel(ctx, ref.ChannelID)
 		if err != nil {
-			return nil, fmt.Errorf("không xác định được channel riêng tư: %v (hãy chắc chắn userbot đã tham gia)", err)
+			if errors.Is(err, errNotJoined) {
+				return nil, i18n.WrapError(err, "userbot_private_not_joined")
+			}
+			return nil, i18n.WrapError(err, "userbot_private_channel_failed", err)
 		}
 		peer = ch
 	} else {
 		p, err := u.Manager.ResolveDomain(ctx, ref.Username)
 		if err != nil {
-			return nil, fmt.Errorf("không xác định được username %s: %v", ref.Username, err)
+			return nil, i18n.WrapError(err, "userbot_username_failed", ref.Username, err)
 		}
 		peer = p
 	}
@@ -319,19 +326,19 @@ func (u *UserBot) fetchMessage(ctx context.Context, ref messageRef) (*tg.Message
 		res, err = u.Client.API().MessagesGetMessages(ctx, ids)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("không lấy được tin nhắn: %v", err)
+		return nil, i18n.WrapError(err, "userbot_fetch_failed", err)
 	}
 
 	modified, ok := res.AsModified()
 	if !ok {
-		return nil, fmt.Errorf("không lấy được tin nhắn")
+		return nil, i18n.NewError("userbot_message_unavailable")
 	}
 	for _, m := range modified.GetMessages() {
 		if msg, ok := m.(*tg.Message); ok {
 			return msg, nil
 		}
 	}
-	return nil, fmt.Errorf("tin nhắn %d không tồn tại hoặc userbot không xem được", ref.MsgID)
+	return nil, i18n.NewError("userbot_message_not_found", ref.MsgID)
 }
 
 type ProgressWriter struct {
@@ -373,14 +380,38 @@ func getFileLocation(media tg.MessageMediaClass) (tg.InputFileLocationClass, err
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("loại media này không hỗ trợ tải xuống")
+	return nil, i18n.NewError("userbot_unsupported_media")
 }
 
-func (u *UserBot) JoinChat(hash string) (string, error) {
+// JoinResult is the outcome of a successful Join.
+type JoinResult struct {
+	// Title is the chat's title; empty when Telegram did not report one.
+	Title string
+	// AlreadyJoined is set when the account was already a member.
+	AlreadyJoined bool
+}
+
+// Message describes the result for a user speaking lang. The text is plain:
+// escape it for MarkdownV2/HTML at the call site.
+func (r JoinResult) Message(lang string) string {
+	if r.AlreadyJoined {
+		return i18n.T(lang, "userbot_already_joined")
+	}
+	title := r.Title
+	if title == "" {
+		title = i18n.T(lang, "userbot_unknown_chat")
+	}
+	return i18n.T(lang, "userbot_joined", title)
+}
+
+// Join joins the chat behind an invite hash. Errors are *i18n.Error values
+// (render with i18n.Message), except for an already-joined account, which is
+// reported as JoinResult.AlreadyJoined.
+func (u *UserBot) Join(hash string) (JoinResult, error) {
 	u.Mu.RLock()
 	if !u.Started {
 		u.Mu.RUnlock()
-		return "", fmt.Errorf("userbot chưa được khởi động")
+		return JoinResult{}, i18n.NewError("userbot_not_started")
 	}
 	u.Mu.RUnlock()
 
@@ -390,15 +421,15 @@ func (u *UserBot) JoinChat(hash string) (string, error) {
 	res, err := u.Client.API().MessagesImportChatInvite(ctx, hash)
 	if err != nil {
 		if strings.Contains(err.Error(), "USER_ALREADY_PARTICIPANT") {
-			return "Already joined", nil
+			return JoinResult{AlreadyJoined: true}, nil
 		}
-		return "", fmt.Errorf("không tham gia được chat: %w", err)
+		return JoinResult{}, i18n.WrapError(err, "userbot_join_failed", err)
 	}
 
 	var title string
 	if result, ok := res.(*tg.MessagesChatInviteJoinResultOk); ok {
-		if u, ok := result.Updates.(*tg.Updates); ok {
-			for _, chat := range u.Chats {
+		if updates, ok := result.Updates.(*tg.Updates); ok {
+			for _, chat := range updates.Chats {
 				switch c := chat.(type) {
 				case *tg.Chat:
 					title = c.Title
@@ -409,9 +440,5 @@ func (u *UserBot) JoinChat(hash string) (string, error) {
 		}
 	}
 
-	if title == "" {
-		title = "Chat không rõ tên"
-	}
-
-	return fmt.Sprintf("Đã tham gia thành công: %s", title), nil
+	return JoinResult{Title: title}, nil
 }

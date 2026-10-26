@@ -18,6 +18,7 @@ import useSystemStats from './hooks/useSystemStats'
 import { usePopups } from './hooks/usePopups'
 import { Task } from './types'
 import { statusLabel } from './utils/format'
+import { useI18n } from './hooks/useI18n'
 import { Activity } from 'lucide-react'
 
 
@@ -29,6 +30,7 @@ const TasksPage = ({
   filterStatus,
   setFilterStatus,
 }: any) => {
+  const { t } = useI18n()
   const formatBytes = (bytes: any) => {
     const num = parseFloat(bytes)
     if (isNaN(num) || num <= 0) return '0 B'
@@ -53,7 +55,7 @@ const TasksPage = ({
         <div className="relative w-full md:w-96 group">
           <input
             type="text"
-            placeholder="Tìm kiếm Task..."
+            placeholder={t('tasks.searchPlaceholder')}
             className="w-full bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-white/5 p-4 pl-12 rounded-2xl outline-none focus:ring-4 ring-primary/10 transition-all"
             onChange={(e) => {
               const term = e.target.value.toLowerCase()
@@ -74,7 +76,7 @@ const TasksPage = ({
                 : 'bg-white dark:bg-zinc-900/60 text-slate-400 border border-slate-200 dark:border-white/5 hover:bg-slate-50'
                 }`}
             >
-              {statusLabel(s)}
+              {statusLabel(s, t)}
             </button>
           ))}
         </div>
@@ -97,7 +99,7 @@ const TasksPage = ({
             <Activity size={48} className="text-slate-400" />
           </div>
           <h4 className="text-xl font-black uppercase tracking-widest text-slate-400">
-            Không tìm thấy kết quả phù hợp
+            {t('tasks.noResults')}
           </h4>
         </div>
       )}
@@ -119,6 +121,7 @@ const App = () => {
   const { tasks, fetchTasks, cancelTask, setTasks } = useTasks(apiToken)
   const { stats, system, fetchStats, setSystem } = useSystemStats(apiToken)
   const { showConfirm } = usePopups()
+  const { t } = useI18n()
   const [settings, setSettings] = useState<any>(null)
 
   useEffect(() => {
@@ -223,12 +226,7 @@ const App = () => {
   }, [apiToken, loginError, fetchTasks, fetchStats, setTasks, setSystem])
 
   const onLogout = async () => {
-    if (
-      await showConfirm(
-        'Đăng xuất',
-        'Bạn có chắc muốn đăng xuất khỏi hệ thống? Phiên làm việc hiện tại sẽ bị kết thúc.',
-      )
-    ) {
+    if (await showConfirm(t('auth.logout'), t('auth.logoutConfirm'))) {
       localStorage.removeItem('api_token')
       window.location.reload()
     }

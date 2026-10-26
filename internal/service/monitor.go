@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	"github.com/shirou/gopsutil/v3/disk"
@@ -95,35 +96,45 @@ func percent(part, total uint64) float64 {
 	return float64(part) / float64(total) * 100
 }
 
+// FormatSystemStats is FormatSystemStatsLang in DefaultLang.
 func (s *BotService) FormatSystemStats(stats SystemStats) string {
-	var content strings.Builder
+	return s.FormatSystemStatsLang(i18n.DefaultLang, stats)
+}
 
-	content.WriteString("⏱️ *THỜI GIAN CHẠY*\n")
-	fmt.Fprintf(&content, "• Thời gian hoạt động: `%s`\n", utils.EscapeMarkdownV2(formatUptime(stats.Uptime)))
-	fmt.Fprintf(&content, "• Khởi động lúc: `%s`\n", utils.EscapeMarkdownV2(stats.StartTime.Format("02 Jan 15:04")))
+// FormatSystemStatsLang renders stats as a MarkdownV2 message in lang.
+func (s *BotService) FormatSystemStatsLang(lang string, stats SystemStats) string {
+	var content strings.Builder
+	line := func(key string, args ...any) {
+		content.WriteString(i18n.T(lang, key, args...))
+		content.WriteString("\n")
+	}
+
+	line("monitor_uptime_header")
+	line("monitor_uptime", utils.EscapeMarkdownV2(formatUptime(stats.Uptime)))
+	line("monitor_started_at", utils.EscapeMarkdownV2(stats.StartTime.Format("02 Jan 15:04")))
 	fmt.Fprintf(&content, "• Goroutines: `%d`\n\n", stats.GoRoutines)
 
-	content.WriteString("📥 *TASK*\n")
-	fmt.Fprintf(&content, "• Đang chạy: `%d`\n", stats.ActiveTasks)
-	fmt.Fprintf(&content, "• Trong hàng đợi: `%d`\n\n", stats.QueuedTasks)
+	line("monitor_tasks_header")
+	line("monitor_tasks_running", stats.ActiveTasks)
+	line("monitor_tasks_queued", stats.QueuedTasks)
+	content.WriteString("\n")
 
-	content.WriteString("💾 *BỘ NHỚ*\n")
+	line("monitor_memory_header")
 	memBar := createUsageBar(percent(stats.MemoryUsed, stats.MemoryTotal), 12)
-	fmt.Fprintf(&content, "• Đã dùng: `%s / %s`\n",
+	line("monitor_used",
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryUsed)),
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryTotal)))
-	fmt.Fprintf(&content, "• Bot đang dùng: `%s`\n",
-		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryBot)))
+	line("monitor_bot_memory", utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.MemoryBot)))
 	fmt.Fprintf(&content, "%s\n\n", utils.EscapeMarkdownV2(memBar))
 
-	content.WriteString("💿 *Ổ ĐĨA \\(thư mục tải\\)*\n")
+	line("monitor_disk_header")
 	diskBar := createUsageBar(stats.DiskUsage, 12)
-	fmt.Fprintf(&content, "• Đã dùng: `%s / %s`\n",
+	line("monitor_used",
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.DiskUsed)),
 		utils.EscapeMarkdownV2(utils.FormatBytesUint64(stats.DiskTotal)))
 	content.WriteString(utils.EscapeMarkdownV2(diskBar))
 
-	return ProfessionalMessage("TÀI NGUYÊN HỆ THỐNG", content.String())
+	return ProfessionalMessage(i18n.T(lang, "monitor_stats_title"), content.String())
 }
 
 func formatUptime(d time.Duration) string {
@@ -169,17 +180,24 @@ type HealthCheck struct {
 	Healthy bool
 }
 
+// PerformHealthChecks is PerformHealthChecksLang in DefaultLang.
 func (s *BotService) PerformHealthChecks() []HealthCheck {
+	return s.PerformHealthChecksLang(i18n.DefaultLang)
+}
+
+// PerformHealthChecksLang runs the health checks, with names and messages
+// (plain text) in lang.
+func (s *BotService) PerformHealthChecksLang(lang string) []HealthCheck {
 	var checks []HealthCheck
 
 	aria2Check := HealthCheck{Name: "Aria2"}
 	if _, err := os.Stat("/usr/bin/aria2c"); err == nil {
 		aria2Check.Status = IconOK
-		aria2Check.Message = "Đã tìm thấy binary Aria2"
+		aria2Check.Message = i18n.T(lang, "monitor_aria2_found")
 		aria2Check.Healthy = true
 	} else {
 		aria2Check.Status = "⚠️ WARNING"
-		aria2Check.Message = "Không tìm thấy binary Aria2"
+		aria2Check.Message = i18n.T(lang, "monitor_aria2_missing")
 		aria2Check.Healthy = true
 	}
 	checks = append(checks, aria2Check)
@@ -187,29 +205,29 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 	rcloneCheck := HealthCheck{Name: "Rclone"}
 	if _, err := os.Stat(s.TaskManager.ConfigDir + "/rclone.conf"); err == nil {
 		rcloneCheck.Status = IconOK
-		rcloneCheck.Message = "Đã có file cấu hình"
+		rcloneCheck.Message = i18n.T(lang, "monitor_rclone_ok")
 		rcloneCheck.Healthy = true
 	} else {
 		rcloneCheck.Status = IconError
-		rcloneCheck.Message = "Thiếu file cấu hình"
+		rcloneCheck.Message = i18n.T(lang, "monitor_rclone_missing")
 		rcloneCheck.Healthy = false
 	}
 	checks = append(checks, rcloneCheck)
 
-	diskCheck := HealthCheck{Name: "Dung lượng đĩa"}
+	diskCheck := HealthCheck{Name: i18n.T(lang, "monitor_disk_name")}
 	diskUsage := s.getDiskUsageOS()
 	switch {
 	case diskUsage < 85:
 		diskCheck.Status = IconOK
-		diskCheck.Message = fmt.Sprintf("Đã dùng %.1f%%", diskUsage)
+		diskCheck.Message = i18n.T(lang, "monitor_disk_ok", diskUsage)
 		diskCheck.Healthy = true
 	case diskUsage < 95:
 		diskCheck.Status = "⚠️ WARNING"
-		diskCheck.Message = fmt.Sprintf("Đã dùng %.1f%% - Sắp hết dung lượng", diskUsage)
+		diskCheck.Message = i18n.T(lang, "monitor_disk_warn", diskUsage)
 		diskCheck.Healthy = true
 	default:
 		diskCheck.Status = "❌ CRITICAL"
-		diskCheck.Message = fmt.Sprintf("Đã dùng %.1f%% - Gần hết dung lượng!", diskUsage)
+		diskCheck.Message = i18n.T(lang, "monitor_disk_critical", diskUsage)
 		diskCheck.Healthy = false
 	}
 	checks = append(checks, diskCheck)
@@ -218,23 +236,23 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 	ctx := context.Background()
 	if err := s.DB.Ping(ctx); err == nil {
 		dbCheck.Status = IconOK
-		dbCheck.Message = "Kết nối database ổn định"
+		dbCheck.Message = i18n.T(lang, "monitor_db_ok")
 		dbCheck.Healthy = true
 	} else {
 		dbCheck.Status = IconError
-		dbCheck.Message = "Lỗi database"
+		dbCheck.Message = i18n.T(lang, "monitor_db_error")
 		dbCheck.Healthy = false
 	}
 	checks = append(checks, dbCheck)
 
-	dlCheck := HealthCheck{Name: "Thư mục tải xuống"}
+	dlCheck := HealthCheck{Name: i18n.T(lang, "monitor_dl_name")}
 	if info, err := os.Stat(s.Config.DownloadDir); err == nil && info.IsDir() {
 		dlCheck.Status = IconOK
-		dlCheck.Message = "Truy cập được thư mục"
+		dlCheck.Message = i18n.T(lang, "monitor_dl_ok")
 		dlCheck.Healthy = true
 	} else {
 		dlCheck.Status = IconError
-		dlCheck.Message = "Không truy cập được thư mục"
+		dlCheck.Message = i18n.T(lang, "monitor_dl_error")
 		dlCheck.Healthy = false
 	}
 	checks = append(checks, dlCheck)
@@ -242,7 +260,13 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 	return checks
 }
 
+// FormatHealthCheck is FormatHealthCheckLang in DefaultLang.
 func (s *BotService) FormatHealthCheck(checks []HealthCheck) string {
+	return s.FormatHealthCheckLang(i18n.DefaultLang, checks)
+}
+
+// FormatHealthCheckLang renders checks as a MarkdownV2 message in lang.
+func (s *BotService) FormatHealthCheckLang(lang string, checks []HealthCheck) string {
 	var content strings.Builder
 
 	allHealthy := true
@@ -253,12 +277,12 @@ func (s *BotService) FormatHealthCheck(checks []HealthCheck) string {
 		}
 	}
 
-	status := "🟢 *HỆ THỐNG BÌNH THƯỜNG*"
+	status := i18n.T(lang, "monitor_health_ok")
 	if !allHealthy {
-		status = "🔴 *PHÁT HIỆN SỰ CỐ*"
+		status = i18n.T(lang, "monitor_health_issue")
 	}
 
-	fmt.Fprintf(&content, "TRẠNG THÁI: %s\n%s\n\n", status, CompactSeparator)
+	fmt.Fprintf(&content, "%s\n%s\n\n", i18n.T(lang, "monitor_health_status", status), CompactSeparator)
 
 	for _, c := range checks {
 		icon := "✅"
@@ -274,9 +298,9 @@ func (s *BotService) FormatHealthCheck(checks []HealthCheck) string {
 		fmt.Fprintf(&content, "└ _%s_\n", utils.EscapeMarkdownV2(c.Message))
 	}
 
-	fmt.Fprintf(&content, "\n%s\n🕐 Kiểm tra lúc: `%s`", CompactSeparator, utils.EscapeMarkdownV2(time.Now().Format("15:04:05")))
+	fmt.Fprintf(&content, "\n%s\n%s", CompactSeparator, i18n.T(lang, "monitor_checked_at", utils.EscapeMarkdownV2(time.Now().Format("15:04:05"))))
 
-	return ProfessionalMessage("KIỂM TRA HỆ THỐNG", content.String())
+	return ProfessionalMessage(i18n.T(lang, "monitor_health_title"), content.String())
 }
 
 func (s *BotService) PerformDiskCleanup() {

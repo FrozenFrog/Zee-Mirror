@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -19,8 +20,9 @@ func HandleDriveMkdir(s *service.BotService, message *tgbotapi.Message, args str
 	if !s.CanUse(message) {
 		return
 	}
+	lang := s.GetUserLanguage(message.From.ID)
 	if args == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/mkdir tên_thư_mục`")
+		s.Reply(message, i18n.T(lang, "drive_usage_mkdir"))
 		return
 	}
 
@@ -33,31 +35,31 @@ func HandleDriveMkdir(s *service.BotService, message *tgbotapi.Message, args str
 	cmd := exec.CommandContext(ctx, "rclone", "mkdir", folderPath, "--config", configPath)
 
 	if err := cmd.Run(); err != nil {
-		s.Reply(message, fmt.Sprintf("❌ *Tạo thư mục thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, i18n.T(lang, "drive_mkdir_failed", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
-	s.Reply(message, fmt.Sprintf("✅ *Đã tạo thư mục*\n\n📁 `%s`", utils.EscapeMarkdownV2(args)))
+	s.Reply(message, i18n.T(lang, "drive_mkdir_ok", utils.EscapeMarkdownV2(args)))
 }
 
 func HandleDriveDelete(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, "❌ *Truy cập bị từ chối*\nChỉ Admin mới có thể xóa file\\.")
+		s.Reply(message, i18n.T(lang, "drive_rm_denied"))
 		return
 	}
 
 	if args == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/rm tên_file_hoặc_thư_mục`")
+		s.Reply(message, i18n.T(lang, "drive_usage_rm"))
 		return
 	}
 
 	targetPath := s.TaskManager.RcloneDest + "/" + args
 
 	msg := tgbotapi.NewMessage(message.Chat.ID,
-		fmt.Sprintf("⚠️ *Xác nhận xóa*\n\nBạn có chắc muốn xóa:\n📁 `%s`\\?",
-			utils.EscapeMarkdownV2(targetPath)))
+		i18n.T(lang, "drive_rm_confirm", utils.EscapeMarkdownV2(targetPath)))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
-	msg.ReplyMarkup = deleteConfirmKeyboard(s, args)
+	msg.ReplyMarkup = deleteConfirmKeyboard(s, lang, args)
 	_, _ = s.Bot.Send(msg)
 }
 
@@ -66,9 +68,10 @@ func HandleDriveMove(s *service.BotService, message *tgbotapi.Message, args stri
 		return
 	}
 
+	lang := s.GetUserLanguage(message.From.ID)
 	parts := strings.SplitN(args, " ", 2)
 	if len(parts) < 2 {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/mv nguồn đích`")
+		s.Reply(message, i18n.T(lang, "drive_usage_mv"))
 		return
 	}
 
@@ -82,11 +85,11 @@ func HandleDriveMove(s *service.BotService, message *tgbotapi.Message, args stri
 	cmd := exec.CommandContext(ctx, "rclone", "moveto", source, dest, "--config", configPath)
 
 	if err := cmd.Run(); err != nil {
-		s.Reply(message, fmt.Sprintf("❌ *Di chuyển file thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, i18n.T(lang, "drive_mv_failed", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
-	s.Reply(message, fmt.Sprintf("✅ *Đã di chuyển file*\n\n📄 `%s`\n➡️ `%s`",
+	s.Reply(message, i18n.T(lang, "drive_mv_ok",
 		utils.EscapeMarkdownV2(parts[0]),
 		utils.EscapeMarkdownV2(parts[1])))
 }
@@ -96,14 +99,15 @@ func HandleDriveShare(s *service.BotService, message *tgbotapi.Message, args str
 		return
 	}
 
+	lang := s.GetUserLanguage(message.From.ID)
 	if args == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/share tên_file`")
+		s.Reply(message, i18n.T(lang, "drive_usage_share"))
 		return
 	}
 
 	targetPath := s.TaskManager.RcloneDest + "/" + args
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🔗 *Đang tạo link chia sẻ\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "drive_share_creating"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, _ := s.Bot.Send(statusMsg)
 
@@ -143,7 +147,7 @@ func HandleDriveShare(s *service.BotService, message *tgbotapi.Message, args str
 
 		if err != nil {
 			editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sent.MessageID,
-				fmt.Sprintf("❌ *Tạo link thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error())))
+				i18n.T(lang, "drive_share_failed", utils.EscapeMarkdownV2(err.Error())))
 			editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 			_, _ = s.Bot.Send(editMsg)
 			return
@@ -151,7 +155,7 @@ func HandleDriveShare(s *service.BotService, message *tgbotapi.Message, args str
 		link = strings.TrimSpace(string(output))
 	}
 
-	text := fmt.Sprintf("✅ *Đã tạo link chia sẻ*\n\n📄 File: `%s`\n🔗 Link: %s",
+	text := i18n.T(lang, "drive_share_ok",
 		utils.EscapeMarkdownV2(args),
 		utils.EscapeMarkdownV2(link))
 
@@ -164,12 +168,13 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 	if !s.CanUse(message) {
 		return
 	}
+	lang := s.GetUserLanguage(message.From.ID)
 	if args == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/find từ_khóa`")
+		s.Reply(message, i18n.T(lang, "drive_usage_find"))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🔍 *Đang tìm kiếm file\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "drive_find_searching"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, _ := s.Bot.Send(statusMsg)
 
@@ -187,7 +192,7 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 
 	if err != nil {
 		editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sent.MessageID,
-			fmt.Sprintf("❌ *Tìm kiếm file thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(utils.RcloneError(err).Error())))
+			i18n.T(lang, "drive_find_failed", utils.EscapeMarkdownV2(utils.RcloneError(err).Error())))
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 		return
@@ -196,7 +201,7 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 	var rawFiles []service.DriveFile
 	if err := json.Unmarshal(output, &rawFiles); err != nil {
 		editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sent.MessageID,
-			"❌ *Không đọc được kết quả tìm kiếm*")
+			i18n.T(lang, "drive_find_parse_failed"))
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 		return
@@ -210,8 +215,8 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 		}
 	}
 
-	text := formatSearchResults(args, files)
-	keyboard := buildSearchNavigationKeyboard(s, files)
+	text := formatSearchResults(lang, args, files)
+	keyboard := buildSearchNavigationKeyboard(s, lang, files)
 	editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sent.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	if len(keyboard.InlineKeyboard) > 0 {
@@ -220,22 +225,22 @@ func HandleDriveSearch(s *service.BotService, message *tgbotapi.Message, args st
 	_, _ = s.Bot.Send(editMsg)
 }
 
-func formatSearchResults(query string, files []service.DriveFile) string {
+func formatSearchResults(lang, query string, files []service.DriveFile) string {
 	var text strings.Builder
 
-	text.WriteString("🔍 *KẾT QUẢ TÌM KIẾM*\n")
+	text.WriteString(i18n.T(lang, "drive_find_title") + "\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&text, "🔎 Từ khóa: `%s`\n\n", utils.EscapeMarkdownV2(query))
+	text.WriteString(i18n.T(lang, "drive_find_keyword", utils.EscapeMarkdownV2(query)) + "\n\n")
 
 	if len(files) == 0 {
-		text.WriteString("📭 _Không tìm thấy file nào_\n")
+		text.WriteString(i18n.T(lang, "drive_find_none") + "\n")
 	} else {
 		maxShow := 20
 		if len(files) > maxShow {
-			fmt.Fprintf(&text, "📊 Hiển thị %d trên %d kết quả\n\n", maxShow, len(files))
+			text.WriteString(i18n.T(lang, "drive_find_showing", maxShow, len(files)) + "\n\n")
 		}
 
-		text.WriteString("📂 *FILE TÌM THẤY*\n")
+		text.WriteString(i18n.T(lang, "drive_find_header") + "\n")
 
 		for i, f := range files {
 			if i >= maxShow {

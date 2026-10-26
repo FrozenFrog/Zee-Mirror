@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -19,12 +20,13 @@ func HandleDashboardCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 		return
 	}
 	action := parts[1]
+	lang := s.GetUserLanguage(callback.From.ID)
 
-	if handleDashboardAction(s, callback, action, parts) {
+	if handleDashboardAction(s, callback, lang, action, parts) {
 		return
 	}
 
-	text := getDashboardModeText(action)
+	text := getDashboardModeText(lang, action)
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -32,28 +34,27 @@ func HandleDashboardCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 }
 
-func handleDashboardAction(s *service.BotService, callback *tgbotapi.CallbackQuery, action string, parts []string) bool {
+func handleDashboardAction(s *service.BotService, callback *tgbotapi.CallbackQuery, lang, action string, parts []string) bool {
 	switch action {
 	case "page":
-		handlePagination(s, callback, parts)
+		handlePagination(s, callback, lang, parts)
 	case "status":
-		handleStatusFromCallback(s, callback)
+		handleStatusFromCallback(s, callback, lang)
 	case "ping":
-		handlePingFromCallback(s, callback)
+		handlePingFromCallback(s, callback, lang)
 	case "speed":
-		handleSpeedFromCallback(s, callback)
+		handleSpeedFromCallback(s, callback, lang)
 	case "stats":
-		handleStatsFromCallback(s, callback)
+		handleStatsFromCallback(s, callback, lang)
 	case "storage":
-		handleStoragesFromCallback(s, callback)
+		handleStoragesFromCallback(s, callback, lang)
 	case "files":
-		handleDriveListFromCallback(s, callback)
+		handleDriveListFromCallback(s, callback, lang)
 	case "media":
-		sendMediaMenu(s, callback)
+		sendMediaMenu(s, callback, lang)
 	case "system":
-		handleSystemFromCallback(s, callback)
+		handleSystemFromCallback(s, callback, lang)
 	case "back":
-		lang := s.GetUserLanguage(callback.From.ID)
 		content := service.GetWelcomeMessage(lang, callback.From.FirstName)
 		kb := service.GetStartKeyboard(lang)
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, content)
@@ -66,38 +67,37 @@ func handleDashboardAction(s *service.BotService, callback *tgbotapi.CallbackQue
 	case "close":
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "basic_toast_closed")))
 	default:
 		return false
 	}
 	return true
 }
 
-func handlePagination(s *service.BotService, callback *tgbotapi.CallbackQuery, parts []string) {
+func handlePagination(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string, parts []string) {
 	if len(parts) >= 3 {
 		page, _ := strconv.Atoi(parts[2])
 		s.TaskManager.Mu.Lock()
 		s.TaskManager.StatusPages[callback.Message.Chat.ID] = page
 		s.TaskManager.Mu.Unlock()
 		s.UpdateSharedDashboard(callback.Message.Chat.ID, false)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, fmt.Sprintf("Trang %d", page+1)))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_page", page+1)))
 	}
 }
 
-func handleStatusFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
-	lang := s.GetUserLanguage(callback.From.ID)
+func handleStatusFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
 	tasks := s.TaskManager.GetActiveTasks()
 
 	if len(tasks) == 0 {
-		content := service.GetErrorMessage("TRẠNG THÁI", "Không có Task nào đang chạy\\.")
+		content := errorCard(lang, "bdash_status_hdr", "bdash_status_none")
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, content)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📭 Trống"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_empty")))
 		return
 	}
 
-	text := service.GetStatusHeader()
+	text := service.GetStatusHeaderLang(lang)
 	for _, task := range tasks {
 		snapshot := task.GetSnapshot()
 		text += service.FormatTaskProfessional(lang, snapshot) + "\n"
@@ -106,26 +106,26 @@ func handleStatusFromCallback(s *service.BotService, callback *tgbotapi.Callback
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeHTML
 	_, _ = s.Bot.Send(editMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã cập nhật"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_updated")))
 }
 
-func handlePingFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
+func handlePingFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
 	start := time.Now()
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "🏓 *Đang ping\\.\\.\\.*")
+	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, i18n.T(lang, "basic_pinging"))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
 
 	elapsed := time.Since(start)
-	text := fmt.Sprintf("🏓 *Pong\\!* `%v`", elapsed.Round(time.Millisecond))
+	text := i18n.T(lang, "basic_pong", elapsed.Round(time.Millisecond))
 
 	finalEdit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	finalEdit.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(finalEdit)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🏓 Pong!"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_pong")))
 }
 
-func handleSpeedFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "🚀 *Đang chạy Speedtest\\.\\.\\.*")
+func handleSpeedFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
+	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, i18n.T(lang, "basic_speedtest_running"))
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
 
@@ -135,11 +135,11 @@ func handleSpeedFromCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 
 		var text string
 		if err != nil {
-			text = fmt.Sprintf("❌ *Lỗi Speedtest*\n\n`%s`", utils.EscapeMarkdownV2(err.Error()))
+			text = i18n.T(lang, "basic_speedtest_error", utils.EscapeMarkdownV2(err.Error()))
 		} else {
 			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 			var result strings.Builder
-			result.WriteString("🚀 *Kết quả Speedtest*\n\n")
+			result.WriteString(i18n.T(lang, "basic_speedtest_result") + "\n\n")
 			for _, line := range lines {
 				fmt.Fprintf(&result, "• `%s`\n", utils.EscapeMarkdownV2(line))
 			}
@@ -150,14 +150,14 @@ func handleSpeedFromCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 		finalEdit.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(finalEdit)
 	}()
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🚀 Đang kiểm tra tốc độ..."))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_speedtest")))
 }
 
-func handleStatsFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
+func handleStatsFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
 	ctx := context.Background()
 	stats, err := s.DB.GetBotStats(ctx)
 	if err != nil {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_error")))
 		return
 	}
 
@@ -165,23 +165,23 @@ func handleStatsFromCallback(s *service.BotService, callback *tgbotapi.CallbackQ
 	dailyStats, _ := s.DB.GetTodayStats(ctx)
 	userDailyStats, _ := s.DB.GetUserTodayStats(ctx, callback.From.ID)
 
-	text := FormatStatsMessage(stats, userStats, dailyStats, userDailyStats)
+	text := FormatStatsMessage(lang, stats, userStats, dailyStats, userDailyStats)
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📊 Thống kê"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_stats")))
 }
 
-func handleStoragesFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
+func handleStoragesFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
 	providers, err := s.GetAvailableStorages()
 	if err != nil {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_error")))
 		return
 	}
 
 	var text strings.Builder
-	text.WriteString("💾 *Nhà cung cấp lưu trữ khả dụng*\n")
+	text.WriteString(i18n.T(lang, "bdash_storage_title") + "\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	for _, p := range providers {
@@ -189,148 +189,74 @@ func handleStoragesFromCallback(s *service.BotService, callback *tgbotapi.Callba
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	text.WriteString("*Hiện tại:* `" + utils.EscapeMarkdownV2(s.TaskManager.RcloneDest) + "`\n\n")
+	text.WriteString(i18n.T(lang, "bdash_storage_current", utils.EscapeMarkdownV2(s.TaskManager.RcloneDest)) + "\n\n")
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text.String())
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "💾 Lưu trữ"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_storage")))
 }
 
-func handleSystemFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
+func handleSystemFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
 	stats := s.GetSystemStats()
-	text := s.FormatSystemStats(stats)
+	text := s.FormatSystemStatsLang(lang, stats)
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🖥️ Hệ thống"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_system")))
 }
 
-func handleDriveListFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery) {
+func handleDriveListFromCallback(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
 	basePath := strings.TrimSuffix(s.TaskManager.RcloneDest, "/")
 	path := basePath
 
-	loadingMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "🔍 *Đang tải danh sách file\\.\\.\\.*")
+	loadingMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, i18n.T(lang, "bdash_files_loading"))
 	loadingMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(loadingMsg)
 
 	files, err := s.ListDriveFiles(path)
 	if err != nil {
-		text := fmt.Sprintf("❌ *Không tải được danh sách file*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error()))
+		text := i18n.T(lang, "bdash_files_error", utils.EscapeMarkdownV2(i18n.Message(lang, err)))
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 		return
 	}
 
-	text := s.FormatDriveFileList("/", files)
+	text := s.FormatDriveFileListLang(lang, "/", files)
 
 	finalEdit := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	finalEdit.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(finalEdit)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📁 Danh sách Drive"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_files")))
 }
 
-func sendMediaMenu(s *service.BotService, callback *tgbotapi.CallbackQuery) {
-	content := "Các thao tác media cho video/audio:\n\n" +
-		"• `/extractaudio` ─ Tách audio từ video\n" +
-		"• `/compress` ─ Nén dung lượng video\n" +
-		"• `/thumbnail` ─ Tạo thumbnail\n" +
-		"• `/screenshots` ─ Chụp nhiều ảnh màn hình\n" +
-		"• `/subtitle` ─ Soft\\-sub \\(Gắn subtitle\\)\n" +
-		"• `/hardsub` ─ Hard\\-sub \\(Ghép cứng subtitle\\)\n" +
-		"• `/rescale` ─ Đổi độ phân giải video\n" +
-		"• `/convert` ─ Chuyển đổi định dạng file\n" +
-		"• `/mediainfo` ─ Thông tin chi tiết file\n\n" +
-		"💡 *Cách dùng:* Reply vào file video bằng lệnh tương ứng"
-
-	text := service.ProfessionalMessage("XỬ LÝ MEDIA", content)
+func sendMediaMenu(s *service.BotService, callback *tgbotapi.CallbackQuery, lang string) {
+	text := service.ProfessionalMessage(i18n.T(lang, "bdash_media_hdr"), i18n.T(lang, "bdash_media_body"))
 
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🎵 Menu Media"))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "bdash_toast_media")))
 }
 
-func getDashboardModeText(action string) string {
-	switch action {
-	case "mirror":
-		return service.ProfessionalMessage("CHẾ ĐỘ MIRROR",
-			"Tải file thẳng lên Google Drive\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• Reply vào file bằng `/mirror`\n"+
-				"• Hoặc gửi: `/mirror URL`\n\n"+
-				"🏷️ *FLAGS*\n"+
-				"• `\\-z` ─ Nén Zip trước khi tải lên\n"+
-				"• `\\-uz` ─ Giải nén sau khi tải xuống\n"+
-				"• `\\-p PASS` ─ Mật khẩu zip")
+// dashboardModes are the dashboard actions that show a usage card; each has
+// bdash_mode_<action>_hdr and bdash_mode_<action>_body keys.
+var dashboardModes = map[string]bool{
+	"mirror": true, "leech": true, "ytdlp": true, "torrent": true, "clone": true,
+	"batch": true, "search": true, "hardsub": true, "rescale": true,
+}
 
-	case "leech":
-		return service.ProfessionalMessage("CHẾ ĐỘ LEECH",
-			"Tải file từ URL về server\\.\n\n"+
-				"✅ *HỖ TRỢ*\n"+
-				"• HTTP/HTTPS • FTP • Magnet\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• `/leech` \\<URL\\>")
-
-	case "ytdlp":
-		return service.ProfessionalMessage("CHẾ ĐỘ YT-DLP",
-			"Tải video từ hơn 1000 trang web\\.\n\n"+
-				"✅ *HỖ TRỢ*\n"+
-				"• YouTube • Twitter • TikTok • v\\.v\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• `/ytdlp` \\<URL\\>")
-
-	case "torrent":
-		return service.ProfessionalMessage("CHẾ ĐỘ TORRENT",
-			"Tải qua Magnet hoặc file Torrent\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• `/torrent` \\<magnet\\_link\\>\n"+
-				"• Reply vào file `.torrent` bằng `/torrent`")
-
-	case "clone":
-		return service.ProfessionalMessage("CHẾ ĐỘ CLONE",
-			"Clone file/thư mục Google Drive\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• `/clone` \\<GDRIVE\\_URL\\>")
-
-	case "batch":
-		return service.ProfessionalMessage("CHẾ ĐỘ BATCH",
-			"Tải nhiều URL cùng lúc\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"`/batch`\n"+
-				"`URL1`\n"+
-				"`URL2`")
-
-	case "search":
-		return service.ProfessionalMessage("CHẾ ĐỘ TÌM KIẾM",
-			"Tìm Torrent từ nhiều nguồn\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• `/search` \\<keyword\\>")
-
-	case "hardsub":
-		return service.ProfessionalMessage("CHẾ ĐỘ HARD-SUB",
-			"Ghép cứng subtitle vĩnh viễn vào video\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• Reply vào video bằng `/hardsub subtitle.srt`\n"+
-				"• Hoặc: `/hardsub video.mp4 subtitle.srt`\n\n"+
-				"🔥 *THÔNG TIN*\n"+
-				"Quá trình này cần re\\-encode video nên sẽ mất nhiều thời gian hơn so với soft\\-sub\\.")
-
-	case "rescale":
-		return service.ProfessionalMessage("CHẾ ĐỘ RESCALE",
-			"Đổi độ phân giải video \\(Transcoding\\)\\.\n\n"+
-				"📌 *CÁCH DÙNG*\n"+
-				"• Reply vào video bằng `/rescale 720p`\n"+
-				"• Hoặc: `/rescale video.mp4 1280x720`\n\n"+
-				"🏷️ *PRESET*\n"+
-				"`4k`, `2k`, `1080p`, `720p`, `480p`, `360p` hoặc định dạng tùy chỉnh `WxH`\\.")
-
-	case "back":
+func getDashboardModeText(lang, action string) string {
+	switch {
+	case dashboardModes[action]:
+		return service.ProfessionalMessage(
+			i18n.T(lang, "bdash_mode_"+action+"_hdr"),
+			i18n.T(lang, "bdash_mode_"+action+"_body"))
+	case action == "back":
 		return ""
-
 	default:
-		return service.GetErrorMessage("KHÔNG XÁC ĐỊNH", "Thao tác không xác định\\.")
+		return errorCard(lang, "bdash_unknown_hdr", "bdash_unknown_body")
 	}
 }

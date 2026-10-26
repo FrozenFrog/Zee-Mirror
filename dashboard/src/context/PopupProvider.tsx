@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import Dialog from '../components/Popups/Dialog'
 import Toast from '../components/Popups/Toast'
 import { PopupContext } from './PopupContext'
+import { useI18n } from '../hooks/useI18n'
 
 interface PopupProviderProps {
   children: ReactNode
@@ -30,6 +31,7 @@ interface ToastState {
 export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
   const [modal, setModal] = useState<ModalState | null>(null)
   const [toasts, setToasts] = useState<ToastState[]>([])
+  const { t } = useI18n()
 
   const showConfirm = useCallback((title: string, content: ReactNode, options: any = {}) => {
     return new Promise<boolean>((resolve) => {
@@ -37,8 +39,8 @@ export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
         title,
         content,
         type: 'confirm',
-        confirmText: options.confirmText || 'Xác nhận',
-        cancelText: options.cancelText || 'Hủy',
+        confirmText: options.confirmText || t('common.confirm'),
+        cancelText: options.cancelText || t('common.cancel'),
         showCancel: true,
         onConfirm: () => {
           setModal(null)
@@ -51,7 +53,7 @@ export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
         ...options,
       })
     })
-  }, [])
+  }, [t])
 
   const showAlert = useCallback((title: string, content: ReactNode, options: any = {}) => {
     return new Promise<boolean>((resolve) => {
@@ -59,7 +61,7 @@ export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
         title,
         content,
         type: options.type || 'info',
-        confirmText: options.confirmText || 'Đồng ý',
+        confirmText: options.confirmText || t('common.ok'),
         showCancel: false,
         onConfirm: () => {
           setModal(null)
@@ -72,7 +74,7 @@ export const PopupProvider: React.FC<PopupProviderProps> = ({ children }) => {
         ...options,
       })
     })
-  }, [])
+  }, [t])
 
   const showToast = useCallback((message: string, type: 'info' | 'success' | 'error' | 'alert' = 'info', duration = 3000) => {
     const id = Date.now()

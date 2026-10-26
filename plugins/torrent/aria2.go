@@ -3,6 +3,7 @@ package torrent
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/downloader"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 	"zee-mirror/plugins/registry"
 )
@@ -60,7 +62,7 @@ func (e *Aria2Engine) Download(ctx context.Context, task *domain.Task, outputDir
 
 		content, readErr := os.ReadFile(filePath)
 		if readErr != nil {
-			return &domain.StorageError{Path: filePath, Err: fmt.Errorf("không đọc được file torrent cục bộ: %v", readErr)}
+			return i18n.WrapError(&domain.StorageError{Path: filePath, Err: readErr}, "plugin_torrent_read_local", readErr)
 		}
 
 		encoded := base64.StdEncoding.EncodeToString(content)
@@ -70,7 +72,7 @@ func (e *Aria2Engine) Download(ctx context.Context, task *domain.Task, outputDir
 	}
 
 	if err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("aria2 rpc thêm task thất bại: %v", err)}
+		return i18n.WrapError(&domain.NetworkError{URL: task.URL, Err: err}, "plugin_torrent_add", err)
 	}
 
 	task.GID = gid
@@ -113,7 +115,7 @@ func (e *Aria2Engine) Download(ctx context.Context, task *domain.Task, outputDir
 			}
 
 			if status.Status == "removed" {
-				return &domain.ExternalError{Tool: "aria2", Err: fmt.Errorf("task đã bị xóa khỏi aria2")}
+				return i18n.WrapError(&domain.ExternalError{Tool: "aria2", Err: errors.New("download removed from aria2")}, "plugin_torrent_removed")
 			}
 
 			update := downloader.ProgressUpdate{}

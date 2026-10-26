@@ -5,7 +5,39 @@ import (
 	"testing"
 
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 )
+
+// Every category button opens a known page, every page is reachable from a
+// category, and labels are translated in every language.
+func TestHelpButtonsMatchPages(t *testing.T) {
+	reachable := map[string]bool{}
+	for cat, buttons := range helpCategoryButtons {
+		for _, b := range buttons {
+			reachable[b.action] = true
+			if _, ok := helpCommandPages[b.action]; !ok {
+				t.Errorf("%s button %q has no help page", cat, b.action)
+			}
+		}
+		for _, l := range i18n.Languages {
+			for _, row := range helpCategoryKeyboard(l.Code, buttons).InlineKeyboard {
+				for _, b := range row {
+					if b.Text == "" || strings.Contains(b.Text, "helptext_") {
+						t.Errorf("%s/%s: untranslated button %q", l.Code, cat, b.Text)
+					}
+				}
+			}
+		}
+	}
+	for action, page := range helpCommandPages {
+		if !reachable[action] {
+			t.Errorf("help page %q is not reachable from any category", action)
+		}
+		if _, ok := helpCategoryButtons[page.category]; !ok {
+			t.Errorf("help page %q returns to unknown category %q", action, page.category)
+		}
+	}
+}
 
 // Every help button must open a page the help handlers know about; this also
 // guards against the keyboards being stubbed out again.

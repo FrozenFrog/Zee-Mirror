@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -45,14 +46,8 @@ func (n *NotificationService) SendAlert(alertType, title, message string) {
 		return
 	}
 
-	text := fmt.Sprintf(`🚨 *CẢNH BÁO: %s*
-
-%s %s
-
-📝 *Chi tiết:*
-%s
-
-⏰ *Thời gian:* %s`,
+	// Alerts go to a channel or the owner, not to one user: DefaultLang.
+	text := i18n.T(i18n.DefaultLang, "notify_alert",
 		utils.EscapeMarkdownV2(title),
 		alertType,
 		utils.EscapeMarkdownV2(title),
@@ -72,8 +67,8 @@ func (n *NotificationService) AlertDiskUsage(usage float64, path string) {
 		return
 	}
 
-	message := fmt.Sprintf("Ổ đĩa đã dùng %.1f%% tại %s\n\nVui lòng giải phóng dung lượng để tránh tải xuống thất bại.", usage, path)
-	n.SendAlert("💾", "Ổ đĩa sắp đầy", message)
+	message := i18n.T(i18n.DefaultLang, "notify_disk_msg", usage, path)
+	n.SendAlert("💾", i18n.T(i18n.DefaultLang, "notify_disk_title"), message)
 }
 
 func (n *NotificationService) AlertSystemHealth(cpuUsage, memUsage float64) {
@@ -83,18 +78,19 @@ func (n *NotificationService) AlertSystemHealth(cpuUsage, memUsage float64) {
 		alerts = append(alerts, fmt.Sprintf("CPU: %.1f%%", cpuUsage))
 	}
 	if memUsage > 90 {
-		alerts = append(alerts, fmt.Sprintf("Bộ nhớ: %.1f%%", memUsage))
+		alerts = append(alerts, i18n.T(i18n.DefaultLang, "notify_mem", memUsage))
 	}
 
 	if len(alerts) > 0 {
-		message := fmt.Sprintf("Phát hiện mức sử dụng tài nguyên cao:\n%s", strings.Join(alerts, "\n"))
-		n.SendAlert("🖥️", "Cảnh báo tình trạng hệ thống", message)
+		message := i18n.T(i18n.DefaultLang, "notify_health_msg", strings.Join(alerts, "\n"))
+		n.SendAlert("🖥️", i18n.T(i18n.DefaultLang, "notify_health_title"), message)
 	}
 }
 
 func (s *BotService) HandleSetAlertChannel(message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if message.From.ID != s.Config.OwnerID {
-		s.reply(message, "❌ *Truy cập bị từ chối*\nChỉ Owner mới dùng được lệnh này\\.")
+		s.reply(message, i18n.T(lang, "notify_owner_only"))
 		return
 	}
 
@@ -114,5 +110,5 @@ func (s *BotService) HandleSetAlertChannel(message *tgbotapi.Message, args strin
 	ctx := context.Background()
 	_ = s.DB.Set(ctx, "alert_channel_id", fmt.Sprintf("%d", channelID))
 
-	s.reply(message, fmt.Sprintf("✅ *Đã đặt kênh cảnh báo*\n\nChannel ID: `%d`\n\nMọi cảnh báo sẽ được gửi tới kênh này\\.", channelID))
+	s.reply(message, i18n.T(lang, "notify_channel_set", channelID))
 }

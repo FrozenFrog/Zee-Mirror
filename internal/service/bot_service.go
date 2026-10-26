@@ -125,12 +125,12 @@ func NewBotService(bot *tgbotapi.BotAPI, cfg *config.Config, db repository.FullR
 
 	// EnsureUser leaves existing rows alone, so a restart keeps the Telegram
 	// username and settings SyncUser stored; the names below are placeholders
-	// until the user first talks to the bot.
+	// until the user first talks to the bot. The language is left empty so
+	// SyncUser can take it from the user's Telegram client.
 	_ = db.EnsureUser(ctx, domain.User{
 		ID:                cfg.OwnerID,
 		Username:          "Owner",
 		Role:              "owner",
-		Language:          i18n.DefaultLang,
 		CreatedAt:         time.Now(),
 		MaxDailyTasks:     -1,
 		MaxDailyBandwidth: -1,
@@ -142,7 +142,6 @@ func NewBotService(bot *tgbotapi.BotAPI, cfg *config.Config, db repository.FullR
 			ID:                id,
 			Username:          "Authorized User",
 			Role:              "authorized",
-			Language:          i18n.DefaultLang,
 			CreatedAt:         time.Now(),
 			MaxDailyTasks:     cfg.DefaultMaxDailyTasks,
 			MaxDailyBandwidth: cfg.DefaultMaxDailyBandwidth,
@@ -237,15 +236,23 @@ func (s *BotService) AutoDeleteCommandAndReply(message *tgbotapi.Message) {
 		s.AutoDeleteMessage(message.Chat.ID, message.ReplyToMessage.MessageID, 0)
 	}
 }
+
+// HandleCreateTaskError reports a failed task creation in the language of
+// chatID (the user's own language in a private chat, DefaultLang in groups).
+// Prefer HandleCreateTaskErrorLang with the sender's language.
 func (s *BotService) HandleCreateTaskError(chatID int64, messageID int, err error) {
+	s.HandleCreateTaskErrorLang(s.GetUserLanguage(chatID), chatID, messageID, err)
+}
+
+// HandleCreateTaskErrorLang replies to messageID with err rendered in lang.
+func (s *BotService) HandleCreateTaskErrorLang(lang string, chatID int64, messageID int, err error) {
 	slog.Info("HandleCreateTaskError called", "chatID", chatID, "error", err)
 
-	text := ""
+	key := "task_create_failed"
 	if errors.Is(err, domain.ErrDuplicateTask) {
-		text = fmt.Sprintf("⚠️ *Đã hủy tải xuống*\n\n%s", utils.EscapeMarkdownV2(err.Error()))
-	} else {
-		text = fmt.Sprintf("❌ *Không tạo được task:*\n%s", utils.EscapeMarkdownV2(err.Error()))
+		key = "task_create_duplicate"
 	}
+	text := i18n.T(lang, key, utils.EscapeMarkdownV2(i18n.Message(lang, err)))
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = MarkdownV2
@@ -311,7 +318,7 @@ func (s *BotService) GetFileWithFallback(fileID string) (tgbotapi.File, bool, er
 	select {
 	case <-time.After(60 * time.Second):
 		slog.Warn("GetFile timed out from official TG API", "fileID", fileID)
-		return tgbotapi.File{}, false, fmt.Errorf("hết thời gian chờ lấy file Telegram: %s", fileID)
+		return tgbotapi.File{}, false, i18n.NewError("task_err_tg_timeout", fileID)
 	case offRes := <-offDone:
 		if offRes.err != nil {
 			// The official API cannot serve files above 20MB ("file is too
@@ -333,11 +340,23 @@ func (s *BotService) GetFileWithFallback(fileID string) (tgbotapi.File, bool, er
 	}
 }
 func (s *BotService) GetUserLanguage(userID int64) string {
+	if s == nil || s.DB == nil {
+		return i18n.DefaultLang
+	}
 	user, err := s.DB.GetByID(context.Background(), userID)
 	if err != nil || user.Language == "" {
 		return i18n.DefaultLang
 	}
 	return user.Language
+}
+
+// initialLanguage picks a new user's language from their Telegram language
+// code, falling back to DefaultLang when it is not supported.
+func initialLanguage(telegramCode string) string {
+	if lang := i18n.Normalize(telegramCode); lang != "" {
+		return lang
+	}
+	return i18n.DefaultLang
 }
 
 func (s *BotService) SyncUser(user *tgbotapi.User) {
@@ -357,13 +376,18 @@ func (s *BotService) SyncUser(user *tgbotapi.User) {
 		}
 	}
 
-	lang := i18n.DefaultLang
+	// A new user (or one created without a language, e.g. the owner seeded
+	// at startup) starts in their Telegram app language; a stored choice is
+	// never overwritten.
+	lang := initialLanguage(user.LanguageCode)
 	maxTasks := s.Config.DefaultMaxDailyTasks
 	maxBandwidth := s.Config.DefaultMaxDailyBandwidth
 	createdAt := time.Now()
 
 	if err == nil && existing != nil {
-		lang = existing.Language
+		if existing.Language != "" {
+			lang = existing.Language
+		}
 		if existing.Role == "owner" || existing.Role == "authorized" {
 			role = existing.Role
 		}

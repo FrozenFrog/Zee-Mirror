@@ -15,6 +15,7 @@ import (
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/downloader"
 	"zee-mirror/internal/parser"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 	"zee-mirror/plugins/registry"
 )
@@ -206,16 +207,16 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("không lấy được stdout pipe: %v", err)}
+		return i18n.WrapError(&domain.NetworkError{URL: task.URL, Err: err}, "plugin_ytdlp_pipe", "stdout", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("không lấy được stderr pipe: %v", err)}
+		return i18n.WrapError(&domain.NetworkError{URL: task.URL, Err: err}, "plugin_ytdlp_pipe", "stderr", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return &domain.NetworkError{URL: task.URL, Err: fmt.Errorf("không khởi động được yt-dlp: %v", err)}
+		return i18n.WrapError(&domain.NetworkError{URL: task.URL, Err: err}, "plugin_ytdlp_start", err)
 	}
 
 	errorOutput := ""
@@ -255,13 +256,19 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	}
 
 	if task.Hardsub && task.SubtitleLangs != "" {
-		onProgress(downloader.ProgressUpdate{Message: "Đang ghép phụ đề cứng..."})
+		var running downloader.ProgressUpdate
+		running.SetMessage("plugin_ytdlp_hardsub_running")
+		onProgress(running)
 		if err := e.burnSubtitles(ctx, outputDir); err != nil {
 			slog.Error("Failed to burn subtitles", "error", err)
 
-			onProgress(downloader.ProgressUpdate{Error: "Ghép phụ đề cứng thất bại: " + err.Error()})
+			var failed downloader.ProgressUpdate
+			failed.SetError("plugin_ytdlp_hardsub_failed", err)
+			onProgress(failed)
 		} else {
-			onProgress(downloader.ProgressUpdate{Message: "Đã ghép phụ đề cứng xong!"})
+			var done downloader.ProgressUpdate
+			done.SetMessage("plugin_ytdlp_hardsub_done")
+			onProgress(done)
 		}
 	}
 
@@ -290,7 +297,7 @@ func (e *Engine) burnSubtitles(ctx context.Context, dir string) error {
 	}
 
 	if videoFile == "" || subFile == "" {
-		return fmt.Errorf("không tìm thấy file video hoặc phụ đề để ghép")
+		return i18n.NewError("plugin_ytdlp_hardsub_no_files")
 	}
 
 	outputFile := strings.TrimSuffix(videoFile, filepath.Ext(videoFile)) + "_hardsub.mp4"
@@ -308,7 +315,7 @@ func (e *Engine) burnSubtitles(ctx context.Context, dir string) error {
 
 	cmd := execCommand(ctx, "ffmpeg", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("ffmpeg thất bại: %v, output: %s", err, string(out))
+		return i18n.WrapError(err, "plugin_ytdlp_ffmpeg_failed", err, string(out))
 	}
 
 	_ = os.Remove(videoFile)
@@ -432,26 +439,26 @@ func (e *Engine) parseProgress(stdout interface{}, onProgress func(downloader.Pr
 			title = strings.TrimSuffix(title, " has already been downloaded")
 			update.FileName = filepath.Base(strings.TrimSpace(title))
 		case strings.HasPrefix(line, "[ExtractAudio]"):
-			update.Message = "Đang tách/chuyển đổi audio..."
+			update.SetMessage("plugin_ytdlp_extract_audio")
 			if strings.Contains(line, "Destination:") {
 				parts := strings.SplitN(line, "Destination:", 2)
 				update.FileName = filepath.Base(strings.TrimSpace(parts[1]))
 			}
 		case strings.HasPrefix(line, "[Merger]"):
-			update.Message = "Đang ghép video/audio..."
+			update.SetMessage("plugin_ytdlp_merging")
 			if strings.Contains(line, "Merging formats into") {
 				parts := strings.SplitN(line, "into", 2)
 				update.FileName = filepath.Base(strings.TrimSpace(parts[1]))
 				update.FileName = strings.Trim(update.FileName, "\"")
 			}
 		case strings.HasPrefix(line, "[VideoConvertor]"):
-			update.Message = "Đang chuyển đổi định dạng video..."
+			update.SetMessage("plugin_ytdlp_converting")
 			if strings.Contains(line, "Destination:") {
 				parts := strings.SplitN(line, "Destination:", 2)
 				update.FileName = filepath.Base(strings.TrimSpace(parts[1]))
 			}
 		case strings.HasPrefix(line, "[Metadata]"):
-			update.Message = "Đang thêm metadata..."
+			update.SetMessage("plugin_ytdlp_metadata")
 		}
 
 		p := parser.ParseYTDLPLine(line)

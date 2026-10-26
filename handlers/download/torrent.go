@@ -12,9 +12,10 @@ import (
 
 func HandleTorrent(s *service.BotService, message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.Reply(message, service.GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
+		s.Reply(message, service.QuotaErrorMessage(s.GetUserLanguage(message.From.ID), err))
 		return
 	}
+	lang := s.GetUserLanguage(message.From.ID)
 
 	url, zip, unzip, password, quality, name, _, _ := utils.ParseFlags(args)
 	if message.ReplyToMessage != nil && message.ReplyToMessage.Document != nil {
@@ -33,7 +34,6 @@ func HandleTorrent(s *service.BotService, message *tgbotapi.Message, args string
 	}
 
 	if url == "" {
-		lang := s.GetUserLanguage(message.From.ID)
 		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "invalid_magnet"))
 		msg.ParseMode = tgbotapi.ModeMarkdownV2
 		_, _ = s.Bot.Send(msg)

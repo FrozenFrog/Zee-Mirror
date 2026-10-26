@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"zee-mirror/internal/domain"
+	"zee-mirror/pkg/i18n"
 )
 
 func (s *BotService) addSessionStatus(sessionID, message string) {
@@ -37,14 +39,16 @@ func (s *BotService) FetchTorrentMetadataBackground(sessionID string) {
 	s.TaskManager.Mu.Lock()
 	session.IsFetching = true
 	session.StatusMessages = []string{}
+	sessionURL, userID := session.URL, session.UserID
 	s.TaskManager.Mu.Unlock()
 
-	s.addSessionStatus(sessionID, "📡 Bắt đầu tìm metadata...")
-	slog.Info("Starting background metadata fetch", "sessionID", sessionID, "url", session.URL)
+	lang := s.GetUserLanguage(userID)
+	s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_start"))
+	slog.Info("Starting background metadata fetch", "sessionID", sessionID, "url", sessionURL)
 
-	metaFilePath, tmpDir, err := s.getMetadataFilePath(sessionID, session.URL)
+	metaFilePath, tmpDir, err := s.getMetadataFilePath(lang, sessionID, sessionURL)
 	if err != nil {
-		s.updateSessionError(sessionID, err.Error())
+		s.updateSessionError(sessionID, i18n.Message(lang, err))
 		return
 	}
 	if tmpDir != "" {
@@ -53,22 +57,22 @@ func (s *BotService) FetchTorrentMetadataBackground(sessionID string) {
 
 	var files []domain.TorrentFile
 	if metaFilePath != "" {
-		s.addSessionStatus(sessionID, "📋 Đang phân tích danh sách file...")
-		files = s.parseTorrentMetadataFile(sessionID, metaFilePath)
+		s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_parsing"))
+		files = s.parseTorrentMetadataFile(lang, sessionID, metaFilePath)
 	}
 
-	s.finalizeMetadataFetch(sessionID, files)
+	s.finalizeMetadataFetch(lang, sessionID, files)
 }
 
-func (s *BotService) getMetadataFilePath(sessionID, sessionURL string) (string, string, error) {
+func (s *BotService) getMetadataFilePath(lang, sessionID, sessionURL string) (string, string, error) {
 	if strings.HasPrefix(sessionURL, "magnet:") {
 		tmpDir, err := os.MkdirTemp("", "torrent_meta_"+sessionID+"_")
 		if err != nil {
-			s.addSessionStatus(sessionID, "❌ Không tạo được thư mục tạm.")
-			return "", "", fmt.Errorf("%w: không tạo được thư mục tạm: %v", domain.ErrStorage, err)
+			s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_tmpdir_failed"))
+			return "", "", i18n.WrapError(domain.ErrStorage, "tor_err_tmpdir", err)
 		}
 
-		path, err := s.fetchMagnetMetadata(sessionID, sessionURL, tmpDir)
+		path, err := s.fetchMagnetMetadata(lang, sessionID, sessionURL, tmpDir)
 		if err != nil {
 			os.RemoveAll(tmpDir)
 			return "", "", err
@@ -76,14 +80,14 @@ func (s *BotService) getMetadataFilePath(sessionID, sessionURL string) (string, 
 		return path, tmpDir, nil
 	}
 
-	s.addSessionStatus(sessionID, "📄 Đang xử lý file .torrent cục bộ...")
+	s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_local"))
 	urlStr := strings.TrimPrefix(sessionURL, "file://")
 	slog.Info("Using local torrent file", "sessionID", sessionID, "path", urlStr)
 	return urlStr, "", nil
 }
 
-func (s *BotService) fetchMagnetMetadata(sessionID, urlStr, tmpDir string) (string, error) {
-	s.addSessionStatus(sessionID, "🧲 Đang kết nối tới peer (Magnet Link)...")
+func (s *BotService) fetchMagnetMetadata(lang, sessionID, urlStr, tmpDir string) (string, error) {
+	s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_connecting"))
 
 	fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer fetchCancel()
@@ -109,17 +113,17 @@ func (s *BotService) fetchMagnetMetadata(sessionID, urlStr, tmpDir string) (stri
 	metaFiles, _ := filepath.Glob(filepath.Join(tmpDir, "*.torrent"))
 	if len(metaFiles) > 0 {
 		metaFilePath := metaFiles[0]
-		s.addSessionStatus(sessionID, "✅ Đã lấy được metadata.")
+		s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_done"))
 		slog.Info("Found downloaded metadata file", "sessionID", sessionID, "path", metaFilePath)
 		return metaFilePath, nil
 	}
 
-	s.addSessionStatus(sessionID, "❌ Không lấy được file metadata .torrent.")
+	s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_failed"))
 	slog.Warn("No .torrent file found after aria2c run", "sessionID", sessionID, "output", output)
-	return "", fmt.Errorf("%w: lấy metadata thất bại", domain.ErrExternal)
+	return "", i18n.WrapError(domain.ErrExternal, "tor_err_metadata")
 }
 
-func (s *BotService) finalizeMetadataFetch(sessionID string, files []domain.TorrentFile) {
+func (s *BotService) finalizeMetadataFetch(lang, sessionID string, files []domain.TorrentFile) {
 	s.TaskManager.Mu.Lock()
 	defer s.TaskManager.Mu.Unlock()
 
@@ -139,7 +143,7 @@ func (s *BotService) finalizeMetadataFetch(sessionID string, files []domain.Torr
 		}
 	} else {
 		session.Files = nil
-		session.Error = "Không lấy được danh sách file. Metadata có thể bị hỏng hoặc không đọc được."
+		session.Error = i18n.T(lang, "tor_err_parse")
 		slog.Warn("Failed to parse torrent metadata", "sessionID", sessionID)
 	}
 }
@@ -192,7 +196,7 @@ func (s *BotService) updateSessionError(sessionID, errMsg string) {
 	}
 }
 
-func (s *BotService) parseTorrentMetadataFile(sessionID, torrentPath string) []domain.TorrentFile {
+func (s *BotService) parseTorrentMetadataFile(lang, sessionID, torrentPath string) []domain.TorrentFile {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -200,7 +204,7 @@ func (s *BotService) parseTorrentMetadataFile(sessionID, torrentPath string) []d
 
 	if _, err := os.Stat(torrentPath); os.IsNotExist(err) {
 		slog.Error("Torrent file does not exist", "path", torrentPath)
-		s.addSessionStatus(sessionID, "❌ Không tìm thấy file metadata trên hệ thống.")
+		s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_missing"))
 		return nil
 	}
 
@@ -210,14 +214,14 @@ func (s *BotService) parseTorrentMetadataFile(sessionID, torrentPath string) []d
 
 	if err != nil {
 		slog.Error("aria2c --show-files failed", "path", torrentPath, "error", err, "output", cleanOutput)
-		s.addSessionStatus(sessionID, "❌ Chạy lệnh show-files thất bại.")
+		s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_show_files_failed"))
 		return nil
 	}
 
 	files := parseTorrentOutput(cleanOutput)
 	if len(files) == 0 {
 		slog.Warn("No files parsed from output", "output", cleanOutput)
-		s.addSessionStatus(sessionID, "⚠️ Danh sách file đọc từ metadata bị trống.")
+		s.addSessionStatus(sessionID, i18n.T(lang, "tor_meta_empty"))
 
 		slog.Info("Raw aria2c output for debugging", "output", cleanOutput)
 	}

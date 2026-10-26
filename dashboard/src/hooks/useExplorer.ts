@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react'
 import api from '../api'
 import { usePopups } from './usePopups'
+import { useI18n } from './useI18n'
 import { FileItem } from '../types'
 
 const useExplorer = (token: string) => {
   const [explorerPath, setExplorerPath] = useState<string>('')
   const [explorerFiles, setExplorerFiles] = useState<FileItem[]>([])
   const { showConfirm, showAlert, showToast } = usePopups()
+  const { t } = useI18n()
 
   const fetchExplorer = useCallback(
     async (path = '') => {
@@ -41,37 +43,22 @@ const useExplorer = (token: string) => {
       if (res.data.link) {
         window.open(res.data.link, '_blank')
       } else {
-        showAlert(
-          'Không có liên kết',
-          'Hiện chưa có liên kết công khai cho tài nguyên này.',
-          { type: 'alert' },
-        )
+        showAlert(t('explorer.noLinkTitle'), t('explorer.noLinkBody'), { type: 'alert' })
       }
     } catch {
-      showAlert('Lỗi tạo liên kết', 'Không thể tạo liên kết đám mây bảo mật cho tài nguyên này.', {
-        type: 'error',
-      })
+      showAlert(t('explorer.linkErrorTitle'), t('explorer.linkErrorBody'), { type: 'error' })
     }
   }
 
   const deleteFile = async (name: string) => {
-    if (
-      await showConfirm(
-        'Xóa tài nguyên',
-        `Xóa vĩnh viễn ${name}? Dữ liệu sẽ bị xóa khỏi kho lưu trữ đám mây.`,
-      )
-    ) {
+    if (await showConfirm(t('explorer.deleteTitle'), t('explorer.deleteBody', { name }))) {
       try {
         const path = explorerPath ? `${explorerPath}/${name}` : name
         await api.delete(`/api/explorer/remote?path=${encodeURIComponent(path)}`)
-        showToast('Đã xóa tài nguyên thành công', 'success')
+        showToast(t('explorer.deleted'), 'success')
         fetchExplorer(explorerPath)
       } catch {
-        showAlert(
-          'Lỗi khi xóa',
-          'Không thể xóa mục đã chọn khỏi kho lưu trữ đám mây.',
-          { type: 'error' },
-        )
+        showAlert(t('explorer.deleteErrorTitle'), t('explorer.deleteErrorBody'), { type: 'error' })
       }
     }
   }
@@ -85,11 +72,11 @@ const useExplorer = (token: string) => {
       await api.post('/api/explorer/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      showToast(`Đã tải lên ${file.name} thành công`, 'success')
+      showToast(t('explorer.uploaded', { name: file.name }), 'success')
       fetchExplorer(explorerPath)
       return { success: true }
     } catch (err: unknown) {
-      showAlert('Lỗi tải lên', `Không thể tải ${file.name} lên kho lưu trữ từ xa.`, {
+      showAlert(t('explorer.uploadErrorTitle'), t('explorer.uploadErrorBody', { name: file.name }), {
         type: 'error',
       })
       return { success: false, error: err }

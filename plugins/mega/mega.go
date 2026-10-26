@@ -2,13 +2,13 @@ package mega
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/downloader"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/plugins/registry"
 )
 
@@ -38,7 +38,7 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 	} else if _, err := exec.LookPath("megadl"); err == nil {
 		cmdName = "megadl"
 	} else {
-		return fmt.Errorf("không tìm thấy mega-get hoặc megadl trên server. Vui lòng cài MEGAcmd hoặc megatools trong Dockerfile")
+		return i18n.NewError("plugin_mega_no_tool")
 	}
 
 	args := []string{}
@@ -50,13 +50,13 @@ func (e *Engine) Download(ctx context.Context, task *domain.Task, outputDir stri
 
 	cmd := execCommand(ctx, cmdName, args...)
 
-	onProgress(downloader.ProgressUpdate{
-		Message: "Đang tải file từ Mega (không hiển thị được tiến độ ở chế độ CLI)...",
-	})
+	var note downloader.ProgressUpdate
+	note.SetMessage("plugin_mega_downloading")
+	onProgress(note)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("tải xuống từ Mega thất bại: %v, output: %s", err, string(output))
+		return i18n.WrapError(err, "plugin_mega_failed", err, string(output))
 	}
 
 	task.Mu.Lock()

@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, Bot, Activity, ShieldCheck, Lock } from 'lucide-react'
-import api from '../api'
+import api, { AuthRedirectError } from '../api'
+import { useI18n } from '../hooks/useI18n'
+import { isMessageKey } from '../i18n'
+import { rich } from '../i18n/rich'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 interface LoginScreenProps {
-    authError: string | null
+    authError: AuthRedirectError | null
 }
 
 interface AuthConfig {
@@ -19,6 +23,17 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
             .then((res) => setAuthConfig(res.data))
             .catch(() => setAuthConfig({ oidc: false, providerName: '' }))
     }, [])
+
+    const { t } = useI18n()
+    const providerName = authConfig?.providerName || 'OIDC'
+    // The backend sends a stable code; older backends sent a ready-made
+    // (Vietnamese) message, which is shown as is.
+    const errorKey = authError ? `oidcError.${authError.code}` : ''
+    const errorText = !authError
+        ? null
+        : isMessageKey(errorKey)
+          ? t(errorKey, { provider: authError.provider || providerName })
+          : authError.code
 
     return (
         <div className="min-h-screen w-full bg-white dark:bg-[#050505] flex flex-col md:flex-row font-sans overflow-hidden">
@@ -37,7 +52,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                     </div>
                     <div className="h-[1px] w-12 bg-white/20 rounded-full" />
                     <span className="text-[10px] font-black uppercase tracking-[0.8em] opacity-40">
-                        Lõi hệ thống
+                        {t('login.systemCore')}
                     </span>
                 </div>
 
@@ -52,8 +67,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                         <div className="h-[5px] w-24 bg-primary/50 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)]" />
                     </div>
                     <p className="text-white/80 text-xl lg:text-3xl font-bold leading-relaxed max-w-lg mt-12 opacity-80 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
-                        Điều phối thế hệ mới của hạ tầng đám mây bền vững và mạng lưới phân phối toàn
-                        cầu.
+                        {t('login.tagline')}
                     </p>
                 </div>
 
@@ -64,10 +78,12 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 leading-none">
-                                Engine toàn cầu
+                                {t('login.globalEngine')}
                             </p>
                             <p className="text-sm font-black uppercase tracking-widest text-white leading-none">
-                                Trạng thái đồng bộ: <span className="text-green-400">Trực tuyến</span>
+                                {rich(t('login.syncStatus'), {
+                                    value: <span className="text-green-400">{t('login.online')}</span>,
+                                })}
                             </p>
                         </div>
                     </div>
@@ -77,10 +93,16 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 leading-none">
-                                Giao thức bảo mật
+                                {t('common.securityProtocol')}
                             </p>
                             <p className="text-sm font-black uppercase tracking-widest text-white leading-none">
-                                Xác thực: <span className="text-primary italic font-black">An toàn</span>
+                                {rich(t('login.authStatus'), {
+                                    value: (
+                                        <span className="text-primary italic font-black">
+                                            {t('login.secure')}
+                                        </span>
+                                    ),
+                                })}
                             </p>
                         </div>
                     </div>
@@ -89,6 +111,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
 
             <div className="flex-1 min-h-screen flex flex-col items-center justify-center p-12 md:p-24 relative bg-[#fcfdfe] dark:bg-zinc-950/40">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-40" />
+                <LanguageSwitcher className="absolute top-8 right-8 z-20" />
 
                 <div className="w-full max-w-sm relative z-10 -mt-12">
                     <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -96,24 +119,24 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                             <div className="flex items-center justify-center md:justify-start space-x-4">
                                 <div className="h-[2px] w-12 bg-primary rounded-full shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
                                 <span className="text-[11px] font-black text-primary uppercase tracking-[0.8em]">
-                                    Đăng nhập hệ thống
+                                    {t('login.header')}
                                 </span>
                             </div>
                             <h3 className="text-8xl font-[1000] text-slate-900 dark:text-white tracking-[-0.08em] leading-none">
-                                Xin chào.
+                                {t('login.hello')}
                             </h3>
                             <p className="text-slate-400 dark:text-zinc-500 font-bold text-xl leading-relaxed max-w-[320px] mx-auto md:mx-0">
                                 {authConfig && !authConfig.oidc
-                                    ? 'Chưa cấu hình đăng nhập. Hãy đặt OIDC_ISSUER và OIDC_CLIENT_ID trong env của bot.'
-                                    : 'Hãy xác minh danh tính để kết nối.'}
+                                    ? t('login.notConfigured')
+                                    : t('login.verifyIdentity')}
                             </p>
                         </div>
-                        {authError && (
+                        {errorText && (
                             <div
                                 role="alert"
                                 className="p-6 rounded-3xl bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-sm leading-relaxed"
                             >
-                                {authError}
+                                {errorText}
                             </div>
                         )}
                         <button
@@ -121,7 +144,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                             onClick={() => window.location.assign('/api/auth/oidc/login')}
                             className="w-full p-10 premium-gradient rounded-[3rem] text-white font-black uppercase tracking-[0.3em] text-lg shadow-[0_32px_64px_-12px_rgba(59,130,246,0.5)] hover:shadow-primary/70 hover:scale-[1.05] active:scale-95 transition-all duration-500 flex items-center justify-center group disabled:opacity-40 disabled:pointer-events-none"
                         >
-                            <span>Đăng nhập bằng {authConfig?.providerName || 'OIDC'}</span>
+                            <span>{t('login.signInWith', { provider: providerName })}</span>
                             <ArrowRight
                                 size={28}
                                 className="ml-6 group-hover:translate-x-3 transition-transform"
@@ -130,7 +153,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
                         <div className="flex items-center justify-center space-x-4 text-slate-300 dark:text-zinc-700">
                             <Lock size={16} />
                             <p className="text-[10px] font-black uppercase tracking-[0.6em] italic">
-                                Xác thực qua OpenID Connect
+                                {t('login.viaOidc')}
                             </p>
                         </div>
                     </div>
@@ -138,7 +161,7 @@ const Login: React.FC<LoginScreenProps> = ({ authError }) => {
 
                 <div className="absolute bottom-12 flex items-center space-x-6 opacity-30">
                     <p className="text-[10px] font-black text-slate-400 dark:text-zinc-600 uppercase tracking-[0.5em]">
-                        Xây dựng cho hệ thống phân phối bền vững
+                        {t('login.footer')}
                     </p>
                 </div>
             </div>

@@ -10,14 +10,14 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"zee-mirror/internal/domain"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func handleDriveFileInfoDetailed(s *service.BotService, chatID int64, messageID int, relPath string) {
+func handleDriveFileInfoDetailed(s *service.BotService, lang string, chatID int64, messageID int, relPath string) {
 	targetPath, configPath := resolvePaths(s, relPath)
 
 	slog.Debug("Detailed drive info request", "relPath", relPath, "targetPath", targetPath)
@@ -28,8 +28,8 @@ func handleDriveFileInfoDetailed(s *service.BotService, chatID int64, messageID 
 	file := getDriveMetadata(ctx, targetPath, configPath)
 	cloudLink := getCloudLink(ctx, s, targetPath, configPath)
 
-	text := buildFileInfoMessage(relPath, file)
-	keyboard := buildFileInfoKeyboard(s, relPath, cloudLink)
+	text := buildFileInfoMessage(lang, relPath, file)
+	keyboard := buildFileInfoKeyboard(s, lang, relPath, cloudLink)
 
 	s.SendOrEditMessage(chatID, messageID, text, keyboard)
 }
@@ -99,30 +99,30 @@ func generateIndexLink(s *service.BotService, targetPath string) string {
 	return fmt.Sprintf("%s/%s", baseURL, encodedPath)
 }
 
-func buildFileInfoMessage(relPath string, file service.DriveFile) string {
+func buildFileInfoMessage(lang, relPath string, file service.DriveFile) string {
 	var text strings.Builder
-	fmt.Fprintf(&text, "%s *THÔNG TIN FILE*\n", getFileIcon(relPath))
+	text.WriteString(i18n.T(lang, "fm_info_title", getFileIcon(relPath)) + "\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&text, "📄 *Tên:* `%s`\n", utils.EscapeMarkdownV2(filepath.Base(relPath)))
+	text.WriteString(i18n.T(lang, "fm_info_name", utils.EscapeMarkdownV2(filepath.Base(relPath))) + "\n")
 
 	if file.Name != "" {
-		fmt.Fprintf(&text, "📦 *Dung lượng:* `%s`\n", utils.EscapeMarkdownV2(utils.FormatBytes(file.Size)))
-		fmt.Fprintf(&text, "🕒 *Sửa đổi:* `%s`\n", utils.EscapeMarkdownV2(file.ModTime))
-		fmt.Fprintf(&text, "🏷️ *MimeType:* `%s`\n", utils.EscapeMarkdownV2(file.MimeType))
+		text.WriteString(i18n.T(lang, "fm_info_size", utils.EscapeMarkdownV2(utils.FormatBytes(file.Size))) + "\n")
+		text.WriteString(i18n.T(lang, "fm_info_modified", utils.EscapeMarkdownV2(file.ModTime)) + "\n")
+		text.WriteString(i18n.T(lang, "fm_info_mime", utils.EscapeMarkdownV2(file.MimeType)) + "\n")
 	} else {
-		text.WriteString("_Metadata bị hạn chế hoặc Rclone đang bận_\n")
+		text.WriteString(i18n.T(lang, "fm_info_restricted") + "\n")
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")
 	return text.String()
 }
 
-func buildFileInfoKeyboard(s *service.BotService, relPath, cloudLink string) tgbotapi.InlineKeyboardMarkup {
+func buildFileInfoKeyboard(s *service.BotService, lang, relPath, cloudLink string) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	if strings.HasPrefix(cloudLink, "http") {
-		btnText := domain.BtnTextCloudLink
+		btnText := i18n.T(lang, "fm_btn_cloud_link")
 		if s.Config.IndexURL != "" {
-			btnText = domain.BtnTextIndexURL
+			btnText = i18n.T(lang, "fm_btn_index_link")
 		}
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonURL(btnText, cloudLink)))
 	}
@@ -133,10 +133,10 @@ func buildFileInfoKeyboard(s *service.BotService, relPath, cloudLink string) tgb
 	}
 	rows = append(rows,
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔙 Thư mục", driveCallbackData(s, "c", dirPath)),
-			tgbotapi.NewInlineKeyboardButtonData("🗑️ Xóa", driveCallbackData(s, "rm", relPath)),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "fm_btn_folder"), driveCallbackData(s, "c", dirPath)),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "fm_btn_rm"), driveCallbackData(s, "rm", relPath)),
 		),
-		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "dr:x")),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "dr:x")),
 	)
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }

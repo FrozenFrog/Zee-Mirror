@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Terminal, RefreshCcw } from 'lucide-react'
 import useLogs from '../hooks/useLogs'
+import { useI18n } from '../hooks/useI18n'
 
 interface LogsProps {
   token: string
@@ -8,6 +9,7 @@ interface LogsProps {
 
 const Logs: React.FC<LogsProps> = ({ token }) => {
   const { logsContent, fetchLogs } = useLogs(token)
+  const { t } = useI18n()
 
   useEffect(() => {
     fetchLogs()
@@ -21,9 +23,9 @@ const Logs: React.FC<LogsProps> = ({ token }) => {
             <Terminal size={32} />
           </div>
           <div>
-            <h3 className="text-4xl font-black text-slate-900 dark:text-white">Nhật ký hệ thống</h3>
+            <h3 className="text-4xl font-black text-slate-900 dark:text-white">{t('nav.logs')}</h3>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1">
-              Đầu ra trực tiếp từ Engine
+              {t('logs.subtitle')}
             </p>
           </div>
         </div>
@@ -44,10 +46,10 @@ const Logs: React.FC<LogsProps> = ({ token }) => {
           </div>
           <div className="flex items-center space-x-4">
             <span className="px-3 py-1 bg-primary/20 text-primary text-[9px] font-black rounded-lg uppercase tracking-widest">
-              Trực tiếp
+              {t('logs.live')}
             </span>
             <span className="text-[10px] font-black text-slate-500 dark:text-zinc-600 tracking-[0.2em] uppercase">
-              RUNTIME.ZEE — {logsContent.split('\n').length} DÒNG
+              RUNTIME.ZEE — {t('logs.lines', { count: logsContent.split('\n').length })}
             </span>
           </div>
         </div>

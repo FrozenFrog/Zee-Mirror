@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { History, ChevronLeft, ChevronRight } from 'lucide-react';
-import { statusLabel, describeSource } from '../utils/format';
+import { statusLabel, describeSource, formatDateTime } from '../utils/format';
+import { useI18n } from '../hooks/useI18n';
 
 interface HistoryTask {
   id: string;
@@ -17,7 +18,8 @@ interface HistoryTask {
 }
 
 const SourceLink: React.FC<{ url: string }> = ({ url }) => {
-  const src = describeSource(url);
+  const { t } = useI18n();
+  const src = describeSource(url, t);
   const className = 'block text-sm truncate max-w-xs';
   if (!src.href) {
     return <span className={`${className} text-slate-500 dark:text-zinc-400`} title={url}>{src.label}</span>;
@@ -36,6 +38,7 @@ const SourceLink: React.FC<{ url: string }> = ({ url }) => {
 };
 
 const TaskHistory: React.FC = () => {
+  const { t, locale } = useI18n();
   const [tasks, setTasks] = useState<HistoryTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -58,11 +61,6 @@ const TaskHistory: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (d: string) => {
-    if (!d) return '-';
-    return new Date(d).toLocaleString('vi-VN');
   };
 
   const formatSize = (bytes: number) => {
@@ -89,9 +87,9 @@ const TaskHistory: React.FC = () => {
             <History size={32} />
           </div>
           <div>
-            <h3 className="text-4xl font-black text-slate-900 dark:text-white">Lịch sử Task</h3>
+            <h3 className="text-4xl font-black text-slate-900 dark:text-white">{t('nav.history')}</h3>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1">
-              Lưu trữ Task hoàn tất & thất bại
+              {t('history.subtitle')}
             </p>
           </div>
         </div>
@@ -107,7 +105,7 @@ const TaskHistory: React.FC = () => {
               : 'bg-white dark:bg-zinc-900/60 text-slate-400 border border-slate-200 dark:border-white/5 hover:bg-slate-50'
               }`}
           >
-            {s ? statusLabel(s) : 'Tất cả'}
+            {statusLabel(s || 'all', t)}
           </button>
         ))}
       </div>
@@ -117,14 +115,14 @@ const TaskHistory: React.FC = () => {
 
         {loading ? (
           <div className="py-32 flex items-center justify-center">
-            <div className="text-slate-400 text-sm font-bold uppercase tracking-widest">Đang tải...</div>
+            <div className="text-slate-400 text-sm font-bold uppercase tracking-widest">{t('common.loading')}</div>
           </div>
         ) : tasks.length === 0 ? (
           <div className="glass-card py-32 rounded-[3.5rem] flex flex-col items-center justify-center text-center opacity-40">
             <div className="p-8 bg-slate-100 dark:bg-white/5 rounded-full mb-6">
               <History size={48} className="text-slate-400" />
             </div>
-            <h4 className="text-xl font-black uppercase tracking-widest text-slate-400">Không tìm thấy Task nào</h4>
+            <h4 className="text-xl font-black uppercase tracking-widest text-slate-400">{t('history.empty')}</h4>
           </div>
         ) : (
           <>
@@ -132,43 +130,43 @@ const TaskHistory: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 border-b border-slate-200 dark:border-white/5">
-                    <th className="p-4 pl-0">Loại</th>
-                    <th className="p-4">Tên file</th>
-                    <th className="p-4">Nguồn</th>
-                    <th className="p-4">Trạng thái</th>
-                    <th className="p-4">Dung lượng</th>
+                    <th className="p-4 pl-0">{t('history.colType')}</th>
+                    <th className="p-4">{t('history.colFileName')}</th>
+                    <th className="p-4">{t('history.colSource')}</th>
+                    <th className="p-4">{t('history.colStatus')}</th>
+                    <th className="p-4">{t('common.size')}</th>
                     <th className="p-4">MD5</th>
-                    <th className="p-4 pr-0">Ngày tạo</th>
+                    <th className="p-4 pr-0">{t('history.colCreated')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tasks.map((t) => (
-                    <tr key={t.id} className="border-b border-slate-100 dark:border-white/[0.03] hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                  {tasks.map((task) => (
+                    <tr key={task.id} className="border-b border-slate-100 dark:border-white/[0.03] hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
                       <td className="p-4 pl-0">
                         <span className="px-3 py-1.5 bg-primary/10 text-primary text-[9px] font-black rounded-lg uppercase tracking-widest">
-                          {t.type}
+                          {task.type}
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className="text-sm font-bold text-slate-700 dark:text-zinc-300 truncate max-w-xs" title={t.file_name || t.url}>
-                          {t.file_name || t.url}
+                        <div className="text-sm font-bold text-slate-700 dark:text-zinc-300 truncate max-w-xs" title={task.file_name || task.url}>
+                          {task.file_name || task.url}
                         </div>
                       </td>
                       <td className="p-4">
-                        <SourceLink url={t.url} />
+                        <SourceLink url={task.url} />
                       </td>
-                      <td className={`p-4 text-sm font-black uppercase ${statusColor(t.status)}`} title={t.error}>{statusLabel(t.status)}</td>
-                      <td className="p-4 text-sm font-mono text-slate-500 dark:text-zinc-400">{formatSize(t.file_size)}</td>
+                      <td className={`p-4 text-sm font-black uppercase ${statusColor(task.status)}`} title={task.error}>{statusLabel(task.status, t)}</td>
+                      <td className="p-4 text-sm font-mono text-slate-500 dark:text-zinc-400">{formatSize(task.file_size)}</td>
                       <td className="p-4">
-                        {t.md5 ? (
-                          <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500" title={t.md5}>
-                            {t.md5.substring(0, 8)}...
+                        {task.md5 ? (
+                          <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500" title={task.md5}>
+                            {task.md5.substring(0, 8)}...
                           </span>
                         ) : (
                           <span className="text-slate-300 dark:text-zinc-700">-</span>
                         )}
                       </td>
-                      <td className="p-4 pr-0 text-sm text-slate-500 dark:text-zinc-400 whitespace-nowrap">{formatDate(t.created_at)}</td>
+                      <td className="p-4 pr-0 text-sm text-slate-500 dark:text-zinc-400 whitespace-nowrap">{formatDateTime(task.created_at, locale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -184,7 +182,7 @@ const TaskHistory: React.FC = () => {
                 <ChevronLeft size={20} className="text-slate-500" />
               </button>
               <span className="px-6 py-3 text-sm font-black text-slate-500 dark:text-zinc-400">
-                Trang {page + 1}
+                {t('history.page', { page: page + 1 })}
               </span>
               <button
                 onClick={() => setPage(p => p + 1)}

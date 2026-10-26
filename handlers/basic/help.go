@@ -19,35 +19,20 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 		}
 	}
 	action = normalizeHelpAction(action)
+	lang := s.GetUserLanguage(callback.From.ID)
 
-	if handleDownloadHelp(s, callback, action) {
+	if buttons, ok := helpCategoryButtons[action]; ok {
+		text := service.ProfessionalMessage(i18n.T(lang, "help_"+action), i18n.T(lang, "helptext_choose_command"))
+		sendHelpMessage(s, callback, lang, text, helpCategoryKeyboard(lang, buttons))
 		return
 	}
-	if handleMonitorHelp(s, callback, action) {
-		return
-	}
-	if handleFilesHelp(s, callback, action) {
-		return
-	}
-	if handleMediaHelp(s, callback, action) {
-		return
-	}
-	if handleTaskHelp(s, callback, action) {
-		return
-	}
-	if handleStorageHelp(s, callback, action) {
-		return
-	}
-	if handleAdminHelp(s, callback, action) {
-		return
-	}
-	if handleRecoveryHelp(s, callback, action) {
+	if page, ok := helpCommandPages[action]; ok {
+		sendHelpMessage(s, callback, lang, page.render(lang), helpCommandKeyboard(lang, page.category))
 		return
 	}
 
 	var text string
 	var keyboard tgbotapi.InlineKeyboardMarkup
-	lang := s.GetUserLanguage(callback.From.ID)
 	backToHelp := tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_back"), "help:main"),
 		tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "help:"+CmdClose),
@@ -59,7 +44,7 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 		keyboard = service.GetHelpKeyboard(lang)
 
 	case "settings":
-		text = GetHelpSettings()
+		text = GetHelpSettings(lang)
 		keyboard = tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_settings"), "settings:open"),
@@ -68,7 +53,7 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 		)
 
 	case "all":
-		text = getHelpAllCommands()
+		text = getHelpAllCommands(lang)
 		keyboard = tgbotapi.NewInlineKeyboardMarkup(backToHelp)
 
 	case ActionBack:
@@ -84,14 +69,14 @@ func HandleHelpCallback(s *service.BotService, callback *tgbotapi.CallbackQuery,
 	case CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "helptext_closed")))
 		return
 
 	default:
 		return
 	}
 
-	sendHelpMessage(s, callback, text, keyboard)
+	sendHelpMessage(s, callback, lang, text, keyboard)
 }
 
 func normalizeHelpAction(action string) string {
@@ -119,7 +104,7 @@ func normalizeHelpAction(action string) string {
 	}
 }
 
-func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
+func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, lang, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
 	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	if len(keyboard.InlineKeyboard) > 0 {
@@ -128,23 +113,37 @@ func sendHelpMessage(s *service.BotService, callback *tgbotapi.CallbackQuery, te
 	_, err := s.Bot.Send(editMsg)
 	if err != nil {
 		slog.Error("Error editing help message", "error", err)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Lỗi khi tải menu"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "helptext_menu_error")))
 	} else {
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	}
 }
 
+// helpButton opens a command's help page; its label is the catalog key
+// helptext_btn_<command>.
 type helpButton struct {
-	label, action string
+	action string
+}
+
+func (b helpButton) label(lang string) string {
+	return i18n.T(lang, "helptext_btn_"+strings.TrimPrefix(b.action, "cmd_"))
+}
+
+func helpButtons(actions ...string) []helpButton {
+	buttons := make([]helpButton, len(actions))
+	for i, a := range actions {
+		buttons[i] = helpButton{action: a}
+	}
+	return buttons
 }
 
 // helpCategoryKeyboard lists a category's commands two per row, then a back-to-help row.
 func helpCategoryKeyboard(lang string, buttons []helpButton) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for i := 0; i < len(buttons); i += 2 {
-		row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(buttons[i].label, "help:"+buttons[i].action))
+		row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(buttons[i].label(lang), "help:"+buttons[i].action))
 		if i+1 < len(buttons) {
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(buttons[i+1].label, "help:"+buttons[i+1].action))
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(buttons[i+1].label(lang), "help:"+buttons[i+1].action))
 		}
 		rows = append(rows, row)
 	}
@@ -163,247 +162,79 @@ func helpCommandKeyboard(lang, category string) tgbotapi.InlineKeyboardMarkup {
 	))
 }
 
-func sendHelpPage(s *service.BotService, callback *tgbotapi.CallbackQuery, category, action, text string, buttons []helpButton) {
-	lang := s.GetUserLanguage(callback.From.ID)
-	keyboard := helpCommandKeyboard(lang, category)
-	if action == category {
-		keyboard = helpCategoryKeyboard(lang, buttons)
-	}
-	sendHelpMessage(s, callback, text, keyboard)
+var (
+	downloadHelpButtons = helpButtons("cmd_mirror", "cmd_leech", "cmd_ytdlp", "cmd_ytdlpleech",
+		"cmd_viking", "cmd_torrent", "cmd_clone", "cmd_batch", "cmd_search")
+	monitorHelpButtons = helpButtons("cmd_status", "cmd_stats", "cmd_system", "cmd_health",
+		"cmd_logs", "cmd_ping", "cmd_speed")
+	filesHelpButtons = helpButtons("cmd_ls", "cmd_mkdir", "cmd_rm", "cmd_mv", "cmd_share", "cmd_find")
+	mediaHelpButtons = helpButtons("cmd_extractaudio", "cmd_compress", "cmd_thumbnail", "cmd_screenshots",
+		"cmd_subtitle", "cmd_hardsub", "cmd_rescale", "cmd_convert", "cmd_mediainfo")
+	taskHelpButtons     = helpButtons("cmd_status", "cmd_cancel", "cmd_cancelall")
+	storageHelpButtons  = helpButtons("cmd_storages", "cmd_setstorage")
+	adminHelpButtons    = helpButtons("cmd_authorize", "cmd_unauthorize", "cmd_users", "cmd_setlogchannel", "cmd_setalertchannel")
+	recoveryHelpButtons = helpButtons("cmd_recover", "cmd_recoverystatus")
+)
+
+// helpCategoryButtons maps a help category (also its help_<category> title
+// key) to the commands it lists.
+var helpCategoryButtons = map[string][]helpButton{
+	"download": downloadHelpButtons,
+	"monitor":  monitorHelpButtons,
+	"files":    filesHelpButtons,
+	"media":    mediaHelpButtons,
+	"task":     taskHelpButtons,
+	"storage":  storageHelpButtons,
+	"admin":    adminHelpButtons,
+	"recovery": recoveryHelpButtons,
 }
 
-var downloadHelpButtons = []helpButton{
-	{"📥 Mirror", "cmd_mirror"}, {"📤 Leech", "cmd_leech"},
-	{"🎬 YT Mirror", "cmd_ytdlp"}, {"🎬 YT Leech", "cmd_ytdlpleech"},
-	{"⚔️ Viking", "cmd_viking"}, {"🧲 Torrent", "cmd_torrent"},
-	{"📋 Clone", "cmd_clone"}, {"📦 Batch", "cmd_batch"},
-	{"🔍 Search", "cmd_search"},
+type helpCommandPage struct {
+	category string // the page's back button returns to this category
+	render   func(lang string) string
 }
 
-func handleDownloadHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "download":
-		text = service.ProfessionalMessage("📥 TẢI XUỐNG", "Chọn lệnh để xem chi tiết:")
-	case "cmd_mirror":
-		text = GetHelpMirror()
-	case "cmd_leech":
-		text = GetHelpLeech()
-	case "cmd_ytdlp":
-		text = GetHelpYTDLP()
-	case "cmd_ytdlpleech":
-		text = GetHelpYTDLPLeech()
-	case "cmd_viking":
-		text = GetHelpViking()
-	case "cmd_torrent":
-		text = GetHelpTorrent()
-	case "cmd_clone":
-		text = GetHelpClone()
-	case "cmd_batch":
-		text = GetHelpBatch()
-	case "cmd_search":
-		text = GetHelpSearch()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "download", action, text, downloadHelpButtons)
-	return true
-}
-
-var monitorHelpButtons = []helpButton{
-	{"📊 Status", "cmd_status"}, {"📈 Stats", "cmd_stats"},
-	{"🖥️ System", "cmd_system"}, {"🏥 Health", "cmd_health"},
-	{"📜 Logs", "cmd_logs"}, {"🏓 Ping", "cmd_ping"},
-	{"🚀 Speed", "cmd_speed"},
-}
-
-func handleMonitorHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "monitor":
-		text = service.ProfessionalMessage("📊 THEO DÕI", "Chọn lệnh để xem chi tiết:")
-	case "cmd_status":
-		text = GetHelpStatus()
-	case "cmd_stats":
-		text = GetHelpStats()
-	case "cmd_system":
-		text = GetHelpSystem()
-	case "cmd_health":
-		text = GetHelpHealth()
-	case "cmd_logs":
-		text = GetHelpLogs()
-	case "cmd_ping":
-		text = GetHelpPing()
-	case "cmd_speed":
-		text = GetHelpSpeed()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "monitor", action, text, monitorHelpButtons)
-	return true
-}
-
-var filesHelpButtons = []helpButton{
-	{"📂 List (ls)", "cmd_ls"}, {"📁 Mkdir", "cmd_mkdir"},
-	{"🗑️ Remove", "cmd_rm"}, {"📦 Move", "cmd_mv"},
-	{"🔗 Share", "cmd_share"}, {"🔍 Find", "cmd_find"},
-}
-
-func handleFilesHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "files":
-		text = service.ProfessionalMessage("📁 FILE", "Chọn lệnh để xem chi tiết:")
-	case "cmd_ls":
-		text = GetHelpLs()
-	case "cmd_mkdir":
-		text = GetHelpMkdir()
-	case "cmd_rm":
-		text = GetHelpRm()
-	case "cmd_mv":
-		text = GetHelpMv()
-	case "cmd_share":
-		text = GetHelpShare()
-	case "cmd_find":
-		text = GetHelpFind()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "files", action, text, filesHelpButtons)
-	return true
-}
-
-var mediaHelpButtons = []helpButton{
-	{"🎵 Extract Audio", "cmd_extractaudio"}, {"🗜️ Compress", "cmd_compress"},
-	{"🖼️ Thumbnail", "cmd_thumbnail"}, {"📸 Screenshots", "cmd_screenshots"},
-	{"💬 Soft-sub", "cmd_subtitle"}, {"🔥 Hard-sub", "cmd_hardsub"},
-	{"📐 Rescale", "cmd_rescale"}, {"🔄 Convert", "cmd_convert"},
-	{"ℹ️ Media Info", "cmd_mediainfo"},
-}
-
-func handleMediaHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "media":
-		text = service.ProfessionalMessage("🎵 MEDIA", "Chọn lệnh để xem chi tiết:")
-	case "cmd_extractaudio":
-		text = GetHelpExtractAudio()
-	case "cmd_compress":
-		text = GetHelpCompress()
-	case "cmd_thumbnail":
-		text = GetHelpThumbnail()
-	case "cmd_screenshots":
-		text = GetHelpScreenshots()
-	case "cmd_subtitle":
-		text = GetHelpSubtitle()
-	case "cmd_hardsub":
-		text = GetHelpHardsub()
-	case "cmd_rescale":
-		text = GetHelpRescale()
-	case "cmd_convert":
-		text = GetHelpConvert()
-	case "cmd_mediainfo":
-		text = GetHelpMediaInfo()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "media", action, text, mediaHelpButtons)
-	return true
-}
-
-var taskHelpButtons = []helpButton{
-	{"📊 Status", "cmd_status"}, {"❌ Cancel", "cmd_cancel"},
-	{"🚫 Cancel All", "cmd_cancelall"},
-}
-
-func handleTaskHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "task":
-		text = service.ProfessionalMessage("📋 TASK", "Chọn lệnh để xem chi tiết:")
-	case "cmd_cancel":
-		text = GetHelpCancel()
-	case "cmd_cancelall":
-		text = GetHelpCancelAll()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "task", action, text, taskHelpButtons)
-	return true
-}
-
-var storageHelpButtons = []helpButton{
-	{"📋 Storages", "cmd_storages"}, {"⚙️ Set Storage", "cmd_setstorage"},
-}
-
-func handleStorageHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "storage":
-		text = service.ProfessionalMessage("💾 LƯU TRỮ", "Chọn lệnh để xem chi tiết:")
-	case "cmd_storages":
-		text = GetHelpStorages()
-	case "cmd_setstorage":
-		text = GetHelpSetStorage()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "storage", action, text, storageHelpButtons)
-	return true
-}
-
-var adminHelpButtons = []helpButton{
-	{"✅ Authorize", "cmd_authorize"}, {"❌ Unauthorize", "cmd_unauthorize"},
-	{"👥 Users", "cmd_users"}, {"📜 Log Channel", "cmd_setlogchannel"},
-	{"🚨 Alert Channel", "cmd_setalertchannel"},
-}
-
-func handleAdminHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "admin":
-		text = service.ProfessionalMessage("👑 QUẢN TRỊ", "Chọn lệnh để xem chi tiết:")
-	case "cmd_authorize":
-		text = GetHelpAuthorize()
-	case "cmd_unauthorize":
-		text = GetHelpUnauthorize()
-	case "cmd_users":
-		text = GetHelpUsers()
-	case "cmd_setalertchannel":
-		text = GetHelpSetAlertChannel()
-	case "cmd_setlogchannel":
-		text = GetHelpSetLogChannel()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "admin", action, text, adminHelpButtons)
-	return true
-}
-
-var recoveryHelpButtons = []helpButton{
-	{"🔄 Recover", "cmd_recover"}, {"📊 Status", "cmd_recoverystatus"},
-}
-
-func handleRecoveryHelp(s *service.BotService, callback *tgbotapi.CallbackQuery, action string) bool {
-	var text string
-
-	switch action {
-	case "recovery":
-		text = service.ProfessionalMessage("🔧 KHÔI PHỤC", "Chọn lệnh để xem chi tiết:")
-	case "cmd_recover":
-		text = GetHelpRecover()
-	case "cmd_recoverystatus":
-		text = GetHelpRecoveryStatus()
-	default:
-		return false
-	}
-	sendHelpPage(s, callback, "recovery", action, text, recoveryHelpButtons)
-	return true
+var helpCommandPages = map[string]helpCommandPage{
+	"cmd_mirror":          {"download", GetHelpMirror},
+	"cmd_leech":           {"download", GetHelpLeech},
+	"cmd_ytdlp":           {"download", GetHelpYTDLP},
+	"cmd_ytdlpleech":      {"download", GetHelpYTDLPLeech},
+	"cmd_viking":          {"download", GetHelpViking},
+	"cmd_torrent":         {"download", GetHelpTorrent},
+	"cmd_clone":           {"download", GetHelpClone},
+	"cmd_batch":           {"download", GetHelpBatch},
+	"cmd_search":          {"download", GetHelpSearch},
+	"cmd_status":          {"monitor", GetHelpStatus},
+	"cmd_stats":           {"monitor", GetHelpStats},
+	"cmd_system":          {"monitor", GetHelpSystem},
+	"cmd_health":          {"monitor", GetHelpHealth},
+	"cmd_logs":            {"monitor", GetHelpLogs},
+	"cmd_ping":            {"monitor", GetHelpPing},
+	"cmd_speed":           {"monitor", GetHelpSpeed},
+	"cmd_ls":              {"files", GetHelpLs},
+	"cmd_mkdir":           {"files", GetHelpMkdir},
+	"cmd_rm":              {"files", GetHelpRm},
+	"cmd_mv":              {"files", GetHelpMv},
+	"cmd_share":           {"files", GetHelpShare},
+	"cmd_find":            {"files", GetHelpFind},
+	"cmd_extractaudio":    {"media", GetHelpExtractAudio},
+	"cmd_compress":        {"media", GetHelpCompress},
+	"cmd_thumbnail":       {"media", GetHelpThumbnail},
+	"cmd_screenshots":     {"media", GetHelpScreenshots},
+	"cmd_subtitle":        {"media", GetHelpSubtitle},
+	"cmd_hardsub":         {"media", GetHelpHardsub},
+	"cmd_rescale":         {"media", GetHelpRescale},
+	"cmd_convert":         {"media", GetHelpConvert},
+	"cmd_mediainfo":       {"media", GetHelpMediaInfo},
+	"cmd_cancel":          {"task", GetHelpCancel},
+	"cmd_cancelall":       {"task", GetHelpCancelAll},
+	"cmd_storages":        {"storage", GetHelpStorages},
+	"cmd_setstorage":      {"storage", GetHelpSetStorage},
+	"cmd_authorize":       {"admin", GetHelpAuthorize},
+	"cmd_unauthorize":     {"admin", GetHelpUnauthorize},
+	"cmd_users":           {"admin", GetHelpUsers},
+	"cmd_setalertchannel": {"admin", GetHelpSetAlertChannel},
+	"cmd_setlogchannel":   {"admin", GetHelpSetLogChannel},
+	"cmd_recover":         {"recovery", GetHelpRecover},
+	"cmd_recoverystatus":  {"recovery", GetHelpRecoveryStatus},
 }

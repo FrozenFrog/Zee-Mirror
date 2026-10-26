@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"zee-mirror/pkg/i18n"
 )
 
 var rcloneLogPrefix = regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} (CRITICAL|ERROR|NOTICE)\s*:\s*`)
@@ -25,7 +27,7 @@ func RcloneError(err error) error {
 		reason = reason[:300] + "…"
 	}
 	if strings.Contains(reason, "invalid_grant") {
-		return fmt.Errorf("%w: token của remote đã hết hạn hoặc bị thu hồi, cần đăng nhập lại (rclone config reconnect): %s", err, reason)
+		return i18n.WrapError(err, "core_rclone_token_expired", err.Error(), reason)
 	}
 	return fmt.Errorf("%w: %s", err, reason)
 }

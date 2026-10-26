@@ -18,7 +18,6 @@ const (
 	LineSeparator    = "━━━━━━━━━━━━━━━━━━━━━━"
 	CompactSeparator = "──────────────────────"
 	RepoURL          = "https://github.com/ifauzeee/Zee-Mirror"
-	UnknownSize      = "Không rõ"
 )
 
 func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL string) string {
@@ -26,7 +25,7 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 	switch snapshot.Status {
 	case domain.StatusCompleted:
 		duration := calculateDuration(snapshot)
-		sizeStr := determineSizeString(snapshot)
+		sizeStr := determineSizeString(lang, snapshot)
 
 		playlistLine := ""
 		if snapshot.PlaylistCount > 0 {
@@ -44,24 +43,21 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 			streamLine = fmt.Sprintf("\n🌊 *Stream:* `%s`", utils.EscapeMarkdownV2Code(streamURL))
 		}
 
-		text = fmt.Sprintf("%s\n\n"+
-			"📄 *Tên:* `%s`\n"+
-			"📦 *Dung lượng:* `%s`\n"+
-			"⏱ *Thời gian:* `%s`\n"+
-			"📁 *Đường dẫn:* `%s`%s%s%s",
+		text = fmt.Sprintf("%s\n\n%s\n%s\n%s\n%s%s%s%s",
 			i18n.T(lang, "status_completed"),
-			utils.EscapeMarkdownV2Code(snapshot.FileName),
-			utils.EscapeMarkdownV2Code(sizeStr),
-			utils.EscapeMarkdownV2Code(utils.FormatDuration(duration)),
-			utils.EscapeMarkdownV2Code(snapshot.RemotePath),
+			i18n.T(lang, "task_done_name", utils.EscapeMarkdownV2Code(snapshot.FileName)),
+			i18n.T(lang, "task_done_size", utils.EscapeMarkdownV2Code(sizeStr)),
+			i18n.T(lang, "task_done_time", utils.EscapeMarkdownV2Code(utils.FormatDuration(duration))),
+			i18n.T(lang, "task_done_path", utils.EscapeMarkdownV2Code(snapshot.RemotePath)),
 			playlistLine,
 			md5Line,
 			streamLine)
 	case domain.StatusFailed:
-		text = fmt.Sprintf("%s\n📄 `%s`\nLỗi: `%s`",
+		text = fmt.Sprintf("%s\n📄 `%s`\n%s",
 			i18n.T(lang, "status_failed"),
 			utils.EscapeMarkdownV2Code(snapshot.FileName),
-			utils.EscapeMarkdownV2Code(utils.TruncateString(snapshot.Error, 100)))
+			i18n.T(lang, "task_failed_error",
+				utils.EscapeMarkdownV2Code(utils.TruncateString(keyOrText(lang, snapshot.Error), 100))))
 	default:
 		return ""
 	}
@@ -76,8 +72,8 @@ func calculateDuration(snapshot domain.TaskSnapshot) time.Duration {
 	return duration
 }
 
-func determineSizeString(snapshot domain.TaskSnapshot) string {
-	sizeStr := UnknownSize
+func determineSizeString(lang string, snapshot domain.TaskSnapshot) string {
+	sizeStr := UnknownSizeLang(lang)
 
 	if snapshot.LocalPath != "" {
 		if info, err := os.Stat(snapshot.LocalPath); err == nil && info.IsDir() {
@@ -119,18 +115,23 @@ func ProfessionalMessage(title string, content string) string {
 // HelpDetailMessage builds a help page. The sections are MarkdownV2 (already
 // escaped, with their own bold and code formatting); only title is escaped.
 func HelpDetailMessage(title, kegunaan, caraPakai, contoh, extra string) string {
+	return HelpDetailMessageLang(i18n.DefaultLang, title, kegunaan, caraPakai, contoh, extra)
+}
+
+// HelpDetailMessageLang is HelpDetailMessage with section headers in lang.
+func HelpDetailMessageLang(lang, title, kegunaan, caraPakai, contoh, extra string) string {
 	content := ""
 
 	if kegunaan != "" {
-		content += "📝 *CÔNG DỤNG*\n" + kegunaan + "\n\n"
+		content += i18n.T(lang, "help_section_purpose") + "\n" + kegunaan + "\n\n"
 	}
 
 	if caraPakai != "" {
-		content += "📌 *CÁCH DÙNG*\n" + caraPakai + "\n\n"
+		content += i18n.T(lang, "help_section_usage") + "\n" + caraPakai + "\n\n"
 	}
 
 	if contoh != "" {
-		content += "💡 *VÍ DỤ*\n" + contoh
+		content += i18n.T(lang, "help_section_example") + "\n" + contoh
 	}
 
 	if extra != "" {
@@ -145,8 +146,42 @@ func GetWelcomeMessage(lang, userName string) string {
 	return ProfessionalMessage(i18n.T(lang, "welcome_title"), content)
 }
 
+// GetStatusHeader is GetStatusHeaderLang in DefaultLang.
 func GetStatusHeader() string {
-	return fmt.Sprintf("📊 <b>TRẠNG THÁI TASK ĐANG CHẠY</b>\n%s\n\n", LineSeparator)
+	return GetStatusHeaderLang(i18n.DefaultLang)
+}
+
+// GetStatusHeaderLang is the HTML header of the status dashboard.
+func GetStatusHeaderLang(lang string) string {
+	return fmt.Sprintf("%s\n%s\n\n", i18n.T(lang, "status_dashboard_header"), LineSeparator)
+}
+
+// UnknownSizeLang is the placeholder for an unknown size in lang (plain text).
+func UnknownSizeLang(lang string) string {
+	return i18n.T(lang, "unit_unknown_size")
+}
+
+// StatusLabel names a task status in lang (plain text); unknown statuses are
+// shown capitalized.
+func StatusLabel(lang string, status domain.TaskStatus) string {
+	if s, ok := i18n.Lookup(lang, "task_state_"+strings.ToLower(string(status))); ok {
+		return s
+	}
+	return utils.FormatStatus(string(status))
+}
+
+// keyOrText renders s in lang when it is a catalog key, so downloaders and
+// uploaders without a user context can report progress messages and errors
+// as keys (plain-text ones, without format arguments). Any other text is
+// returned unchanged.
+func keyOrText(lang, s string) string {
+	if s == "" || strings.ContainsAny(s, " \n") {
+		return s
+	}
+	if msg, ok := i18n.Lookup(lang, s); ok {
+		return msg
+	}
+	return s
 }
 
 func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) string {
@@ -160,14 +195,14 @@ func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) strin
 
 	totalSizeStr := utils.FormatBytes(taskSnapshot.TotalSize)
 	if taskSnapshot.TotalSize == 0 {
-		totalSizeStr = UnknownSize
+		totalSizeStr = UnknownSizeLang(lang)
 	}
 
 	msgLine := ""
 	if taskSnapshot.ProcessingMessage != "" {
-		msgLine = fmt.Sprintf("💬 <b>Trạng thái:</b> <i>%s</i>\n", html.EscapeString(taskSnapshot.ProcessingMessage))
+		msgLine = i18n.T(lang, "task_card_status", html.EscapeString(keyOrText(lang, taskSnapshot.ProcessingMessage))) + "\n"
 	} else if taskSnapshot.Status == domain.StatusDownloading && taskSnapshot.Progress >= 100 {
-		msgLine = "💬 <b>Trạng thái:</b> <i>Đang xử lý file...</i>\n"
+		msgLine = i18n.T(lang, "task_card_status", html.EscapeString(i18n.T(lang, "task_card_processing_file"))) + "\n"
 	}
 
 	playlistInfo := ""
@@ -180,22 +215,21 @@ func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) strin
 			"%s\n"+
 			"%s"+
 			"%s"+
-			"📄 <b>File:</b> <code>%s</code>\n"+
-			"📦 <b>Dung lượng:</b> <code>%s / %s</code>\n"+
-			"⚡ <b>Tốc độ:</b> <code>%s</code> • ⏱️ <b>Còn lại:</b> <code>%s</code>\n"+
-			"🚫 <b>Hủy:</b> /cancel_%s\n",
+			"%s\n%s\n%s\n%s\n",
 		html.EscapeString(taskSnapshot.ID),
 		emoji,
-		html.EscapeString(i18n.T(lang, strings.ToLower(string(taskSnapshot.Status)))),
+		html.EscapeString(StatusLabel(lang, taskSnapshot.Status)),
 		bar,
 		msgLine,
 		playlistInfo,
-		html.EscapeString(utils.TruncateString(taskSnapshot.FileName, 35)),
-		html.EscapeString(utils.FormatBytes(processedSize)),
-		html.EscapeString(totalSizeStr),
-		html.EscapeString(utils.FormatSpeed(taskSnapshot.Speed)),
-		html.EscapeString(utils.FormatDuration(taskSnapshot.ETA)),
-		html.EscapeString(taskSnapshot.ID),
+		i18n.T(lang, "task_card_file", html.EscapeString(utils.TruncateString(taskSnapshot.FileName, 35))),
+		i18n.T(lang, "task_card_size",
+			html.EscapeString(utils.FormatBytes(processedSize)),
+			html.EscapeString(totalSizeStr)),
+		i18n.T(lang, "task_card_speed_eta",
+			html.EscapeString(utils.FormatSpeed(taskSnapshot.Speed)),
+			html.EscapeString(utils.FormatDuration(taskSnapshot.ETA))),
+		i18n.T(lang, "task_card_cancel", html.EscapeString(taskSnapshot.ID)),
 	)
 }
 

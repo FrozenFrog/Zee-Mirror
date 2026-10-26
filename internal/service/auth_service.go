@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"zee-mirror/internal/errors"
 	"zee-mirror/internal/forum"
 	"zee-mirror/internal/repository"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -97,6 +97,11 @@ func (s *AuthService) IsAdmin(userID int64) bool {
 	return user.Role == RoleAdmin || user.Role == RoleOwner
 }
 
+// CheckQuota returns nil when userID may start another task. Failures are
+// *i18n.Error values wrapping the sentinel (errors.ErrUserNotFound,
+// ErrAccountInactive, ErrQuotaExceeded), so errors.Is still matches while
+// i18n.Message(lang, err) renders them in the user's language; err.Error()
+// is English. Display them with QuotaErrorMessage.
 func (s *AuthService) CheckQuota(userID int64) error {
 	if s.IsOwner(userID) {
 		return nil
@@ -105,14 +110,14 @@ func (s *AuthService) CheckQuota(userID int64) error {
 	ctx := context.Background()
 	user, err := s.UserRepo.GetByID(ctx, userID)
 	if err != nil {
-		return errors.ErrUserNotFound
+		return i18n.WrapError(errors.ErrUserNotFound, "auth_user_not_found")
 	}
 
 	if !user.IsActive {
 		if user.ExpiresAt.Valid {
-			return fmt.Errorf("%w: akses anda telah berakhir pada %s", errors.ErrAccountInactive, user.ExpiresAt.Time.Format("02 Jan 2006"))
+			return i18n.WrapError(errors.ErrAccountInactive, "auth_account_expired", user.ExpiresAt.Time.Format("02 Jan 2006"))
 		}
-		return errors.ErrAccountInactive
+		return i18n.WrapError(errors.ErrAccountInactive, "auth_account_inactive")
 	}
 
 	if user.MaxDailyTasks == -1 && user.MaxDailyBandwidth == -1 {
@@ -125,14 +130,42 @@ func (s *AuthService) CheckQuota(userID int64) error {
 	}
 
 	if user.MaxDailyTasks != -1 && stats.TotalTasks >= user.MaxDailyTasks {
-		return fmt.Errorf("%w: (%d/%d)", errors.ErrQuotaExceeded, stats.TotalTasks, user.MaxDailyTasks)
+		return i18n.WrapError(errors.ErrQuotaExceeded, "auth_quota_tasks", stats.TotalTasks, user.MaxDailyTasks)
 	}
 
 	if user.MaxDailyBandwidth != -1 && stats.TotalBandwidth >= user.MaxDailyBandwidth {
-		return fmt.Errorf("%w: bandwidth (%s/%s)", errors.ErrQuotaExceeded, utils.FormatBytes(stats.TotalBandwidth), utils.FormatBytes(user.MaxDailyBandwidth))
+		return i18n.WrapError(errors.ErrQuotaExceeded, "auth_quota_bandwidth", utils.FormatBytes(stats.TotalBandwidth), utils.FormatBytes(user.MaxDailyBandwidth))
 	}
 
 	return nil
+}
+
+// QuotaErrorMessage renders an error from CheckQuota as a MarkdownV2 message
+// in lang.
+func QuotaErrorMessage(lang string, err error) string {
+	return i18n.T(lang, "quota_exceeded", utils.EscapeMarkdownV2(i18n.Message(lang, err)))
+}
+
+// SenderLanguage is the bot language matching a Telegram client's language
+// code, or i18n.DefaultLang. Use it for people who may not be in the
+// database (e.g. denied users), where GetUserLanguage has nothing to read.
+func SenderLanguage(u *tgbotapi.User) string {
+	if u != nil {
+		if lang := i18n.Normalize(u.LanguageCode); lang != "" {
+			return lang
+		}
+	}
+	return i18n.DefaultLang
+}
+
+// AccessDeniedMessage is the MarkdownV2 reply for a user who may not use the bot.
+func AccessDeniedMessage(lang string) string {
+	return GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "auth_denied_body"))
+}
+
+// AccessDeniedToast is the plain-text callback answer for the same case.
+func AccessDeniedToast(lang string) string {
+	return i18n.T(lang, "auth_toast_denied")
 }
 
 func (s *BotService) IsAuthorized(userID int64) bool {

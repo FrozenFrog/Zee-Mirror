@@ -126,13 +126,13 @@ func signIn(t *testing.T, s *Server, p *fakeProvider, tamperState bool) string {
 
 func fragmentValue(t *testing.T, location, key string) string {
 	t.Helper()
-	frag, ok := strings.CutPrefix(location, "/#"+key+"=")
+	frag, ok := strings.CutPrefix(location, "/#")
 	if !ok {
 		return ""
 	}
-	v, err := url.QueryUnescape(frag)
+	q, err := url.ParseQuery(frag)
 	require.NoError(t, err)
-	return v
+	return q.Get(key)
 }
 
 // Group membership alone grants access: no bot user exists for "alice", and
@@ -159,11 +159,12 @@ func TestOIDC_Rejections(t *testing.T) {
 		groups  []string
 		allowed []string
 		tamper  bool
+		code    string
 	}{
-		{"no groups claim", nil, []string{"zee-admin"}, false},
-		{"outside allowed groups", []string{"staff"}, []string{"zee-admin"}, false},
-		{"allowed groups not configured", []string{"zee-admin"}, nil, false},
-		{"state mismatch", []string{"zee-admin"}, []string{"zee-admin"}, true},
+		{"no groups claim", nil, []string{"zee-admin"}, false, oidcErrNotInGroup},
+		{"outside allowed groups", []string{"staff"}, []string{"zee-admin"}, false, oidcErrNotInGroup},
+		{"allowed groups not configured", []string{"zee-admin"}, nil, false, oidcErrGroupsNotConfigured},
+		{"state mismatch", []string{"zee-admin"}, []string{"zee-admin"}, true, oidcErrInvalidState},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -174,9 +175,24 @@ func TestOIDC_Rejections(t *testing.T) {
 
 			location := signIn(t, s, p, tt.tamper)
 			assert.Empty(t, fragmentValue(t, location, "oidc_token"))
-			assert.NotEmpty(t, fragmentValue(t, location, "oidc_error"))
+			// A stable code the dashboard translates, not display text.
+			assert.Equal(t, tt.code, fragmentValue(t, location, "oidc_error"))
+			assert.Empty(t, fragmentValue(t, location, "oidc_provider"))
 		})
 	}
+}
+
+func TestOIDC_UnreachableProviderNamesIt(t *testing.T) {
+	p := newFakeProvider(t)
+	s := newOIDCServer(t, p)
+	p.srv.Close()
+
+	rec := httptest.NewRecorder()
+	s.handleOIDCLogin(rec, httptest.NewRequest("GET", "/api/auth/oidc/login", nil))
+	require.Equal(t, http.StatusFound, rec.Code)
+	location := rec.Header().Get("Location")
+	assert.Equal(t, oidcErrProviderUnreachable, fragmentValue(t, location, "oidc_error"))
+	assert.Equal(t, "Pocket-ID", fragmentValue(t, location, "oidc_provider"))
 }
 
 func TestOIDC_DisabledAndConfig(t *testing.T) {

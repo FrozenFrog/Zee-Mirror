@@ -18,8 +18,11 @@ interface SidebarProps {
 }
 
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useI18n } from '../../hooks/useI18n'
+import LanguageSwitcher from '../LanguageSwitcher'
 
 const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
   const currentPath = location.pathname.substring(1) || 'overview'
@@ -29,14 +32,14 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
     return false
   }
   const navItems = [
-    { id: 'overview', label: 'Tổng quan', icon: Activity },
-    { id: 'tasks', label: 'Task đang chờ', icon: Download },
-    { id: 'tasks/history', label: 'Lịch sử Task', icon: Clock },
-    { id: 'files', label: 'Trình duyệt file', icon: Folder },
-    { id: 'analytics', label: 'Thống kê', icon: BarChart3 },
-    { id: 'logs', label: 'Nhật ký hệ thống', icon: Terminal },
-    { id: 'users', label: 'Quản lý người dùng', icon: Users },
-    { id: 'settings', label: 'Cài đặt', icon: Settings },
+    { id: 'overview', label: t('nav.overview'), icon: Activity },
+    { id: 'tasks', label: t('nav.tasks'), icon: Download },
+    { id: 'tasks/history', label: t('nav.history'), icon: Clock },
+    { id: 'files', label: t('nav.files'), icon: Folder },
+    { id: 'analytics', label: t('nav.analytics'), icon: BarChart3 },
+    { id: 'logs', label: t('nav.logs'), icon: Terminal },
+    { id: 'users', label: t('nav.users'), icon: Users },
+    { id: 'settings', label: t('nav.settings'), icon: Settings },
   ]
 
   return (
@@ -53,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
               Zee<span className="text-primary italic">Mirror</span>
             </h1>
             <p className="text-[9px] font-black text-primary/60 tracking-[0.4em] uppercase mt-1.5 opacity-80">
-              Giao diện đám mây
+              {t('sidebar.tagline')}
             </p>
           </div>
         </div>
@@ -99,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500">
-              Duy trì bởi
+              {t('sidebar.maintainedBy')}
             </p>
             <p className="text-sm font-black text-slate-800 dark:text-white group-hover/credit:text-primary transition-colors">
               ifauzee
@@ -107,12 +110,14 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
           </div>
         </a>
 
+        <LanguageSwitcher className="rounded-[2rem] px-5" />
+
         <button
           onClick={onLogout}
           className="w-full flex items-center justify-center space-x-3 p-5 rounded-[2rem] bg-red-500/5 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/10 transition-all duration-500 group"
         >
           <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Đăng xuất</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('auth.logout')}</span>
         </button>
       </div>
     </aside>

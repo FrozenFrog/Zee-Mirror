@@ -15,6 +15,7 @@ import (
 
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/domain"
+	"zee-mirror/pkg/i18n"
 )
 
 // TestMain doubles as the fake "rclone" binary: when ZEE_FAKE_TOOL=1 is set,
@@ -120,6 +121,13 @@ func TestUpload_FakeRcloneFailure(t *testing.T) {
 	var ext *domain.ExternalError
 	if !errors.As(err, &ext) {
 		t.Fatalf("error type %T, want *domain.ExternalError", err)
+	}
+	if !errors.Is(err, domain.ErrExternal) {
+		t.Error("ErrExternal not reachable")
+	}
+	var local *i18n.Error
+	if !errors.As(err, &local) || local.Key != "upload_err_rclone_failed" {
+		t.Errorf("want translatable upload_err_rclone_failed, got %v", err)
 	}
 }
 

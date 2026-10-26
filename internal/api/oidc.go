@@ -32,6 +32,22 @@ const (
 	maxPendingLogins  = 256
 )
 
+// Error codes sent to the dashboard in /#oidc_error=<code>. They are part of
+// the contract with dashboard/src/i18n (keys "oidcError.<code>"); keep both in
+// sync.
+const (
+	oidcErrProviderUnreachable = "provider_unreachable"
+	oidcErrTooManyPending      = "too_many_pending"
+	oidcErrCancelled           = "cancelled"
+	oidcErrInvalidState        = "invalid_state"
+	oidcErrExpired             = "expired"
+	oidcErrAuthFailed          = "auth_failed"
+	oidcErrClaimsUnreadable    = "claims_unreadable"
+	oidcErrGroupsNotConfigured = "groups_not_configured"
+	oidcErrNotInGroup          = "not_in_group"
+	oidcErrSessionFailed       = "session_failed"
+)
+
 var oidcHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 type pendingLogin struct {
@@ -122,14 +138,14 @@ func (s *Server) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 	provider, err := s.sso.getProvider(cfg.OIDCIssuer)
 	if err != nil {
 		slog.Error("OIDC discovery failed", "issuer", cfg.OIDCIssuer, "error", err)
-		oidcFail(w, r, "Không kết nối được "+cfg.OIDCProviderName)
+		oidcFail(w, r, oidcErrProviderUnreachable, cfg.OIDCProviderName)
 		return
 	}
 
 	state, nonce := randomToken(), randomToken()
 	verifier := oauth2.GenerateVerifier()
 	if !s.sso.begin(state, pendingLogin{verifier: verifier, nonce: nonce, expires: time.Now().Add(oidcLoginTTL)}) {
-		oidcFail(w, r, "Quá nhiều lượt đăng nhập đang chờ, hãy thử lại sau")
+		oidcFail(w, r, oidcErrTooManyPending, "")
 		return
 	}
 
@@ -150,24 +166,24 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if e := q.Get("error"); e != "" {
 		slog.Warn("OIDC provider returned an error", "error", e, "description", q.Get("error_description"))
-		oidcFail(w, r, "Đăng nhập bị hủy hoặc bị từ chối")
+		oidcFail(w, r, oidcErrCancelled, "")
 		return
 	}
 	state := q.Get("state")
 	cookie, err := r.Cookie(oidcStateCookie)
 	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(state)) != 1 {
-		oidcFail(w, r, "Phiên đăng nhập không hợp lệ, hãy thử lại")
+		oidcFail(w, r, oidcErrInvalidState, "")
 		return
 	}
 	login, ok := s.sso.finish(state)
 	if !ok {
-		oidcFail(w, r, "Phiên đăng nhập đã hết hạn, hãy thử lại")
+		oidcFail(w, r, oidcErrExpired, "")
 		return
 	}
 	provider, err := s.sso.getProvider(cfg.OIDCIssuer)
 	if err != nil {
 		slog.Error("OIDC discovery failed", "issuer", cfg.OIDCIssuer, "error", err)
-		oidcFail(w, r, "Không kết nối được "+cfg.OIDCProviderName)
+		oidcFail(w, r, oidcErrProviderUnreachable, cfg.OIDCProviderName)
 		return
 	}
 
@@ -175,14 +191,14 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	token, err := s.oauth2Config(provider).Exchange(ctx, q.Get("code"), oauth2.VerifierOption(login.verifier))
 	if err != nil {
 		slog.Warn("OIDC code exchange failed", "error", err)
-		oidcFail(w, r, "Không xác thực được với "+cfg.OIDCProviderName)
+		oidcFail(w, r, oidcErrAuthFailed, cfg.OIDCProviderName)
 		return
 	}
 	rawIDToken, _ := token.Extra("id_token").(string)
 	idToken, err := provider.Verifier(&oidc.Config{ClientID: cfg.OIDCClientID}).Verify(ctx, rawIDToken)
 	if err != nil || subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(login.nonce)) != 1 {
 		slog.Warn("OIDC ID token rejected", "error", err)
-		oidcFail(w, r, "Không xác thực được với "+cfg.OIDCProviderName)
+		oidcFail(w, r, oidcErrAuthFailed, cfg.OIDCProviderName)
 		return
 	}
 	var claims struct {
@@ -190,18 +206,18 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Groups            []string `json:"groups"`
 	}
 	if err = idToken.Claims(&claims); err != nil {
-		oidcFail(w, r, "Không đọc được thông tin tài khoản")
+		oidcFail(w, r, oidcErrClaimsUnreadable, "")
 		return
 	}
 
 	if len(cfg.OIDCAllowedGroups) == 0 {
 		slog.Error("OIDC login refused: OIDC_ALLOWED_GROUPS is not set", "username", claims.PreferredUsername)
-		oidcFail(w, r, "Chưa cấu hình nhóm được phép (OIDC_ALLOWED_GROUPS)")
+		oidcFail(w, r, oidcErrGroupsNotConfigured, "")
 		return
 	}
 	if !inAllowedGroups(claims.Groups, cfg.OIDCAllowedGroups) {
 		slog.Warn("OIDC login outside allowed groups", "username", claims.PreferredUsername, "groups", claims.Groups)
-		oidcFail(w, r, "Tài khoản không thuộc nhóm được phép")
+		oidcFail(w, r, oidcErrNotInGroup, "")
 		return
 	}
 
@@ -210,7 +226,7 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		"username": claims.PreferredUsername,
 	})
 	if err != nil {
-		oidcFail(w, r, "Không tạo được phiên đăng nhập")
+		oidcFail(w, r, oidcErrSessionFailed, "")
 		return
 	}
 	slog.Info("Dashboard OIDC login", "username", claims.PreferredUsername, "sub", idToken.Subject, "ip", getClientIP(r))
@@ -244,8 +260,15 @@ func inAllowedGroups(groups, allowed []string) bool {
 	return false
 }
 
-func oidcFail(w http.ResponseWriter, r *http.Request, msg string) {
-	http.Redirect(w, r, "/#oidc_error="+url.QueryEscape(msg), http.StatusFound)
+// oidcFail sends the browser back to the dashboard with a stable error code
+// (one of the oidcErr* constants) that the login page translates. provider,
+// when set, names the identity provider for messages that mention it.
+func oidcFail(w http.ResponseWriter, r *http.Request, code, provider string) {
+	q := url.Values{"oidc_error": {code}}
+	if provider != "" {
+		q.Set("oidc_provider", provider)
+	}
+	http.Redirect(w, r, "/#"+q.Encode(), http.StatusFound)
 }
 
 func randomToken() string {

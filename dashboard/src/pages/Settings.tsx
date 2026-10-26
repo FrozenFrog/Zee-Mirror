@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import api from '../api'
 import { usePopups } from '../hooks/usePopups'
+import { useI18n } from '../hooks/useI18n'
 
 interface SettingsState {
   AutoDeleteMessages: boolean
@@ -24,6 +25,7 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
   const { showAlert, showToast } = usePopups()
+  const { t } = useI18n()
   const [settings, setSettings] = useState<SettingsState>(
     initialSettings || { AutoDeleteMessages: false, DefaultMode: 'mirror' },
   )
@@ -52,18 +54,19 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
   const handleUpdateSettings = async () => {
     try {
       await api.post('/api/settings', settings)
-      showToast('Đã đồng bộ cấu hình', 'success')
+      showToast(t('settings.synced'), 'success')
     } catch {
-      showAlert('Lỗi hệ thống', 'Không thể đồng bộ cài đặt hệ thống.', { type: 'error' })
+      showAlert(t('settings.systemError'), t('settings.syncFailed'), { type: 'error' })
     }
   }
 
   const handleUpdateRawConfig = async () => {
     try {
-      const res = await api.post('/api/config', { config: rawConfig })
-      showToast(res.data.status || 'Đã cập nhật cấu hình thành công', 'success')
+      // The response carries an English status line; show our own text instead.
+      await api.post('/api/config', { config: rawConfig })
+      showToast(t('settings.configUpdated'), 'success')
     } catch {
-      showAlert('Lỗi cấu hình', 'Không thể cập nhật tệp cấu hình hệ thống.', { type: 'error' })
+      showAlert(t('settings.configError'), t('settings.configUpdateFailed'), { type: 'error' })
     }
   }
 
@@ -72,10 +75,10 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
     setUpdateResult(null)
     try {
       const res = await api.post('/api/tools/update', {})
-      setUpdateResult(res.data.output || res.data.error || 'Đã cập nhật')
+      setUpdateResult(res.data.output || res.data.error || t('settings.toolsUpdated'))
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-      setUpdateResult(axiosErr.response?.data?.error || axiosErr.message || 'Cập nhật thất bại')
+      setUpdateResult(axiosErr.response?.data?.error || axiosErr.message || t('common.updateFailed'))
     } finally {
       setUpdating(false)
     }
@@ -91,10 +94,10 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
           </div>
           <div>
             <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
-              Bảng điều khiển
+              {t('settings.title')}
             </h2>
             <p className="text-[10px] uppercase font-black tracking-[0.3em] text-primary/60 mt-1">
-              Quản trị hệ thống Zee-Mirror
+              {t('settings.subtitle')}
             </p>
           </div>
         </div>
@@ -102,7 +105,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
           <div className="px-6 py-3 bg-white/80 dark:bg-zinc-800 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm flex items-center space-x-3">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
-              Trạng thái Node: Đang chạy
+              {t('settings.nodeStatus')}
             </span>
           </div>
         </div>
@@ -118,7 +121,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                 <Zap size={24} />
               </div>
               <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
-                Hành vi Bot
+                {t('settings.botBehavior')}
               </h3>
             </div>
 
@@ -126,10 +129,10 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
               <div className="flex items-center justify-between p-7 rounded-[2.5rem] bg-slate-50/50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-primary/30 transition-all duration-500">
                 <div className="flex-1 pr-8">
                   <h4 className="font-bold text-slate-900 dark:text-white">
-                    Tự động dọn dẹp
+                    {t('settings.autoClean')}
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    Tự động xóa tin nhắn trạng thái trên Telegram khi Task hoàn tất.
+                    {t('settings.autoCleanDesc')}
                   </p>
                 </div>
                 <button
@@ -147,7 +150,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
               <div className="p-7 rounded-[2.5rem] bg-slate-50/50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
                 <div className="flex items-center space-x-3 mb-6">
                   <h4 className="font-bold text-slate-900 dark:text-white">
-                    Chế độ mặc định
+                    {t('settings.defaultMode')}
                   </h4>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -169,7 +172,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
               className="w-full mt-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-widest flex items-center justify-center space-x-3 hover:scale-[0.98] active:scale-[0.95] transition-all shadow-xl"
             >
               <Save size={20} />
-              <span>Lưu cài đặt</span>
+              <span>{t('settings.save')}</span>
             </button>
           </div>
 
@@ -180,7 +183,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                 <Cpu size={24} />
               </div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">
-                Kiến trúc
+                {t('common.architecture')}
               </p>
               <p className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest">
                 Go 1.25.7 Pure
@@ -191,7 +194,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                 <Database size={24} />
               </div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">
-                Cơ sở dữ liệu
+                {t('settings.database')}
               </p>
               <p className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest">
                 PostgreSQL
@@ -206,12 +209,12 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                 <Terminal size={24} />
               </div>
               <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
-                Công cụ
+                {t('settings.tools')}
               </h3>
             </div>
             <div className="space-y-6">
               <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                Cập nhật yt-dlp lên phiên bản mới nhất bằng trình quản lý gói của hệ thống.
+                {t('settings.toolsDesc')}
               </p>
               <button
                 onClick={handleUpdateTools}
@@ -219,7 +222,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                 className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-widest flex items-center justify-center space-x-3 hover:scale-[0.98] active:scale-[0.95] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw size={20} className={updating ? 'animate-spin' : ''} />
-                <span>{updating ? 'Đang cập nhật...' : 'Cập nhật yt-dlp'}</span>
+                <span>{updating ? t('settings.updating') : t('settings.updateYtdlp')}</span>
               </button>
               {updateResult && (
                 <pre className="mt-4 p-6 bg-slate-900/90 dark:bg-black/40 text-emerald-400 font-mono text-[13px] rounded-[2rem] border border-white/5 shadow-inner leading-relaxed whitespace-pre-wrap overflow-x-auto">
@@ -241,7 +244,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                   <Terminal size={24} />
                 </div>
                 <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
-                  Cấu hình
+                  {t('settings.config')}
                 </h3>
               </div>
               <button
@@ -255,7 +258,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
             {isConfigLoading ? (
               <div className="flex-1 flex flex-col items-center justify-center space-y-4 py-32 opacity-30 italic font-black uppercase tracking-widest text-xs">
                 <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                <span>Đang tải...</span>
+                <span>{t('common.loading')}</span>
               </div>
             ) : (
               <div className="flex-1 flex flex-col space-y-8">
@@ -267,7 +270,7 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                     spellCheck={false}
                   />
                   <div className="absolute bottom-6 right-6 px-3 py-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-[9px] text-slate-500 font-black tracking-widest uppercase">
-                    Đọc/Ghi OK
+                    {t('settings.readWriteOk')}
                   </div>
                 </div>
 
@@ -276,12 +279,11 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
                   className="w-full bg-indigo-600 text-white py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-widest flex items-center justify-center space-x-3 hover:bg-indigo-500 hover:scale-[0.98] transition-all shadow-2xl shadow-indigo-500/20"
                 >
                   <Save size={20} />
-                  <span>Lưu cấu hình</span>
+                  <span>{t('settings.saveConfig')}</span>
                 </button>
 
                 <p className="text-center text-[9px] font-black text-slate-400 opacity-40 uppercase tracking-[0.2em] leading-relaxed px-6">
-                  Lưu ý: Một số biến môi trường có thể cần khởi động lại Node để áp dụng các tham số
-                  mới.
+                  {t('settings.restartNote')}
                 </p>
               </div>
             )}

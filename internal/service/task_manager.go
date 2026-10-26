@@ -20,6 +20,7 @@ import (
 	"zee-mirror/internal/recovery"
 	"zee-mirror/internal/repository"
 	"zee-mirror/internal/uploader"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/plugins/registry"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -54,10 +55,8 @@ const (
 )
 
 const (
-	MarkdownV2       = "MarkdownV2"
-	StatusHeaderText = "📊 *Trạng thái Task đang chạy*\n\n"
-	UnknownFile      = "unknown_file"
-	UnlimitedStr     = "Không giới hạn"
+	MarkdownV2  = "MarkdownV2"
+	UnknownFile = "unknown_file"
 
 	ModeLeech  = "leech"
 	CmdRefresh = "refresh"
@@ -379,7 +378,7 @@ func (tm *TaskManager) validateTaskConstraints(url, quality string, userID int64
 
 			if !isFinished && sameURL && sameQuality {
 				tm.Mu.RUnlock()
-				return fmt.Errorf("%w: ID %s", domain.ErrDuplicateTask, t.ID)
+				return i18n.WrapError(domain.ErrDuplicateTask, "task_err_duplicate_active", t.ID)
 			}
 		}
 		tm.Mu.RUnlock()
@@ -387,13 +386,13 @@ func (tm *TaskManager) validateTaskConstraints(url, quality string, userID int64
 		if tm.DB != nil && !tm.isPrivileged(userID) {
 			oldTask, errDB := tm.DB.GetCompletedTaskByURL(context.Background(), url, quality)
 			if errDB == nil && oldTask != nil {
-				return fmt.Errorf("%w: file đã có trên cloud/database", domain.ErrDuplicateTask)
+				return i18n.WrapError(domain.ErrDuplicateTask, "task_err_duplicate_done")
 			}
 		}
 	}
 
 	if !tm.RateLimiter.Allow(userID) {
-		return fmt.Errorf("%w: vượt giới hạn 5 task/phút", domain.ErrLimitExceeded)
+		return i18n.WrapError(domain.ErrLimitExceeded, "task_err_rate_limit")
 	}
 
 	return nil
@@ -725,7 +724,9 @@ func (tm *TaskManager) IsShuttingDown() bool {
 	}
 }
 
-func (t *Task) UpdateFromProgressUpdate(up downloader.ProgressUpdate) {
+// UpdateFromProgressUpdate applies a download progress update; lang is the
+// owner's language, used for translatable messages and errors.
+func (t *Task) UpdateFromProgressUpdate(lang string, up downloader.ProgressUpdate) {
 	t.Update(func() {
 		if up.FileName != "" {
 			t.FileName = up.FileName
@@ -747,17 +748,18 @@ func (t *Task) UpdateFromProgressUpdate(up downloader.ProgressUpdate) {
 			t.ETA = up.ETA
 		}
 		if up.Error != "" {
-			t.Error = up.Error
+			t.Error = up.ErrorIn(lang)
 		}
 		if up.Message != "" {
-			t.ProcessingMessage = up.Message
+			t.ProcessingMessage = up.MessageIn(lang)
 			t.Speed = 0
 			t.ETA = 0
 		}
 	})
 }
 
-func (t *Task) UpdateFromUploadProgress(up uploader.ProgressUpdate) {
+// UpdateFromUploadProgress is UpdateFromProgressUpdate for uploads.
+func (t *Task) UpdateFromUploadProgress(lang string, up uploader.ProgressUpdate) {
 	t.Update(func() {
 		if up.UploadedSize > 0 {
 			t.UploadedSize = up.UploadedSize
@@ -775,7 +777,7 @@ func (t *Task) UpdateFromUploadProgress(up uploader.ProgressUpdate) {
 			t.ETA = up.ETA
 		}
 		if up.Error != "" {
-			t.Error = up.Error
+			t.Error = up.ErrorIn(lang)
 		}
 	})
 }
@@ -859,14 +861,15 @@ func (s *BotService) HandleConfirmCallback(callback *tgbotapi.CallbackQuery, par
 	}
 
 	action := parts[1]
+	lang := s.GetUserLanguage(callback.From.ID)
 	switch action {
 	case "yes":
-		text := "✅ *Đã xác nhận*"
+		text := i18n.T(lang, "task_confirmed")
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(editMsg)
 	case "no":
-		text := "❌ *Đã hủy*"
+		text := i18n.T(lang, "task_confirm_cancelled")
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(editMsg)

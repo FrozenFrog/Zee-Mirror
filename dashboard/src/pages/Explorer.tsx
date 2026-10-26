@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { formatBytes } from '../utils/format'
 import useExplorer from '../hooks/useExplorer'
+import { useI18n } from '../hooks/useI18n'
 
 interface ExplorerProps {
   token: string
@@ -20,6 +21,7 @@ interface ExplorerProps {
 const Explorer: React.FC<ExplorerProps> = ({ token }) => {
   const { explorerPath, explorerFiles, fetchExplorer, getExternalLink, deleteFile, uploadFile } =
     useExplorer(token)
+  const { t } = useI18n()
 
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [isUploading, setIsUploading] = useState<boolean>(false)
@@ -75,7 +77,7 @@ const Explorer: React.FC<ExplorerProps> = ({ token }) => {
             <div className="flex flex-col items-center space-y-4">
               <UploadCloud size={64} className="text-primary" />
               <p className="font-black text-primary uppercase tracking-widest text-xl">
-                Thả file để tải lên
+                {t('explorer.dropToUpload')}
               </p>
             </div>
           </div>
@@ -95,7 +97,7 @@ const Explorer: React.FC<ExplorerProps> = ({ token }) => {
           </button>
           <div className="flex flex-col">
             <h3 className="text-3xl font-[900] text-slate-900 dark:text-white">
-              Trình duyệt file
+              {t('nav.files')}
             </h3>
             <p className="text-[10px] font-black text-primary/60 mt-1.5 truncate max-w-md italic tracking-widest uppercase">
               root:/{explorerPath || ''}
@@ -106,7 +108,7 @@ const Explorer: React.FC<ExplorerProps> = ({ token }) => {
         <div className="flex items-center space-x-4">
           <label className="p-4 bg-primary text-white rounded-2xl transition-all shadow-xl hover:shadow-primary/30 cursor-pointer hover:scale-105 active:scale-95 flex items-center space-x-3 font-bold">
             <UploadCloud size={24} />
-            <span className="hidden md:inline uppercase tracking-tight">Tải lên</span>
+            <span className="hidden md:inline uppercase tracking-tight">{t('explorer.upload')}</span>
             <input type="file" multiple className="hidden" onChange={handleFileUpload} />
           </label>
           <button
@@ -124,14 +126,14 @@ const Explorer: React.FC<ExplorerProps> = ({ token }) => {
 
       <div className="glass-card rounded-[3.5rem] overflow-hidden shadow-2xl border border-slate-100 dark:border-white/5 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-3xl px-2">
         <div className="grid grid-cols-12 gap-4 px-10 py-8 bg-slate-50/20 dark:bg-white/5 border-b border-slate-100 dark:border-white/5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-          <div className="col-span-6 md:col-span-7">Tên</div>
-          <div className="col-span-3 md:col-span-2 text-center text-primary">Dung lượng</div>
-          <div className="col-span-3 text-right">Thao tác</div>
+          <div className="col-span-6 md:col-span-7">{t('explorer.colName')}</div>
+          <div className="col-span-3 md:col-span-2 text-center text-primary">{t('common.size')}</div>
+          <div className="col-span-3 text-right">{t('common.actions')}</div>
         </div>
         <div className="divide-y divide-slate-100 dark:divide-white/5">
           {explorerFiles.length === 0 && (
             <div className="px-10 py-20 text-center text-slate-400 italic font-bold uppercase tracking-widest opacity-50">
-              Thư mục trống - Sẵn sàng nhận dữ liệu
+              {t('explorer.empty')}
             </div>
           )}
           {explorerFiles.map((file, i) => (
@@ -154,18 +156,18 @@ const Explorer: React.FC<ExplorerProps> = ({ token }) => {
                   </p>
                   <div className="flex items-center space-x-3 mt-1.5">
                     <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">
-                      Liên kết
+                      {t('explorer.link')}
                     </span>
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-white/10" />
                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate opacity-70 font-mono italic whitespace-nowrap overflow-hidden">
-                      MÃ: {file.name.slice(0, 8).toUpperCase()}
+                      {t('explorer.code', { code: file.name.slice(0, 8).toUpperCase() })}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="col-span-3 md:col-span-2 text-center">
                 <span className="text-[11px] font-[900] text-slate-600 dark:text-slate-400 uppercase tracking-tighter bg-slate-110 dark:bg-white/5 px-3 py-1.5 rounded-lg">
-                  {file.isDir ? 'THƯ MỤC' : formatBytes(file.size)}
+                  {file.isDir ? t('explorer.folder') : formatBytes(file.size)}
                 </span>
               </div>
               <div className="col-span-3 flex justify-end items-center space-x-3">

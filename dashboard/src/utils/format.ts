@@ -1,3 +1,5 @@
+import { isMessageKey, TFunction } from '../i18n'
+
 export const formatBytes = (bytes: number): string => {
   const num = parseFloat(String(bytes))
   if (isNaN(num) || num <= 0) return '0 B'
@@ -7,32 +9,27 @@ export const formatBytes = (bytes: number): string => {
   return parseFloat((num / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// Vietnamese display labels for status values coming from the backend.
+// Translated display label for a status value coming from the backend.
 // Only used for rendering — comparisons must keep using the raw values.
-const STATUS_LABELS: Record<string, string> = {
-  all: 'Tất cả',
-  downloading: 'Đang tải xuống',
-  uploading: 'Đang tải lên',
-  queued: 'Đang chờ',
-  pending: 'Chờ xử lý',
-  completed: 'Hoàn tất',
-  failed: 'Thất bại',
-  cancelled: 'Đã hủy',
-  canceled: 'Đã hủy',
-  active: 'Đang chạy',
-  banned: 'Bị cấm',
+export const statusLabel = (status: string, t: TFunction): string => {
+  const key = `status.${status === 'canceled' ? 'cancelled' : status}`
+  return isMessageKey(key) ? t(key) : status
 }
 
-export const statusLabel = (status: string): string => STATUS_LABELS[status] ?? status
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: 'Chủ sở hữu',
-  admin: 'Quản trị viên',
-  authorized: 'Được cấp quyền',
-  user: 'Người dùng',
+export const roleLabel = (role: string, t: TFunction): string => {
+  const key = `role.${role}`
+  return isMessageKey(key) ? t(key) : role
 }
 
-export const roleLabel = (role: string): string => ROLE_LABELS[role] ?? role
+// Dates use the active locale (useI18n().locale).
+export const formatDateTime = (value: string, locale: string): string =>
+  value ? new Date(value).toLocaleString(locale) : '-'
+
+export const formatDate = (value: string, locale: string): string =>
+  value ? new Date(value).toLocaleDateString(locale) : '-'
+
+export const formatWeekday = (value: string, locale: string): string =>
+  new Date(value).toLocaleDateString(locale, { weekday: 'short' })
 
 export interface SourceInfo {
   label: string
@@ -41,10 +38,10 @@ export interface SourceInfo {
 
 // Short display form of a task's source link. href is only set for links a
 // browser can open; torrent tasks carry a "#select=" suffix for chosen files.
-export const describeSource = (raw: string): SourceInfo => {
+export const describeSource = (raw: string, t: TFunction): SourceInfo => {
   if (!raw) return { label: '-' }
-  if (raw.startsWith('tgfileid://')) return { label: 'File Telegram' }
-  if (raw.startsWith('file://')) return { label: 'File cục bộ' }
+  if (raw.startsWith('tgfileid://')) return { label: t('source.telegram') }
+  if (raw.startsWith('file://')) return { label: t('source.local') }
   if (raw.startsWith('magnet:')) {
     const link = raw.split('#select=')[0]
     const params = new URLSearchParams(link.slice(link.indexOf('?') + 1))

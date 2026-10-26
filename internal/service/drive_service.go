@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"zee-mirror/internal/domain"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 )
 
@@ -26,26 +27,33 @@ func (s *BotService) ListDriveFiles(path string) ([]DriveFile, error) {
 	cmd := execCommand(ctx, "rclone", args...)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("%w: rclone lsjson failed: %v", domain.ErrExternal, utils.RcloneError(err))
+		return nil, i18n.WrapError(domain.ErrExternal, "fm_err_rclone", utils.RcloneError(err))
 	}
 
 	var files []DriveFile
 	if err := json.Unmarshal(output, &files); err != nil {
-		return nil, fmt.Errorf("%w: failed to parse response: %v", domain.ErrExternal, err)
+		return nil, i18n.WrapError(domain.ErrExternal, "fm_err_parse", err)
 	}
 
 	return files, nil
 }
 
+// FormatDriveFileList renders the file list in the default language. Callers
+// that know the user's language should use FormatDriveFileListLang.
 func (s *BotService) FormatDriveFileList(path string, files []DriveFile) string {
+	return s.FormatDriveFileListLang(i18n.DefaultLang, path, files)
+}
+
+// FormatDriveFileListLang renders the MarkdownV2 file list in lang.
+func (s *BotService) FormatDriveFileListLang(lang, path string, files []DriveFile) string {
 	var text strings.Builder
 
-	text.WriteString("📂 *QUẢN LÝ FILE \\- GDRIVE*\n")
+	text.WriteString(i18n.T(lang, "fm_title") + "\n")
 	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&text, "📍 *ĐƯỜNG DẪN:* `%s`\n\n", utils.EscapeMarkdownV2Code(path))
+	text.WriteString(i18n.T(lang, "fm_path", utils.EscapeMarkdownV2Code(path)) + "\n\n")
 
 	if len(files) == 0 {
-		text.WriteString("📭 _Thư mục này trống_\n")
+		text.WriteString(i18n.T(lang, "fm_empty") + "\n")
 	} else {
 		folderCount := 0
 		fileCount := 0
@@ -59,7 +67,7 @@ func (s *BotService) FormatDriveFileList(path string, files []DriveFile) string 
 		}
 
 		if len(folders) > 0 {
-			text.WriteString("📁 *THƯ MỤC*\n")
+			text.WriteString(i18n.T(lang, "fm_folders") + "\n")
 			for _, f := range folders {
 				text.WriteString(f + "\n")
 			}
@@ -78,16 +86,16 @@ func (s *BotService) FormatDriveFileList(path string, files []DriveFile) string 
 		}
 
 		if len(fileList) > 0 {
-			text.WriteString("📄 *FILE*\n")
+			text.WriteString(i18n.T(lang, "fm_files") + "\n")
 			for _, f := range fileList {
 				text.WriteString(f + "\n")
 			}
 			text.WriteString("\n")
 		}
 
-		text.WriteString("📊 *TỔNG KẾT*\n")
-		fmt.Fprintf(&text, "📂 Thư mục: `%d`\n", folderCount)
-		fmt.Fprintf(&text, "📄 File: `%d`\n", fileCount)
+		text.WriteString(i18n.T(lang, "fm_summary") + "\n")
+		text.WriteString(i18n.T(lang, "fm_count_folders", folderCount) + "\n")
+		text.WriteString(i18n.T(lang, "fm_count_files", fileCount) + "\n")
 	}
 
 	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━")

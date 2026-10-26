@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"strings"
+
+	"zee-mirror/pkg/i18n"
 )
 
 var (
@@ -121,56 +123,63 @@ func CategorizeError(err error) error {
 
 	switch {
 	case strings.Contains(errMsg, "status=618"), strings.Contains(errMsg, "link expired"), strings.Contains(errMsg, "token expired"):
-		return fmt.Errorf("%w: %v", ErrLinkExpired, err)
+		return fmt.Errorf("%w: %w", ErrLinkExpired, err)
 	case strings.Contains(errMsg, "404"), strings.Contains(errMsg, "not found"):
-		return fmt.Errorf("%w: %v", ErrNotFound, err)
+		return fmt.Errorf("%w: %w", ErrNotFound, err)
 	case strings.Contains(errMsg, "403"), strings.Contains(errMsg, "unauthorized"), strings.Contains(errMsg, "forbidden"):
-		return fmt.Errorf("%w: %v", ErrAuth, err)
+		return fmt.Errorf("%w: %w", ErrAuth, err)
 	case strings.Contains(errMsg, "quota"), strings.Contains(errMsg, "rate limit"), strings.Contains(errMsg, "too many requests"):
-		return fmt.Errorf("%w: %v", ErrQuota, err)
+		return fmt.Errorf("%w: %w", ErrQuota, err)
 	case strings.Contains(errMsg, "connection"), strings.Contains(errMsg, "timeout"), strings.Contains(errMsg, "dial"), strings.Contains(errMsg, "no route"):
-		return fmt.Errorf("%w: %v", ErrNetwork, err)
+		return fmt.Errorf("%w: %w", ErrNetwork, err)
 	case strings.Contains(errMsg, "disk"), strings.Contains(errMsg, "space"), strings.Contains(errMsg, "no space"), strings.Contains(errMsg, "permission denied"):
-		return fmt.Errorf("%w: %v", ErrStorage, err)
+		return fmt.Errorf("%w: %w", ErrStorage, err)
 	case strings.Contains(errMsg, "aria2"), strings.Contains(errMsg, "yt-dlp"), strings.Contains(errMsg, "rclone"):
-		return fmt.Errorf("%w: %v", ErrExternal, err)
+		return fmt.Errorf("%w: %w", ErrExternal, err)
 	default:
 		return err
 	}
 }
 
+// GetUserMessage is GetUserMessageLang in i18n.DefaultLang.
 func GetUserMessage(err error) string {
+	return GetUserMessageLang(i18n.DefaultLang, err)
+}
+
+// GetUserMessageLang explains err to a user in lang (plain text), by the
+// sentinel it wraps.
+func GetUserMessageLang(lang string, err error) string {
 	if err == nil {
 		return ""
 	}
 
 	if errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrAuth) {
-		return "⚠️ Truy cập bị từ chối. Vui lòng liên hệ chủ bot."
+		return i18n.T(lang, "core_err_unauthorized")
 	}
 	if errors.Is(err, ErrDuplicateTask) {
-		return "🚫 Task tương tự đang chạy."
+		return i18n.T(lang, "core_err_duplicate")
 	}
 	if errors.Is(err, ErrLimitExceeded) || errors.Is(err, ErrQuota) {
-		return "📉 Bạn đã dùng hết hạn mức hôm nay."
+		return i18n.T(lang, "core_err_limit")
 	}
 	if errors.Is(err, ErrNotFound) {
-		return "🔍 Không tìm thấy file hoặc tài nguyên."
+		return i18n.T(lang, "core_err_not_found")
 	}
 	if errors.Is(err, ErrLinkExpired) {
-		return "🔗 Link đã hết hạn hoặc không hợp lệ. Vui lòng dùng link mới."
+		return i18n.T(lang, "core_err_link_expired")
 	}
 	if errors.Is(err, ErrInvalidInput) {
-		return "❓ Dữ liệu không hợp lệ. Vui lòng kiểm tra lại lệnh."
+		return i18n.T(lang, "core_err_invalid_input")
 	}
 	if errors.Is(err, ErrNetwork) {
-		return "🌐 Có sự cố kết nối mạng. Vui lòng thử lại."
+		return i18n.T(lang, "core_err_network")
 	}
 	if errors.Is(err, ErrStorage) {
-		return "💾 Có sự cố lưu trữ. Ổ đĩa có thể đã đầy."
+		return i18n.T(lang, "core_err_storage")
 	}
 	if errors.Is(err, ErrExternal) {
-		return "🔧 Dịch vụ bên ngoài đang gặp sự cố. Vui lòng thử lại sau."
+		return i18n.T(lang, "core_err_external")
 	}
 
-	return "❌ Đã xảy ra lỗi nội bộ. Vui lòng thử lại sau."
+	return i18n.T(lang, "core_err_internal")
 }

@@ -155,8 +155,9 @@ func (s *BotService) CreateTorrentSession(url, name string, zip, unzip bool, pas
 }
 
 func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQuery, parts []string) {
+	lang := s.GetUserLanguage(callback.From.ID)
 	if len(parts) < 3 {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Phiên không hợp lệ"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_session_invalid")))
 		return
 	}
 
@@ -167,7 +168,7 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 	session, exists := s.TaskManager.TorrentSessions[sessionID]
 	if !exists {
 		s.TaskManager.Mu.Unlock()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không tìm thấy phiên hoặc phiên đã hết hạn"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_session_not_found")))
 		return
 	}
 
@@ -176,11 +177,11 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 		delete(s.TaskManager.TorrentSessions, sessionID)
 		s.TaskManager.Mu.Unlock()
 
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "✅ Bắt đầu tải tất cả file..."))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_toast_start_all")))
 
 		_, _ = s.Bot.Request(tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID))
 
-		confirmMsg := tgbotapi.NewMessage(callback.Message.Chat.ID, "✅ *Đã bắt đầu tải*\n\nĐang tải tất cả file trong torrent\\.\\.\\.")
+		confirmMsg := tgbotapi.NewMessage(callback.Message.Chat.ID, i18n.T(lang, "tor_started_all"))
 		confirmMsg.ParseMode = MarkdownV2
 		sentMsg, _ := s.Bot.Send(confirmMsg)
 		statusMsgID := sentMsg.MessageID
@@ -195,7 +196,7 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 
 		task, err := s.TaskManager.CreateTask(TypeTorrent, session.URL, fileName, session.ChatID, statusMsgID, session.ReplyID, session.UserID, session.Zip, session.Unzip, session.Password, "", 0, "", false)
 		if err != nil {
-			s.HandleCreateTaskError(session.ChatID, statusMsgID, err)
+			s.HandleCreateTaskErrorLang(s.GetUserLanguage(session.UserID), session.ChatID, statusMsgID, err)
 			return
 		}
 		s.UpdateSharedDashboard(session.ChatID, true)
@@ -210,18 +211,18 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 
 		if session.IsFetching {
 			s.TaskManager.Mu.Unlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "⏳ Vẫn đang lấy metadata..."))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_still_fetching")))
 			return
 		}
 
 		if len(session.Files) == 0 {
 			s.TaskManager.Mu.Unlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Không lấy được danh sách file"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_no_files")))
 			return
 		}
 
 		s.TaskManager.Mu.Unlock()
-		s.ShowTorrentBrowseMenu(callback, sessionID, offset)
+		s.showTorrentBrowseMenu(callback, lang, sessionID, offset)
 		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 
 	case "toggle":
@@ -248,14 +249,14 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 		}
 
 		s.TaskManager.Mu.Unlock()
-		s.ShowTorrentBrowseMenu(callback, sessionID, offset)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã cập nhật lựa chọn"))
+		s.showTorrentBrowseMenu(callback, lang, sessionID, offset)
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_selection_updated")))
 
 	case "start_sel":
 		selected := session.SelectedFiles
 		if len(selected) == 0 {
 			s.TaskManager.Mu.Unlock()
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "⚠️ Hãy chọn ít nhất một file!"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_select_one")))
 			return
 		}
 		s.TaskManager.Mu.Unlock()
@@ -264,7 +265,6 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 	case "back":
 		s.TaskManager.Mu.Unlock()
 
-		lang := s.GetUserLanguage(callback.From.ID)
 		text := i18n.T(lang, "torrent_menu_text")
 
 		edit := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text, s.torrentMenuKeyboard(lang, sessionID))
@@ -276,7 +276,7 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 		delete(s.TaskManager.TorrentSessions, sessionID)
 		s.TaskManager.Mu.Unlock()
 
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Đã hủy"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_cancelled")))
 
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
@@ -285,11 +285,15 @@ func (s *BotService) HandleTorrentSelectionCallback(callback *tgbotapi.CallbackQ
 
 	default:
 		s.TaskManager.Mu.Unlock()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Thao tác không hợp lệ"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "tor_invalid_action")))
 	}
 }
 
 func (s *BotService) ShowTorrentBrowseMenu(callback *tgbotapi.CallbackQuery, sessionID string, offset int) {
+	s.showTorrentBrowseMenu(callback, s.GetUserLanguage(callback.From.ID), sessionID, offset)
+}
+
+func (s *BotService) showTorrentBrowseMenu(callback *tgbotapi.CallbackQuery, lang, sessionID string, offset int) {
 	s.TaskManager.Mu.RLock()
 	session, exists := s.TaskManager.TorrentSessions[sessionID]
 	if !exists {
@@ -305,7 +309,6 @@ func (s *BotService) ShowTorrentBrowseMenu(callback *tgbotapi.CallbackQuery, ses
 		offset = 0
 	}
 
-	lang := s.GetUserLanguage(callback.From.ID)
 	text := i18n.T(lang, "torrent_browse_title", len(files))
 
 	edit := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text,
@@ -348,14 +351,14 @@ func (s *BotService) StartTorrentWithSelectedFiles(sessionID string, selectedFil
 
 	_, _ = s.Bot.Request(tgbotapi.NewDeleteMessage(session.ChatID, session.MessageID))
 
-	confirmText := fmt.Sprintf("✅ *Đã bắt đầu tải*\n\nĐang tải %d file đã chọn\\.\\.\\.", len(selectedFiles))
+	confirmText := i18n.T(s.GetUserLanguage(session.UserID), "torrent_selected_start", len(selectedFiles))
 	msg := tgbotapi.NewMessage(session.ChatID, confirmText)
 	msg.ParseMode = MarkdownV2
 	sentMsg, _ := s.Bot.Send(msg)
 
 	task, err := s.TaskManager.CreateTask(TypeTorrent, url, fileName, session.ChatID, sentMsg.MessageID, session.ReplyID, session.UserID, session.Zip, session.Unzip, session.Password, "", 0, "", false)
 	if err != nil {
-		s.HandleCreateTaskError(session.ChatID, sentMsg.MessageID, err)
+		s.HandleCreateTaskErrorLang(s.GetUserLanguage(session.UserID), session.ChatID, sentMsg.MessageID, err)
 		return nil
 	}
 	s.UpdateSharedDashboard(session.ChatID, true)

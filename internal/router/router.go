@@ -7,6 +7,7 @@ import (
 
 	"zee-mirror/handlers/download"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -15,8 +16,12 @@ type CommandHandler func(s *service.BotService, msg *tgbotapi.Message)
 type CallbackHandler func(s *service.BotService, cb *tgbotapi.CallbackQuery)
 
 type CommandInfo struct {
-	DetailedFn  func() string
-	Name        string
+	// DetailedFn renders the command's detailed help page in a language.
+	DetailedFn func(lang string) string
+	Name       string
+	// Description is the DefaultLang description. When empty it is filled
+	// from the catalog key i18n.CommandKey(Name); use LocalizedDescription
+	// for other languages.
 	Description string
 	Category    string
 	Emoji       string
@@ -43,7 +48,19 @@ func NewRouter(service *service.BotService) *Router {
 	}
 }
 
+// LocalizedDescription returns the command description in lang, falling
+// back to Description when the catalog has no entry for the command.
+func (c CommandInfo) LocalizedDescription(lang string) string {
+	if s, ok := i18n.Lookup(lang, i18n.CommandKey(c.Name)); ok {
+		return s
+	}
+	return c.Description
+}
+
 func (r *Router) RegisterCommandWithInfo(info CommandInfo, handler CommandHandler) {
+	if info.Description == "" {
+		info.Description, _ = i18n.Lookup(i18n.DefaultLang, i18n.CommandKey(info.Name))
+	}
 	r.commands[info.Name] = handler
 	for _, alias := range info.Aliases {
 		r.commands[alias] = handler
@@ -107,7 +124,7 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 	}
 
 	if msg.ReplyToMessage != nil && msg.ReplyToMessage.From.ID == r.service.Bot.Self.ID {
-		if isWizardPromptReply(msg.ReplyToMessage.Text) {
+		if download.IsWizardPromptReply(msg.ReplyToMessage.Text) {
 			if r.service != nil {
 				download.HandleWizardInput(r.service, msg)
 				return
@@ -126,38 +143,6 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 			return
 		}
 	}
-}
-
-// isWizardPromptReply reports whether replyText is one of the mirror wizard's
-// ForceReply prompts. Telegram returns the prompt as plain text (entities and
-// MarkdownV2 escapes removed), so the prompt constants are compared after
-// stripping their markup. The legacy Indonesian prompts are kept so replies to
-// messages sent before the translation still route correctly.
-func isWizardPromptReply(replyText string) bool {
-	for _, prompt := range []string{download.PromptMirrorURL, download.PromptRename} {
-		if plain := stripMarkdownV2(prompt); plain != "" && strings.Contains(replyText, plain) {
-			return true
-		}
-	}
-	return strings.Contains(replyText, "Silakan kirim URL") || strings.Contains(replyText, "Silakan kirim Nama Baru")
-}
-
-func stripMarkdownV2(text string) string {
-	var sb strings.Builder
-	runes := []rune(text)
-	for i := 0; i < len(runes); i++ {
-		switch runes[i] {
-		case '\\':
-			if i+1 < len(runes) {
-				i++
-				sb.WriteRune(runes[i])
-			}
-		case '*', '_', '~', '`', '|':
-		default:
-			sb.WriteRune(runes[i])
-		}
-	}
-	return strings.TrimSpace(sb.String())
 }
 
 func (r *Router) HandleCallback(cb *tgbotapi.CallbackQuery) {
@@ -184,6 +169,10 @@ func (r *Router) HandleCallback(cb *tgbotapi.CallbackQuery) {
 
 	slog.Warn("Unknown callback received", "data", cb.Data)
 	if r.service != nil && cb.ID != "" {
-		_, _ = r.service.Bot.Request(tgbotapi.NewCallback(cb.ID, "Thao tác không được hỗ trợ"))
+		lang := i18n.DefaultLang
+		if cb.From != nil {
+			lang = r.service.GetUserLanguage(cb.From.ID)
+		}
+		_, _ = r.service.Bot.Request(tgbotapi.NewCallback(cb.ID, i18n.T(lang, "menu_unsupported_action")))
 	}
 }

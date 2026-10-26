@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"zee-mirror/internal/domain"
+	"zee-mirror/pkg/i18n"
+	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -176,11 +178,19 @@ func (s *BotService) ExtractFileFromReply(reply *tgbotapi.Message) (string, stri
 	return fileID, fileName, fileSize
 }
 
+// GetErrorMessage is GetErrorMessageLang in DefaultLang.
 func GetErrorMessage(title string, err any) string {
+	return GetErrorMessageLang(i18n.DefaultLang, title, err)
+}
+
+// GetErrorMessageLang builds a MarkdownV2 error message. title and string
+// content are inserted as given (MarkdownV2); an error is rendered with
+// i18n.Message in lang and is not escaped, so callers escape dynamic text.
+func GetErrorMessageLang(lang, title string, err any) string {
 	var errMsg string
 	switch e := err.(type) {
 	case error:
-		errMsg = e.Error()
+		errMsg = i18n.Message(lang, e)
 	case string:
 		errMsg = e
 	default:
@@ -191,4 +201,28 @@ func GetErrorMessage(title string, err any) string {
 
 func GetSuccessMessage(title, content string) string {
 	return fmt.Sprintf("✅ *%s*\n\n%s", title, content)
+}
+
+// coreTitle is the plain-text title key in lang, escaped for MarkdownV2 so it
+// can go to GetErrorMessage/GetSuccessMessage.
+func coreTitle(lang, key string) string {
+	return utils.EscapeMarkdownV2(i18n.T(lang, key))
+}
+
+// coreTaskLang is the language of the task's owner, for background messages.
+func (s *BotService) coreTaskLang(task *Task) string {
+	return s.GetUserLanguage(task.UserID)
+}
+
+// coreFailTask marks task failed with err rendered in the owner's language;
+// key, when set, wraps the rendered error (e.g. "task_err_upload" → "Upload
+// failed: %s").
+func (s *BotService) coreFailTask(task *Task, key string, err error) {
+	slog.Warn("Task failed", "taskID", task.ID, "reason", key, "error", err)
+	lang := s.coreTaskLang(task)
+	msg := i18n.Message(lang, err)
+	if key != "" {
+		msg = i18n.T(lang, key, msg)
+	}
+	task.SetError(msg)
 }

@@ -12,17 +12,55 @@ import (
 	"time"
 
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+// GetErrorMessage and GetSuccessMessage wrap a MarkdownV2 body under a bold
+// header. title is plain text (a translated i18n title) and is escaped here;
+// content must already be MarkdownV2.
 func GetErrorMessage(title, content string) string {
-	return fmt.Sprintf("❌ *%s*\n\n%s", title, content)
+	return fmt.Sprintf("❌ *%s*\n\n%s", utils.EscapeMarkdownV2(title), content)
 }
 
 func GetSuccessMessage(title, content string) string {
-	return fmt.Sprintf("✅ *%s*\n\n%s", title, content)
+	return fmt.Sprintf("✅ *%s*\n\n%s", utils.EscapeMarkdownV2(title), content)
+}
+
+// messageLang is the language of the user who sent m; anonymous senders (no
+// From) get the default language.
+func messageLang(s *service.BotService, m *tgbotapi.Message) string {
+	if m.From == nil {
+		return i18n.DefaultLang
+	}
+	return s.GetUserLanguage(m.From.ID)
+}
+
+// usageMessage builds the "invalid format" reply: a shared header plus the
+// command-specific usage text.
+func usageMessage(lang, usageKey string) string {
+	return i18n.T(lang, "media_usage_header") + "\n\n" + i18n.T(lang, usageKey)
+}
+
+// uploadKeyboard is the "upload to Drive" button shown under every finished
+// media operation.
+func uploadKeyboard(lang, pathID string) *tgbotapi.InlineKeyboardMarkup {
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "media_btn_upload_drive"), "media_m:"+pathID),
+		),
+	)
+	return &keyboard
+}
+
+// ffmpegFailure renders a localized "<operation> failed" message carrying the
+// error and the tail of ffmpeg's output.
+func ffmpegFailure(lang, key string, err error, output []byte) string {
+	return i18n.T(lang, key,
+		utils.EscapeMarkdownV2(err.Error()),
+		utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15)))
 }
 
 func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args string) {
@@ -30,20 +68,22 @@ func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args s
 		return
 	}
 
+	lang := messageLang(s, message)
+
 	fileID, fileName := s.GetFileFromMessage(message)
 	inputPath := args
 
 	if fileID == "" && inputPath == "" {
-		s.Reply(message, GetErrorMessage("SAI ĐỊNH DẠNG", "Hãy reply vào một file video bằng /extractaudio hoặc dùng:\n`/extractaudio path`"))
+		s.Reply(message, GetErrorMessage(i18n.T(lang, "media_title_invalid_format"), i18n.T(lang, "media_extract_usage")))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🎵 *Đang tách audio\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_extract_progress"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
 		slog.Error("Failed to send status message", "error", err)
-		s.Reply(message, "❌ *Không gửi được tin nhắn trạng thái*")
+		s.Reply(message, i18n.T(lang, "media_status_send_failed"))
 		return
 	}
 
@@ -52,7 +92,7 @@ func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args s
 		inputPath, downloadErr = s.DownloadTelegramFile(fileID, fileName)
 		if downloadErr != nil {
 			slog.Error("Telegram download failed during audio extraction", "error", downloadErr)
-			s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Tải file thất bại*\nLỗi: %s", utils.EscapeMarkdownV2(downloadErr.Error())))
+			s.EditMessage(sent.Chat.ID, sent.MessageID, i18n.T(lang, "media_download_failed_detail", utils.EscapeMarkdownV2(i18n.Message(lang, downloadErr))))
 			return
 		}
 	}
@@ -63,7 +103,7 @@ func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args s
 	defer cancel()
 
 	if hasAudio, errAudio := s.HasAudioStream(inputPath); errAudio != nil || !hasAudio {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, GetErrorMessage("KHÔNG CÓ AUDIO", "Video này không có track audio để tách\\."))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, GetErrorMessage(i18n.T(lang, "media_title_no_audio"), i18n.T(lang, "media_no_audio")))
 		return
 	}
 
@@ -75,26 +115,21 @@ func HandleExtractAudio(s *service.BotService, message *tgbotapi.Message, args s
 	cmd.Dir = inputDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, GetErrorMessage("LỖI FFMPEG", fmt.Sprintf("Tách audio thất bại: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15)))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, GetErrorMessage(i18n.T(lang, "media_title_ffmpeg_error"), ffmpegFailure(lang, "media_extract_failed", err, output)))
 		return
 	}
 
-	content := fmt.Sprintf("🎵 Output: `%s`\\!\n\nBấm nút bên dưới để tải lên Drive\\.", utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
+	content := i18n.T(lang, "media_done_audio", utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
 	pathID := s.StorePath(outputPath)
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📤 Tải lên Drive", "media_m:"+pathID),
-		),
-	)
-	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage("ĐÃ TÁCH AUDIO", content), &keyboard)
+	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage(i18n.T(lang, "media_title_extract_done"), content), uploadKeyboard(lang, pathID))
 }
 
 func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args string) {
 	if !s.CanUse(message) {
 		return
 	}
+
+	lang := messageLang(s, message)
 
 	fileID, fileName := s.GetFileFromMessage(message)
 	inputPath := args
@@ -112,7 +147,7 @@ func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args 
 	}
 
 	if fileID == "" && inputPath == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nHãy reply vào một file video bằng /compress hoặc dùng:\n`/compress path/to/video [quality]`\n\nChất lượng: low, medium, high \\(mặc định: medium\\)")
+		s.Reply(message, usageMessage(lang, "media_compress_usage"))
 		return
 	}
 
@@ -124,12 +159,12 @@ func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args 
 		crf = "23"
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🗜️ *Đang nén video\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_compress_progress"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
 		slog.Error("Failed to send status message", "error", err)
-		s.Reply(message, "❌ *Không gửi được tin nhắn trạng thái*")
+		s.Reply(message, i18n.T(lang, "media_status_send_failed"))
 		return
 	}
 
@@ -137,7 +172,7 @@ func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args 
 		var downloadErr error
 		inputPath, downloadErr = s.DownloadTelegramFile(fileID, fileName)
 		if downloadErr != nil {
-			s.EditMessage(sent.Chat.ID, sent.MessageID, "❌ *Tải file thất bại*")
+			s.EditMessage(sent.Chat.ID, sent.MessageID, i18n.T(lang, "media_download_failed"))
 			return
 		}
 	}
@@ -160,28 +195,23 @@ func HandleCompressVideo(s *service.BotService, message *tgbotapi.Message, args 
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Nén video thất bại*\n\nLỗi: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, ffmpegFailure(lang, "media_compress_failed", err, output))
 		return
 	}
 
-	content := fmt.Sprintf("🎬 Output: `%s`\\!\n📊 Chất lượng: %s\n\nBấm nút bên dưới để tải lên Drive\\.",
+	content := i18n.T(lang, "media_done_compress",
 		utils.EscapeMarkdownV2Code(filepath.Base(outputPath)),
 		utils.EscapeMarkdownV2(quality))
 	pathID := s.StorePath(outputPath)
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📤 Tải lên Drive", "media_m:"+pathID),
-		),
-	)
-	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage("ĐÃ NÉN VIDEO", content), &keyboard)
+	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage(i18n.T(lang, "media_title_compress_done"), content), uploadKeyboard(lang, pathID))
 }
 
 func HandleGenerateThumbnail(s *service.BotService, message *tgbotapi.Message, args string) {
 	if !s.CanUse(message) {
 		return
 	}
+
+	lang := messageLang(s, message)
 
 	fileID, fileName := s.GetFileFromMessage(message)
 	timestamp := "00:00:05"
@@ -202,16 +232,16 @@ func HandleGenerateThumbnail(s *service.BotService, message *tgbotapi.Message, a
 	}
 
 	if fileID == "" && inputPath == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nHãy reply vào một file video bằng /thumbnail hoặc dùng:\n`/thumbnail [timestamp]`\n\nVí dụ: `/thumbnail 00:01:30`")
+		s.Reply(message, usageMessage(lang, "media_thumbnail_usage"))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🖼️ *Đang tạo thumbnail\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_thumbnail_progress"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
 		slog.Error("Failed to send status message", "error", err)
-		s.Reply(message, "❌ *Không gửi được tin nhắn trạng thái*")
+		s.Reply(message, i18n.T(lang, "media_status_send_failed"))
 		return
 	}
 
@@ -219,7 +249,7 @@ func HandleGenerateThumbnail(s *service.BotService, message *tgbotapi.Message, a
 		var downloadErr error
 		inputPath, downloadErr = s.DownloadTelegramFile(fileID, fileName)
 		if downloadErr != nil {
-			s.EditMessage(sent.Chat.ID, sent.MessageID, "❌ *Tải file thất bại*")
+			s.EditMessage(sent.Chat.ID, sent.MessageID, i18n.T(lang, "media_download_failed"))
 			return
 		}
 	}
@@ -240,14 +270,12 @@ func HandleGenerateThumbnail(s *service.BotService, message *tgbotapi.Message, a
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Tạo thumbnail thất bại*\n\nLỗi: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, ffmpegFailure(lang, "media_thumbnail_failed", err, output))
 		return
 	}
 
 	photo := tgbotapi.NewPhoto(message.Chat.ID, tgbotapi.FilePath(outputPath))
-	photo.Caption = fmt.Sprintf("🖼️ Thumbnail từ `%s` tại %s", utils.EscapeMarkdownV2Code(filepath.Base(inputPath)), utils.EscapeMarkdownV2(timestamp))
+	photo.Caption = i18n.T(lang, "media_thumbnail_caption", utils.EscapeMarkdownV2Code(filepath.Base(inputPath)), utils.EscapeMarkdownV2(timestamp))
 	photo.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(photo)
 
@@ -259,6 +287,8 @@ func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args 
 		return
 	}
 
+	lang := messageLang(s, message)
+
 	fileID, fileName := s.GetFileFromMessage(message)
 	var videoPath, subPath string
 
@@ -267,7 +297,7 @@ func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args 
 		var err error
 		videoPath, err = s.DownloadTelegramFile(fileID, fileName)
 		if err != nil {
-			s.Reply(message, "❌ *Tải file thất bại*")
+			s.Reply(message, i18n.T(lang, "media_download_failed"))
 			return
 		}
 		if len(parts) > 0 {
@@ -275,7 +305,7 @@ func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args 
 		}
 	} else {
 		if len(parts) < 2 {
-			s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/subtitle video.mp4 subtitle.srt` hoặc reply vào video bằng `/subtitle subtitle.srt`")
+			s.Reply(message, usageMessage(lang, "media_subtitle_usage"))
 			return
 		}
 		videoPath = parts[0]
@@ -283,16 +313,16 @@ func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args 
 	}
 
 	if videoPath == "" || subPath == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/subtitle video.mp4 subtitle.srt` hoặc reply vào video bằng `/subtitle subtitle.srt`")
+		s.Reply(message, usageMessage(lang, "media_subtitle_usage"))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "📝 *Đang gắn subtitle\\.\\.\\.*")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_subtitle_progress"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
 		slog.Error("Failed to send status message", "error", err)
-		s.Reply(message, "❌ *Không gửi được tin nhắn trạng thái*")
+		s.Reply(message, i18n.T(lang, "media_status_send_failed"))
 		return
 	}
 
@@ -312,27 +342,21 @@ func HandleEmbedSubtitle(s *service.BotService, message *tgbotapi.Message, args 
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Gắn subtitle thất bại*\n\nLỗi: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, ffmpegFailure(lang, "media_subtitle_failed", err, output))
 		return
 	}
 
-	content := fmt.Sprintf("🎬 Output: `%s`\\!\n\nBấm nút bên dưới để tải lên Drive\\.",
-		utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
+	content := i18n.T(lang, "media_done_video", utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
 	pathID := s.StorePath(outputPath)
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📤 Tải lên Drive", "media_m:"+pathID),
-		),
-	)
-	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage("ĐÃ GẮN SUBTITLE", content), &keyboard)
+	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage(i18n.T(lang, "media_title_subtitle_done"), content), uploadKeyboard(lang, pathID))
 }
 
 func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args string) {
 	if !s.CanUse(message) {
 		return
 	}
+
+	lang := messageLang(s, message)
 
 	fileID, fileName := s.GetFileFromMessage(message)
 	var inputPath, targetFormat string
@@ -342,7 +366,7 @@ func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args 
 		var err error
 		inputPath, err = s.DownloadTelegramFile(fileID, fileName)
 		if err != nil {
-			s.Reply(message, "❌ *Tải file thất bại*")
+			s.Reply(message, i18n.T(lang, "media_download_failed"))
 			return
 		}
 		if len(parts) > 0 {
@@ -350,7 +374,7 @@ func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args 
 		}
 	} else {
 		if len(parts) < 2 {
-			s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/convert input.mp4 mkv` hoặc reply vào file bằng `/convert mkv`")
+			s.Reply(message, usageMessage(lang, "media_convert_usage"))
 			return
 		}
 		inputPath = parts[0]
@@ -363,16 +387,16 @@ func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args 
 	}
 
 	if !validFormats[targetFormat] {
-		s.Reply(message, "❌ *Định dạng không được hỗ trợ*\n\nHỗ trợ: mp4, mkv, avi, mov, webm, mp3, aac, flac, wav")
+		s.Reply(message, i18n.T(lang, "media_convert_unsupported"))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("🔄 *Đang chuyển đổi sang %s\\.\\.\\.*", targetFormat))
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_convert_progress", targetFormat))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
 		slog.Error("Failed to send status message", "error", err)
-		s.Reply(message, "❌ *Không gửi được tin nhắn trạng thái*")
+		s.Reply(message, i18n.T(lang, "media_status_send_failed"))
 		return
 	}
 
@@ -395,27 +419,21 @@ func HandleConvertFormat(s *service.BotService, message *tgbotapi.Message, args 
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Chuyển đổi định dạng thất bại*\n\nLỗi: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, ffmpegFailure(lang, "media_convert_failed", err, output))
 		return
 	}
 
-	content := fmt.Sprintf("📄 Output: `%s`\\!\n\nBấm nút bên dưới để tải lên Drive\\.",
-		utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
+	content := i18n.T(lang, "media_done_file", utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
 	pathID := s.StorePath(outputPath)
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📤 Tải lên Drive", "media_m:"+pathID),
-		),
-	)
-	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage("ĐÃ CHUYỂN ĐỔI MEDIA", content), &keyboard)
+	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage(i18n.T(lang, "media_title_convert_done"), content), uploadKeyboard(lang, pathID))
 }
 
 func HandleMediaInfo(s *service.BotService, message *tgbotapi.Message, args string) {
 	if !s.CanUse(message) {
 		return
 	}
+
+	lang := messageLang(s, message)
 
 	fileID, fileName := s.GetFileFromMessage(message)
 	inputPath := args
@@ -424,13 +442,13 @@ func HandleMediaInfo(s *service.BotService, message *tgbotapi.Message, args stri
 		var err error
 		inputPath, err = s.DownloadTelegramFile(fileID, fileName)
 		if err != nil {
-			s.Reply(message, "❌ *Tải file thất bại*")
+			s.Reply(message, i18n.T(lang, "media_download_failed"))
 			return
 		}
 	}
 
 	if inputPath == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nHãy reply vào một file media hoặc dùng:\n`/mediainfo path/to/file`")
+		s.Reply(message, usageMessage(lang, "media_mediainfo_usage"))
 		return
 	}
 
@@ -440,18 +458,18 @@ func HandleMediaInfo(s *service.BotService, message *tgbotapi.Message, args stri
 	cmd := execCommand(ctx, "ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", inputPath)
 	output, err := cmd.Output()
 	if err != nil {
-		s.Reply(message, fmt.Sprintf("❌ *Không lấy được thông tin*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, i18n.T(lang, "media_mediainfo_failed", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
 	var probe service.FFProbeOutput
 	if err := json.Unmarshal(output, &probe); err != nil {
 		slog.Error("FFProbe JSON unmarshal failed", "error", err)
-		s.Reply(message, "❌ *Không phân tích được metadata của file*")
+		s.Reply(message, i18n.T(lang, "media_mediainfo_parse_failed"))
 		return
 	}
 
-	text := s.FormatMediaInfo(filepath.Base(inputPath), probe)
+	text := s.FormatMediaInfo(lang, filepath.Base(inputPath), probe)
 	s.Reply(message, text)
 }
 
@@ -460,19 +478,21 @@ func HandleMediaMirrorCallback(s *service.BotService, cb *tgbotapi.CallbackQuery
 		return
 	}
 
+	lang := s.GetUserLanguage(cb.From.ID)
+
 	pathID := parts[1]
 	fullPath, ok := s.GetPath(pathID)
 	if !ok {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "❌ Liên kết đã hết hạn hoặc không hợp lệ!"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, i18n.T(lang, "media_toast_link_expired")))
 		return
 	}
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "❌ File đã bị xóa khỏi server!"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, i18n.T(lang, "media_toast_file_deleted")))
 		return
 	}
 
-	_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, "📤 Đang bắt đầu Mirror lên Drive..."))
+	_, _ = s.Bot.Request(tgbotapi.NewCallback(cb.ID, i18n.T(lang, "media_toast_mirror_starting")))
 
 	s.TaskManager.Mu.Lock()
 	s.TaskManager.LastStatusMsg[cb.Message.Chat.ID] = cb.Message.MessageID
@@ -488,7 +508,7 @@ func HandleMediaMirrorCallback(s *service.BotService, cb *tgbotapi.CallbackQuery
 
 	task, err := s.TaskManager.CreateTask(service.TypeMirror, url, fileName, cb.Message.Chat.ID, 0, replyID, cb.From.ID, false, false, "", "", 0, "", false)
 	if err != nil {
-		s.HandleCreateTaskError(cb.Message.Chat.ID, cb.Message.MessageID, err)
+		s.HandleCreateTaskErrorLang(s.GetUserLanguage(cb.From.ID), cb.Message.Chat.ID, cb.Message.MessageID, err)
 		return
 	}
 	s.HandleAutoDelete(task)
@@ -501,6 +521,8 @@ func HandleScreenshots(s *service.BotService, message *tgbotapi.Message, args st
 		return
 	}
 
+	lang := messageLang(s, message)
+
 	fileID, fileName := s.GetFileFromMessage(message)
 	count := 4
 	inputPath := args
@@ -510,7 +532,7 @@ func HandleScreenshots(s *service.BotService, message *tgbotapi.Message, args st
 		var err error
 		inputPath, err = s.DownloadTelegramFile(fileID, fileName)
 		if err != nil {
-			s.Reply(message, "❌ *Tải file thất bại*")
+			s.Reply(message, i18n.T(lang, "media_download_failed"))
 			return
 		}
 		if len(parts) > 0 {
@@ -530,22 +552,22 @@ func HandleScreenshots(s *service.BotService, message *tgbotapi.Message, args st
 	}
 
 	if inputPath == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/screenshots video.mp4 [count]` hoặc reply vào video bằng `/screenshots [count]`")
+		s.Reply(message, usageMessage(lang, "media_screenshots_usage"))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("📸 *Đang tạo %d ảnh chụp màn hình\\.\\.\\.*", count))
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_screenshots_progress", count))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
 		slog.Error("Failed to send status message during screenshots", "error", err)
-		s.Reply(message, "❌ *Không gửi được tin nhắn trạng thái*")
+		s.Reply(message, i18n.T(lang, "media_status_send_failed"))
 		return
 	}
 
 	screenshots, err := s.GenerateScreenshotsList(inputPath, count)
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Tạo ảnh chụp màn hình thất bại*\n\nLỗi: %s", utils.EscapeMarkdownV2(err.Error())))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, i18n.T(lang, "media_screenshots_failed", utils.EscapeMarkdownV2(i18n.Message(lang, err))))
 		return
 	}
 
@@ -566,6 +588,8 @@ func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string
 		return
 	}
 
+	lang := messageLang(s, message)
+
 	fileID, fileName := s.GetFileFromMessage(message)
 	var videoPath, subPath string
 
@@ -574,7 +598,7 @@ func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string
 		var err error
 		videoPath, err = s.DownloadTelegramFile(fileID, fileName)
 		if err != nil {
-			s.Reply(message, "❌ *Tải file thất bại*")
+			s.Reply(message, i18n.T(lang, "media_download_failed"))
 			return
 		}
 		if len(parts) > 0 {
@@ -582,7 +606,7 @@ func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string
 		}
 	} else {
 		if len(parts) < 2 {
-			s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/hardsub video.mp4 subtitle.srt` hoặc reply vào video bằng `/hardsub subtitle.srt`")
+			s.Reply(message, usageMessage(lang, "media_hardsub_usage"))
 			return
 		}
 		videoPath = parts[0]
@@ -590,11 +614,11 @@ func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string
 	}
 
 	if videoPath == "" || subPath == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/hardsub video.mp4 subtitle.srt` hoặc reply vào video bằng `/hardsub subtitle.srt`")
+		s.Reply(message, usageMessage(lang, "media_hardsub_usage"))
 		return
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, "🔥 *Đang ghép cứng subtitle \\(Hard\\-sub\\)\\.\\.\\.*\n_Quá trình này mất nhiều thời gian hơn vì phải re\\-encode video\\._")
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_hardsub_progress"))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
@@ -620,21 +644,13 @@ func HandleHardsub(s *service.BotService, message *tgbotapi.Message, args string
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Ghép cứng subtitle thất bại*\n\nLỗi: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, ffmpegFailure(lang, "media_hardsub_failed", err, output))
 		return
 	}
 
-	content := fmt.Sprintf("🎬 Output: `%s`\\!\n\nBấm nút bên dưới để tải lên Drive\\.",
-		utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
+	content := i18n.T(lang, "media_done_video", utils.EscapeMarkdownV2Code(filepath.Base(outputPath)))
 	pathID := s.StorePath(outputPath)
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📤 Tải lên Drive", "media_m:"+pathID),
-		),
-	)
-	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage("ĐÃ GHÉP CỨNG SUBTITLE", content), &keyboard)
+	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage(i18n.T(lang, "media_title_hardsub_done"), content), uploadKeyboard(lang, pathID))
 }
 
 func HandleRescale(s *service.BotService, message *tgbotapi.Message, args string) {
@@ -642,25 +658,27 @@ func HandleRescale(s *service.BotService, message *tgbotapi.Message, args string
 		return
 	}
 
+	lang := messageLang(s, message)
+
 	fileID, fileName := s.GetFileFromMessage(message)
 	var inputPath, resolution string
 
 	parts := strings.Fields(args)
 	if fileID != "" {
 		if len(parts) == 0 {
-			s.Reply(message, "⚠️ *Sai định dạng*\n\nHãy reply vào video bằng `/rescale 1280x720` hoặc `/rescale 720p`")
+			s.Reply(message, usageMessage(lang, "media_rescale_usage_reply"))
 			return
 		}
 		var err error
 		inputPath, err = s.DownloadTelegramFile(fileID, fileName)
 		if err != nil {
-			s.Reply(message, "❌ *Tải file thất bại*")
+			s.Reply(message, i18n.T(lang, "media_download_failed"))
 			return
 		}
 		resolution = parts[0]
 	} else {
 		if len(parts) < 2 {
-			s.Reply(message, "⚠️ *Sai định dạng*\n\nDùng: `/rescale video.mp4 1280x720` hoặc `/rescale video.mp4 720p`")
+			s.Reply(message, usageMessage(lang, "media_rescale_usage_path"))
 			return
 		}
 		inputPath = parts[0]
@@ -688,12 +706,12 @@ func HandleRescale(s *service.BotService, message *tgbotapi.Message, args string
 		case strings.Contains(resolution, ":"):
 			scale = resolution
 		default:
-			s.Reply(message, "❌ *Độ phân giải không hợp lệ*\n\nDùng định dạng: `1280x720` hoặc `720p`")
+			s.Reply(message, i18n.T(lang, "media_rescale_invalid"))
 			return
 		}
 	}
 
-	statusMsg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("📐 *Đang đổi độ phân giải video sang %s\\.\\.\\.*", resolution))
+	statusMsg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "media_rescale_progress", utils.EscapeMarkdownV2(resolution)))
 	statusMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := s.Bot.Send(statusMsg)
 	if err != nil {
@@ -715,20 +733,13 @@ func HandleRescale(s *service.BotService, message *tgbotapi.Message, args string
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.EditMessage(sent.Chat.ID, sent.MessageID, fmt.Sprintf("❌ *Đổi độ phân giải video thất bại*\n\nLỗi: %s\n\nOutput \\(phần cuối\\):\n`%s`",
-			utils.EscapeMarkdownV2(err.Error()),
-			utils.EscapeMarkdownV2Code(utils.GetLastLines(string(output), 15))))
+		s.EditMessage(sent.Chat.ID, sent.MessageID, ffmpegFailure(lang, "media_rescale_failed", err, output))
 		return
 	}
 
-	content := fmt.Sprintf("🎬 Output: `%s`\\!\n📐 Độ phân giải: %s\n\nBấm nút bên dưới để tải lên Drive\\.",
+	content := i18n.T(lang, "media_done_rescale",
 		utils.EscapeMarkdownV2Code(filepath.Base(outputPath)),
 		utils.EscapeMarkdownV2(resolution))
 	pathID := s.StorePath(outputPath)
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📤 Tải lên Drive", "media_m:"+pathID),
-		),
-	)
-	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage("ĐÃ ĐỔI ĐỘ PHÂN GIẢI VIDEO", content), &keyboard)
+	s.EditMessageWithMarkup(sent.Chat.ID, sent.MessageID, GetSuccessMessage(i18n.T(lang, "media_title_rescale_done"), content), uploadKeyboard(lang, pathID))
 }

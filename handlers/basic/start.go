@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -13,13 +14,22 @@ const (
 	CmdClose   = "close"
 )
 
+// senderLang returns the language of the user who sent m, or the default when
+// the message has no sender (channel posts).
+func senderLang(s *service.BotService, m *tgbotapi.Message) string {
+	if m == nil || m.From == nil {
+		return i18n.DefaultLang
+	}
+	return s.GetUserLanguage(m.From.ID)
+}
+
 func StartHandler(s *service.BotService, message *tgbotapi.Message) {
+	lang := s.GetUserLanguage(message.From.ID)
 	userName := message.From.FirstName
 	if userName == "" {
-		userName = "bạn"
+		userName = i18n.T(lang, "basic_name_plain")
 	}
 
-	lang := s.GetUserLanguage(message.From.ID)
 	welcomeText := service.GetWelcomeMessage(lang, userName)
 	keyboard := service.GetStartKeyboard(lang)
 
@@ -50,7 +60,7 @@ func HelpHandler(s *service.BotService, message *tgbotapi.Message) {
 	if sentMsg, err := s.Bot.Send(msg); err != nil {
 		slog.Error("Error sending help message", "error", err)
 		msg.ParseMode = ""
-		msg.Text = "📖 Hướng dẫn sử dụng\n\nVui lòng chọn danh mục bên dưới:"
+		msg.Text = i18n.T(lang, "basic_help_fallback_plain")
 		_, _ = s.Bot.Send(msg)
 	} else {
 		s.AutoDeleteMessage(message.Chat.ID, sentMsg.MessageID, 60*time.Second)

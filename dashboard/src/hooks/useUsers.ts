@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api'
 import { User } from '../types'
+import { useI18n } from './useI18n'
+import type { MessageKey } from '../i18n'
 
 export const useUsers = (apiToken: string) => {
+  const { t } = useI18n()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string | null>(null)
+  // Kept as a key so the message follows language changes.
+  const [errorKey, setErrorKey] = useState<MessageKey | null>(null)
+  const error = errorKey ? t(errorKey) : null
 
   const fetchUsers = useCallback(async () => {
     if (!apiToken) return
@@ -13,9 +18,9 @@ export const useUsers = (apiToken: string) => {
     try {
       const response = await api.get('/api/users')
       setUsers(response.data || [])
-      setError(null)
+      setErrorKey(null)
     } catch {
-      setError('Không thể tải danh sách người dùng')
+      setErrorKey('users.loadFailed')
     } finally {
       setLoading(false)
     }
@@ -28,9 +33,9 @@ export const useUsers = (apiToken: string) => {
         await fetchUsers()
         return { success: true, apiKey: (response.data as { apiKey?: string }).apiKey }
       }
-      return { success: false, error: 'Cập nhật thất bại' }
+      return { success: false, error: t('common.updateFailed') }
     } catch {
-      return { success: false, error: 'Lỗi mạng' }
+      return { success: false, error: t('common.networkError') }
     }
   }
 
@@ -41,9 +46,9 @@ export const useUsers = (apiToken: string) => {
         await fetchUsers()
         return { success: true }
       }
-      return { success: false, error: 'Xóa thất bại' }
+      return { success: false, error: t('users.deleteFailed') }
     } catch {
-      return { success: false, error: 'Lỗi mạng' }
+      return { success: false, error: t('common.networkError') }
     }
   }
 
@@ -54,9 +59,9 @@ export const useUsers = (apiToken: string) => {
         await fetchUsers()
         return { success: true, apiKey: (response.data as { apiKey?: string }).apiKey }
       }
-      return { success: false, error: (response.data as { error?: string }).error || 'Thêm thất bại' }
+      return { success: false, error: (response.data as { error?: string }).error || t('users.addFailed') }
     } catch {
-      return { success: false, error: 'Lỗi mạng' }
+      return { success: false, error: t('common.networkError') }
     }
   }
 

@@ -10,6 +10,7 @@ import (
 	"zee-mirror/internal/metrics"
 	"zee-mirror/internal/organizer"
 	"zee-mirror/internal/uploader"
+	"zee-mirror/pkg/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -19,8 +20,9 @@ func (s *BotService) UploadWithRclone(task *Task) error {
 	task.SetProgress(0)
 	s.updateTaskStatus(task)
 
+	lang := s.GetUserLanguage(task.UserID)
 	err := s.RcloneUploader.Upload(task.Ctx, &task.Task, func(up uploader.ProgressUpdate) {
-		task.UpdateFromUploadProgress(up)
+		task.UpdateFromUploadProgress(lang, up)
 		s.updateTaskStatus(task)
 	})
 
@@ -40,20 +42,20 @@ func (s *BotService) UploadToTelegram(task *Task) error {
 
 	filePath := task.LocalPath
 	if filePath == "" {
-		return fmt.Errorf("%w: không có file cục bộ để tải lên", domain.ErrInvalidInput)
+		return i18n.WrapError(domain.ErrInvalidInput, "upload_err_no_local_file")
 	}
 
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return fmt.Errorf("%w: không đọc được thông tin file: %v", domain.ErrStorage, err)
+		return i18n.WrapError(domain.ErrStorage, "upload_err_stat", err)
 	}
 
 	if info.IsDir() {
-		return fmt.Errorf("%w: không thể tải thư mục trực tiếp lên Telegram, hãy nén zip trước", domain.ErrInvalidInput)
+		return i18n.WrapError(domain.ErrInvalidInput, "upload_err_tg_dir")
 	}
 
 	if info.Size() > domain.MaxTelegramUploadSize {
-		return fmt.Errorf("%w: file quá lớn cho Telegram (tối đa 2GB)", domain.ErrInvalidInput)
+		return i18n.WrapError(domain.ErrInvalidInput, "upload_err_tg_too_large")
 	}
 
 	var msg tgbotapi.Chattable
@@ -83,7 +85,7 @@ func (s *BotService) UploadToTelegram(task *Task) error {
 	sentMsg, err := s.Bot.Send(msg)
 	if err != nil {
 		metrics.UploadDuration.WithLabelValues("telegram", "failed").Observe(time.Since(startTime).Seconds())
-		return fmt.Errorf("%w: tải lên Telegram thất bại: %v", domain.ErrExternal, err)
+		return i18n.WrapError(domain.ErrExternal, "upload_err_tg_failed", err)
 	}
 	metrics.UploadDuration.WithLabelValues("telegram", "success").Observe(time.Since(startTime).Seconds())
 

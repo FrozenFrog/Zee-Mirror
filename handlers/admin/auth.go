@@ -9,25 +9,25 @@ import (
 
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const (
-	UnknownSize  = "unknown"
-	UnlimitedStr = "Không giới hạn"
-)
+// UnknownSize is the placeholder username when /authorize gets only an ID.
+const UnknownSize = "unknown"
 
 func HandleAuth(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if message.From.ID != s.Config.OwnerID {
-		s.Reply(message, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Chỉ Owner mới có thể dùng lệnh này\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "admin_need_owner")))
 		return
 	}
 
 	targetID, username := parseUserArgs(message, args)
 	if targetID == 0 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Cách dùng: /authorize ID \\[username\\] hoặc reply vào người dùng\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_usage_authorize")))
 		return
 	}
 
@@ -44,72 +44,78 @@ func HandleAuth(s *service.BotService, message *tgbotapi.Message, args string) {
 		MaxDailyTasks:     s.Config.DefaultMaxDailyTasks,
 		MaxDailyBandwidth: s.Config.DefaultMaxDailyBandwidth,
 	}
+	// Upsert overwrites the language column; keep the target's own choice.
+	if existing, getErr := s.DB.GetByID(ctx, targetID); getErr == nil && existing != nil {
+		user.Language = existing.Language
+	}
 
 	err := s.DB.Upsert(ctx, user)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI CƠ SỞ DỮ LIỆU", "Lưu người dùng thất bại: "+utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_db_error"), i18n.T(lang, "admin_save_failed", utils.EscapeMarkdownV2(err.Error()))))
 		return
 	}
 
-	quota := UnlimitedStr
+	unlimited := i18n.T(lang, "admin_unlimited")
+	quota := unlimited
 	if s.Config.DefaultMaxDailyTasks != -1 || s.Config.DefaultMaxDailyBandwidth != -1 {
-		tasks := UnlimitedStr
+		tasks := unlimited
 		if s.Config.DefaultMaxDailyTasks != -1 {
 			tasks = fmt.Sprintf("%d", s.Config.DefaultMaxDailyTasks)
 		}
-		bw := UnlimitedStr
+		bw := unlimited
 		if s.Config.DefaultMaxDailyBandwidth != -1 {
 			bw = utils.FormatBytes(s.Config.DefaultMaxDailyBandwidth)
 		}
-		quota = fmt.Sprintf("Task: %s | BW: %s", tasks, bw)
+		quota = i18n.T(lang, "admin_quota_format", tasks, bw)
 	}
 
-	content := fmt.Sprintf("👤 *Người dùng:* %s\n🏷️ *ID:* `%d`\n🔰 *Vai trò:* `Được cấp quyền`\n♾️ *Hạn mức:* `%s`",
-		utils.EscapeMarkdownV2(username), targetID, utils.EscapeMarkdownV2(quota))
-	s.Reply(message, service.GetSuccessMessage("ĐÃ CẤP QUYỀN", content))
+	content := i18n.T(lang, "admin_authorize_info", utils.EscapeMarkdownV2(username), targetID, utils.EscapeMarkdownV2(quota))
+	s.Reply(message, service.GetSuccessMessage(i18n.T(lang, "admin_title_authorized"), content))
 }
 
 func HandleUnauth(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if message.From.ID != s.Config.OwnerID {
-		s.Reply(message, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Chỉ Owner mới có thể dùng lệnh này\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "admin_need_owner")))
 		return
 	}
 
 	if args == "" {
-		s.Reply(message, "⚠️ *Sai định dạng*\n\nCách dùng: `/unauth <user_id>`")
+		s.Reply(message, i18n.T(lang, "admin_unauth_usage"))
 		return
 	}
 
 	userID, err := strconv.ParseInt(args, 10, 64)
 	if err != nil {
-		s.Reply(message, "⚠️ *ID người dùng không hợp lệ*")
+		s.Reply(message, i18n.T(lang, "admin_invalid_user_id"))
 		return
 	}
 
 	ctx := context.Background()
 	if err := s.DB.SetRole(ctx, userID, "user"); err != nil {
-		s.Reply(message, fmt.Sprintf("❌ *Xóa người dùng thất bại:* %s", utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, i18n.T(lang, "admin_unauth_failed", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
-	s.Reply(message, fmt.Sprintf("✅ *Đã xóa người dùng %d khỏi danh sách được cấp quyền*", userID))
+	s.Reply(message, i18n.T(lang, "admin_unauth_done", userID))
 }
 
 func HandleUserList(s *service.BotService, message *tgbotapi.Message) {
 	if !s.IsAuthorized(message.From.ID) {
 		return
 	}
+	lang := s.GetUserLanguage(message.From.ID)
 
 	ctx := context.Background()
 	usersCount, _ := s.DB.GetCount(ctx)
 	users, err := s.DB.GetAll(ctx)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI CƠ SỞ DỮ LIỆU", "Không thể lấy danh sách người dùng\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_db_error"), i18n.T(lang, "admin_user_list_failed")))
 		return
 	}
 
 	var content strings.Builder
-	_, _ = fmt.Fprintf(&content, "Tổng số người dùng: %d\n\n", usersCount)
+	content.WriteString(i18n.T(lang, "admin_user_count", usersCount))
 	for _, u := range users {
 		status := "✅"
 		if !u.IsActive {
@@ -133,50 +139,52 @@ func HandleUserList(s *service.BotService, message *tgbotapi.Message) {
 			status, u.ID, utils.EscapeMarkdownV2(u.Username), strings.ToUpper(role), utils.EscapeMarkdownV2(limits))
 	}
 
-	s.Reply(message, service.ProfessionalMessage("DANH SÁCH NGƯỜI DÙNG", content.String()))
+	s.Reply(message, service.ProfessionalMessage(i18n.T(lang, "admin_title_user_list"), content.String()))
 }
 
 func RemoveUserHandler(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Chỉ Admin/Owner mới có thể dùng lệnh này\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "admin_need_admin")))
 		return
 	}
 
 	targetID, _ := parseUserArgs(message, args)
 	if targetID == 0 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Cách dùng: /removeuser ID hoặc reply vào người dùng\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_usage_removeuser")))
 		return
 	}
 
 	if s.IsOwner(targetID) {
-		s.Reply(message, service.GetErrorMessage("LỖI", "Không thể xóa Owner\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_error"), i18n.T(lang, "admin_cannot_remove_owner")))
 		return
 	}
 
 	ctx := context.Background()
 	err := s.DB.Delete(ctx, targetID)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI CƠ SỞ DỮ LIỆU", "Xóa người dùng thất bại: "+utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_db_error"), i18n.T(lang, "admin_remove_failed", utils.EscapeMarkdownV2(err.Error()))))
 		return
 	}
 
-	s.Reply(message, service.GetSuccessMessage("ĐÃ XÓA NGƯỜI DÙNG", fmt.Sprintf("Người dùng `%d` đã bị xóa khỏi cơ sở dữ liệu\\.", targetID)))
+	s.Reply(message, service.GetSuccessMessage(i18n.T(lang, "admin_title_user_removed"), i18n.T(lang, "admin_remove_done", targetID)))
 }
 
 func SetRoleHandler(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Chỉ Admin/Owner mới có thể dùng lệnh này\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "admin_need_admin")))
 		return
 	}
 
 	targetID, _ := parseUserArgs(message, args)
 	if targetID == 0 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Cách dùng: /setrole ID <role> hoặc reply vào người dùng kèm <role>\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_usage_setrole")))
 		return
 	}
 
 	if s.IsOwner(targetID) {
-		s.Reply(message, service.GetErrorMessage("LỖI", "Không thể đổi vai trò của Owner\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_error"), i18n.T(lang, "admin_cannot_change_owner_role")))
 		return
 	}
 
@@ -191,22 +199,23 @@ func SetRoleHandler(s *service.BotService, message *tgbotapi.Message, args strin
 	ctx := context.Background()
 	err := s.DB.SetRole(ctx, targetID, role)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI CƠ SỞ DỮ LIỆU", "Đổi vai trò thất bại: "+utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_db_error"), i18n.T(lang, "admin_setrole_failed", utils.EscapeMarkdownV2(err.Error()))))
 		return
 	}
 
-	s.Reply(message, service.GetSuccessMessage("ĐÃ CẬP NHẬT VAI TRÒ", fmt.Sprintf("Vai trò của người dùng `%d` đã được đổi thành `%s`\\.", targetID, strings.ToUpper(role))))
+	s.Reply(message, service.GetSuccessMessage(i18n.T(lang, "admin_title_role_updated"), i18n.T(lang, "admin_setrole_done", targetID, strings.ToUpper(role))))
 }
 
 func SetLimitHandler(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Chỉ Admin/Owner mới có thể dùng lệnh này\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "admin_need_admin")))
 		return
 	}
 
 	targetID, _ := parseUserArgs(message, args)
 	if targetID == 0 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Cách dùng: /setlimit ID <tasks> <bandwidth> hoặc reply kèm <tasks> <bandwidth>\\.\nDùng \\-1 để không giới hạn\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_usage_setlimit")))
 		return
 	}
 
@@ -221,19 +230,19 @@ func SetLimitHandler(s *service.BotService, message *tgbotapi.Message, args stri
 	}
 
 	if len(remainingArgs) < 2 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Hãy nhập số Task và bandwidth \\(ví dụ: 10 50GB\\)\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_setlimit_missing_args")))
 		return
 	}
 
 	maxTasks, err := strconv.Atoi(remainingArgs[0])
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("GIÁ TRỊ KHÔNG HỢP LỆ", "Số Task phải là số\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_invalid_value"), i18n.T(lang, "admin_tasks_nan")))
 		return
 	}
 
 	maxBandwidth := utils.ParseBytesString(remainingArgs[1])
 	if maxBandwidth == 0 && remainingArgs[1] != "0" && remainingArgs[1] != "-1" {
-		s.Reply(message, service.GetErrorMessage("GIÁ TRỊ KHÔNG HỢP LỆ", "Định dạng bandwidth không hợp lệ \\(ví dụ: 10GB, 100MB, \\-1\\)\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_invalid_value"), i18n.T(lang, "admin_bandwidth_invalid")))
 		return
 	}
 
@@ -244,33 +253,34 @@ func SetLimitHandler(s *service.BotService, message *tgbotapi.Message, args stri
 	ctx := context.Background()
 	err = s.DB.SetLimits(ctx, targetID, maxTasks, maxBandwidth)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI CƠ SỞ DỮ LIỆU", "Lưu giới hạn thất bại: "+utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_db_error"), i18n.T(lang, "admin_setlimit_failed", utils.EscapeMarkdownV2(err.Error()))))
 		return
 	}
 
-	bwStr := UnlimitedStr
+	unlimited := i18n.T(lang, "admin_unlimited")
+	bwStr := unlimited
 	if maxBandwidth != -1 {
 		bwStr = utils.FormatBytes(maxBandwidth)
 	}
-	taskStr := UnlimitedStr
+	taskStr := unlimited
 	if maxTasks != -1 {
 		taskStr = strconv.Itoa(maxTasks)
 	}
 
-	content := fmt.Sprintf("👤 *ID người dùng:* `%d`\n📋 *Task mỗi ngày:* `%s`\n📊 *Bandwidth mỗi ngày:* `%s`",
-		targetID, taskStr, bwStr)
-	s.Reply(message, service.GetSuccessMessage("ĐÃ CẬP NHẬT GIỚI HẠN", content))
+	content := i18n.T(lang, "admin_setlimit_done", targetID, taskStr, bwStr)
+	s.Reply(message, service.GetSuccessMessage(i18n.T(lang, "admin_title_limit_updated"), content))
 }
 
 func SetExpireHandler(s *service.BotService, message *tgbotapi.Message, args string) {
+	lang := s.GetUserLanguage(message.From.ID)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, service.GetErrorMessage("TRUY CẬP BỊ TỪ CHỐI", "Chỉ Admin/Owner mới có thể dùng lệnh này\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "auth_title_access_denied"), i18n.T(lang, "admin_need_admin")))
 		return
 	}
 
 	targetID, _ := parseUserArgs(message, args)
 	if targetID == 0 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Cách dùng: /setexpire ID <days> hoặc reply kèm <days>\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_usage_setexpire")))
 		return
 	}
 
@@ -285,13 +295,13 @@ func SetExpireHandler(s *service.BotService, message *tgbotapi.Message, args str
 	}
 
 	if len(remainingArgs) < 1 {
-		s.Reply(message, service.GetErrorMessage("SAI ĐỊNH DẠNG", "Hãy nhập số ngày hiệu lực\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_bad_format"), i18n.T(lang, "admin_expire_missing_days")))
 		return
 	}
 
 	days, err := strconv.Atoi(remainingArgs[0])
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("GIÁ TRỊ KHÔNG HỢP LỆ", "Số ngày phải là số\\."))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_invalid_value"), i18n.T(lang, "admin_days_nan")))
 		return
 	}
 
@@ -299,12 +309,12 @@ func SetExpireHandler(s *service.BotService, message *tgbotapi.Message, args str
 	ctx := context.Background()
 	err = s.DB.SetExpiration(ctx, targetID, expiresAt)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI CƠ SỞ DỮ LIỆU", "Lưu thời hạn thất bại: "+utils.EscapeMarkdownV2(err.Error())))
+		s.Reply(message, service.GetErrorMessage(i18n.T(lang, "admin_title_db_error"), i18n.T(lang, "admin_setexpire_failed", utils.EscapeMarkdownV2(err.Error()))))
 		return
 	}
 
-	s.Reply(message, service.GetSuccessMessage("ĐÃ CẬP NHẬT THỜI HẠN", fmt.Sprintf("Thời hạn của người dùng `%d` đã được cập nhật đến *%s* \\(%d ngày\\)\\.",
-		targetID, expiresAt.Format("02 Jan 2006"), days)))
+	s.Reply(message, service.GetSuccessMessage(i18n.T(lang, "admin_title_expiry_updated"),
+		i18n.T(lang, "admin_setexpire_done", targetID, expiresAt.Format("02 Jan 2006"), days)))
 }
 
 func parseUserArgs(message *tgbotapi.Message, args string) (int64, string) {

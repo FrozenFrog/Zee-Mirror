@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 	"zee-mirror/plugins/drive"
 
@@ -20,9 +21,10 @@ import (
 
 func (s *BotService) HandleClone(message *tgbotapi.Message, args string) {
 	if err := s.CheckQuota(message.From.ID); err != nil {
-		s.reply(message, GetErrorMessage("VƯỢT HẠN MỨC", err.Error()))
+		s.reply(message, QuotaErrorMessage(s.GetUserLanguage(message.From.ID), err))
 		return
 	}
+	lang := s.GetUserLanguage(message.From.ID)
 
 	url, _, _, _, _, name, _, _ := utils.ParseFlags(args)
 	if url == "" {
@@ -30,14 +32,14 @@ func (s *BotService) HandleClone(message *tgbotapi.Message, args string) {
 	}
 
 	if url == "" {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nVui lòng cung cấp URL Google Drive để Clone\\.")
+		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "clone_no_url"))
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
 	}
 
 	if !strings.Contains(url, "drive.google.com") && !strings.Contains(url, "docs.google.com") && !strings.Contains(url, "drive.usercontent.google.com") {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "❌ *Lỗi*\n\nURL không phải link Google Drive hợp lệ\\.")
+		msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "clone_invalid_url"))
 		msg.ParseMode = MarkdownV2
 		_, _ = s.Bot.Send(msg)
 		return
@@ -54,7 +56,7 @@ func (s *BotService) HandleClone(message *tgbotapi.Message, args string) {
 
 	task, err := s.TaskManager.CreateTask(TypeClone, url, fileName, message.Chat.ID, message.MessageID, replyID, message.From.ID, false, false, "", "", 0, "", false)
 	if err != nil {
-		s.HandleCreateTaskError(message.Chat.ID, message.MessageID, err)
+		s.HandleCreateTaskErrorLang(s.GetUserLanguage(message.From.ID), message.Chat.ID, message.MessageID, err)
 		return
 	}
 	s.HandleAutoDelete(task)
@@ -71,7 +73,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 
 	driveID, isFolderHint := drive.ExtractDriveID(task.URL)
 	if driveID == "" {
-		task.SetError("Không trích xuất được ID từ URL Google Drive")
+		task.SetError(i18n.T(s.GetUserLanguage(task.UserID), "clone_err_no_id"))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -81,7 +83,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 
 	driveName, isDir, driveSize, err := drive.GetDriveInfo(task.Ctx, driveID, configPath, remoteName, isFolderHint, task.URL)
 	if err != nil {
-		task.SetError(fmt.Sprintf("Không lấy được thông tin Google Drive: %v", err))
+		task.SetError(i18n.T(s.GetUserLanguage(task.UserID), "clone_err_info", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -121,7 +123,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 	slog.Info("Starting rclone clone", "taskID", task.ID, "args", strings.Join(args, " "))
 
 	if err := cmd.Start(); err != nil {
-		task.SetError(fmt.Sprintf("Không khởi động được rclone: %v", err))
+		task.SetError(i18n.T(s.GetUserLanguage(task.UserID), "clone_err_start", err))
 		s.updateTaskStatus(task)
 		return
 	}
@@ -132,7 +134,7 @@ func (s *BotService) cloneWithRclone(task *Task) {
 		if task.Status == StatusCancelled {
 			return
 		}
-		task.SetError(fmt.Sprintf("Clone bằng rclone thất bại: %v", err))
+		task.SetError(i18n.T(s.GetUserLanguage(task.UserID), "clone_err_failed", err))
 		s.updateTaskStatus(task)
 		return
 	}

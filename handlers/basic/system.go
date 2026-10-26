@@ -11,15 +11,24 @@ import (
 	"time"
 	"zee-mirror/internal/service"
 	"zee-mirror/pkg/chart"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+// errorCard renders service.GetErrorMessage with a translated title and body.
+// The body key holds pre-escaped MarkdownV2; the title is escaped here because
+// GetErrorMessage inserts it verbatim.
+func errorCard(lang, titleKey, bodyKey string, args ...any) string {
+	return service.GetErrorMessage(utils.EscapeMarkdownV2(i18n.T(lang, titleKey)), i18n.T(lang, bodyKey, args...))
+}
+
 func HandlePing(s *service.BotService, message *tgbotapi.Message) {
+	lang := senderLang(s, message)
 	start := time.Now()
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, "🏓 *Đang ping\\.\\.\\.*")
+	msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "basic_pinging"))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	sentMsg, err := s.Bot.Send(msg)
 	if err != nil {
@@ -28,14 +37,15 @@ func HandlePing(s *service.BotService, message *tgbotapi.Message) {
 
 	elapsed := time.Since(start)
 
-	text := fmt.Sprintf("🏓 *Pong\\!* `%v`", elapsed.Round(time.Millisecond))
+	text := i18n.T(lang, "basic_pong", elapsed.Round(time.Millisecond))
 	editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sentMsg.MessageID, text)
 	editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(editMsg)
 }
 
 func HandleSpeed(s *service.BotService, message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "🚀 *Đang chạy Speedtest\\.\\.\\.*")
+	lang := senderLang(s, message)
+	msg := tgbotapi.NewMessage(message.Chat.ID, i18n.T(lang, "basic_speedtest_running"))
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	sentMsg, err := s.Bot.Send(msg)
 	if err != nil {
@@ -46,7 +56,7 @@ func HandleSpeed(s *service.BotService, message *tgbotapi.Message) {
 		cmd := execCommand(context.Background(), "speedtest-cli", "--simple")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			text := fmt.Sprintf("❌ *Lỗi Speedtest*\n\n`%s`", utils.EscapeMarkdownV2Code(err.Error()))
+			text := i18n.T(lang, "basic_speedtest_error", utils.EscapeMarkdownV2Code(err.Error()))
 			editMsg := tgbotapi.NewEditMessageText(message.Chat.ID, sentMsg.MessageID, text)
 			editMsg.ParseMode = tgbotapi.ModeMarkdownV2
 			_, _ = s.Bot.Send(editMsg)
@@ -56,7 +66,7 @@ func HandleSpeed(s *service.BotService, message *tgbotapi.Message) {
 		outStr := string(output)
 		lines := strings.Split(strings.TrimSpace(outStr), "\n")
 		var result strings.Builder
-		result.WriteString("🚀 *Kết quả Speedtest*\n\n")
+		result.WriteString(i18n.T(lang, "basic_speedtest_result") + "\n\n")
 		for _, line := range lines {
 			fmt.Fprintf(&result, "• `%s`\n", utils.EscapeMarkdownV2Code(line))
 		}
@@ -94,12 +104,13 @@ func HandleSystem(s *service.BotService, message *tgbotapi.Message) {
 		return
 	}
 
+	lang := senderLang(s, message)
 	stats := s.GetSystemStats()
-	text := s.FormatSystemStats(stats)
+	text := s.FormatSystemStatsLang(lang, stats)
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
-	msg.ReplyMarkup = systemKeyboard()
+	msg.ReplyMarkup = systemKeyboard(lang)
 	_, _ = s.Bot.Send(msg)
 }
 
@@ -108,8 +119,9 @@ func HandleHealth(s *service.BotService, message *tgbotapi.Message) {
 		return
 	}
 
-	checks := s.PerformHealthChecks()
-	text := s.FormatHealthCheck(checks)
+	lang := senderLang(s, message)
+	checks := s.PerformHealthChecksLang(lang)
+	text := s.FormatHealthCheckLang(lang, checks)
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
@@ -117,15 +129,16 @@ func HandleHealth(s *service.BotService, message *tgbotapi.Message) {
 }
 
 func HandleLogs(s *service.BotService, message *tgbotapi.Message, _ string) {
+	lang := senderLang(s, message)
 	if !s.IsAdmin(message.From.ID) {
-		s.Reply(message, service.GetErrorMessage("TỪ CHỐI TRUY CẬP", "Chỉ Admin mới được xem log\\."))
+		s.Reply(message, errorCard(lang, "sys_logs_denied_hdr", "sys_logs_denied"))
 		return
 	}
 
 	logPath := filepath.Join(s.Config.ConfigDir, "zee-mirror.log")
 
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		s.Reply(message, service.GetErrorMessage("KHÔNG TÌM THẤY FILE", "Không tìm thấy file log hoặc file chưa được tạo\\."))
+		s.Reply(message, errorCard(lang, "sys_logs_missing_hdr", "sys_logs_missing"))
 		return
 	}
 
@@ -135,40 +148,40 @@ func HandleLogs(s *service.BotService, message *tgbotapi.Message, _ string) {
 
 	input, err := os.ReadFile(filepath.Clean(logPath))
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI ĐỌC FILE", fmt.Sprintf("Không đọc được log: %s", utils.EscapeMarkdownV2(err.Error()))))
+		s.Reply(message, errorCard(lang, "sys_logs_read_hdr", "sys_logs_read_err", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 
 	// #nosec G703 -- temp file name is constants + timestamp under os.TempDir()
 	err = os.WriteFile(tempPath, input, 0600)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI GHI FILE", fmt.Sprintf("Không tạo được file tạm: %s", utils.EscapeMarkdownV2(err.Error()))))
+		s.Reply(message, errorCard(lang, "sys_logs_write_hdr", "sys_logs_write_err", utils.EscapeMarkdownV2(err.Error())))
 		return
 	}
 	defer func() { _ = os.Remove(tempPath) }()
 
 	file := tgbotapi.NewDocument(message.Chat.ID, tgbotapi.FilePath(tempPath))
-	file.Caption = fmt.Sprintf("📝 *Log ứng dụng:* `%s`", utils.EscapeMarkdownV2(tempFileName))
+	file.Caption = i18n.T(lang, "sys_logs_caption", utils.EscapeMarkdownV2(tempFileName))
 	file.ParseMode = tgbotapi.ModeMarkdownV2
 
 	_, err = s.Bot.Send(file)
 	if err != nil {
-		s.Reply(message, service.GetErrorMessage("LỖI GỬI FILE", fmt.Sprintf("Không gửi được file: %s", utils.EscapeMarkdownV2(err.Error()))))
+		s.Reply(message, errorCard(lang, "sys_logs_send_hdr", "sys_logs_send_err", utils.EscapeMarkdownV2(err.Error())))
 	}
 }
 
-func systemKeyboard() tgbotapi.InlineKeyboardMarkup {
+func systemKeyboard(lang string) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔄 Làm mới", "system:"+CmdRefresh),
-			tgbotapi.NewInlineKeyboardButtonData("📊 Chi tiết", "system:detailed"),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "basic_btn_refresh"), "system:"+CmdRefresh),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "sys_btn_detail"), "system:detailed"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📈 Logs", "system:logs"),
-			tgbotapi.NewInlineKeyboardButtonData("🧹 Dọn dẹp", "system:cleanup"),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "sys_btn_logs"), "system:logs"),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "sys_btn_cleanup"), "system:cleanup"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✖️ Đóng", "system:"+CmdClose),
+			tgbotapi.NewInlineKeyboardButtonData(i18n.T(lang, "help_close"), "system:"+CmdClose),
 		),
 	)
 }
@@ -180,29 +193,30 @@ func HandleSystemCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 	}
 
 	action := parts[1]
+	lang := s.GetUserLanguage(callback.From.ID)
 
 	switch action {
 	case CmdRefresh:
 		stats := s.GetSystemStats()
-		text := s.FormatSystemStats(stats)
+		text := s.FormatSystemStatsLang(lang, stats)
 
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
-		kb := systemKeyboard()
+		kb := systemKeyboard(lang)
 		editMsg.ReplyMarkup = &kb
 		_, _ = s.Bot.Send(editMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🔄 Đã làm mới"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "sys_toast_refreshed")))
 
 	case "detailed":
-		checks := s.PerformHealthChecks()
-		text := s.FormatHealthCheck(checks)
+		checks := s.PerformHealthChecksLang(lang)
+		text := s.FormatHealthCheckLang(lang, checks)
 
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, text)
 		editMsg.ParseMode = tgbotapi.ModeMarkdownV2
-		kb := systemKeyboard()
+		kb := systemKeyboard(lang)
 		editMsg.ReplyMarkup = &kb
 		_, _ = s.Bot.Send(editMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "📊 Xem chi tiết"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "sys_toast_detail")))
 
 	case "logs":
 		msg := &tgbotapi.Message{
@@ -218,20 +232,20 @@ func HandleSystemCallback(s *service.BotService, callback *tgbotapi.CallbackQuer
 			From: callback.From,
 		}
 		HandleLogs(s, msg, "file")
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đang gửi file..."))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "sys_toast_sending")))
 
 	case "cleanup":
 		if callback.From.ID != s.Config.OwnerID {
-			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "❌ Chỉ dành cho Owner"))
+			_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "sys_toast_owner_only")))
 			return
 		}
 		go s.PerformDiskCleanup()
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "🧹 Đã bắt đầu dọn dẹp"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "sys_toast_cleanup")))
 
 	case CmdClose:
 		deleteMsg := tgbotapi.NewDeleteMessage(callback.Message.Chat.ID, callback.Message.MessageID)
 		_, _ = s.Bot.Request(deleteMsg)
-		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, "Đã đóng"))
+		_, _ = s.Bot.Request(tgbotapi.NewCallback(callback.ID, i18n.T(lang, "basic_toast_closed")))
 		return
 	}
 }

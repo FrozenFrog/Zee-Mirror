@@ -1,10 +1,10 @@
 package basic
 
 import (
-	"fmt"
 	"strings"
 
 	"zee-mirror/internal/service"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -16,26 +16,26 @@ func HandleNotify(s *service.BotService, m *tgbotapi.Message, args string) {
 	if m.From == nil {
 		return
 	}
+	lang := s.GetUserLanguage(m.From.ID)
 	arg := strings.TrimSpace(args)
 	if arg == "" {
-		notifyReply(s, m, "🔔 WEBHOOK THÔNG BÁO\n\nDùng: /notify <webhook_url>\nXóa: /notify off\n\nWebhook sẽ nhận POST JSON khi Task của bạn hoàn thành/thất bại.")
+		notifyReply(s, m, i18n.T(lang, "notify_cmd_usage_plain"))
 		return
 	}
 
 	if strings.EqualFold(arg, "off") {
 		n := s.SetUserNotify(m.From.ID, "")
-		notifyReply(s, m, fmt.Sprintf("🔕 Đã tắt webhook thông báo (%d Task đang chạy)", n))
+		notifyReply(s, m, i18n.T(lang, "notify_cmd_off_plain", n))
 		return
 	}
 
 	if !service.ValidNotifyURL(arg) {
-		notifyReply(s, m, "❌ URL không hợp lệ — phải là http/https")
+		notifyReply(s, m, i18n.T(lang, "notify_cmd_invalid_url_plain"))
 		return
 	}
 
 	n := s.SetUserNotify(m.From.ID, arg)
-	text := fmt.Sprintf("✅ Đã lưu webhook cho %d Task đang chạy\n\nURL: `%s`\nWebhook sẽ nhận POST JSON khi Task hoàn thành/thất bại\\.",
-		n, utils.EscapeMarkdownV2Code(arg))
+	text := i18n.T(lang, "notify_cmd_saved", n, utils.EscapeMarkdownV2Code(arg))
 	detail := tgbotapi.NewMessage(m.Chat.ID, text)
 	detail.ParseMode = tgbotapi.ModeMarkdownV2
 	_, _ = s.Bot.Send(detail)

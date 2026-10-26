@@ -68,16 +68,17 @@ func TestCalculateDuration(t *testing.T) {
 
 func TestDetermineSizeString(t *testing.T) {
 	snap := domain.TaskSnapshot{TotalSize: 1500}
-	assert.Equal(t, utils.FormatBytes(1500), determineSizeString(snap))
+	assert.Equal(t, utils.FormatBytes(1500), determineSizeString("vi", snap))
 
 	snap = domain.TaskSnapshot{DownloadedSize: 2048}
-	assert.Equal(t, utils.FormatBytes(2048), determineSizeString(snap))
+	assert.Equal(t, utils.FormatBytes(2048), determineSizeString("vi", snap))
 
 	snap = domain.TaskSnapshot{}
-	assert.Equal(t, UnknownSize, determineSizeString(snap))
+	assert.Equal(t, UnknownSizeLang("vi"), determineSizeString("vi", snap))
+	assert.Equal(t, "Unknown", determineSizeString("en", snap))
 
 	snap = domain.TaskSnapshot{LocalPath: filepath.Join(t.TempDir(), "missing.bin"), TotalSize: 300}
-	assert.Equal(t, utils.FormatBytes(300), determineSizeString(snap))
+	assert.Equal(t, utils.FormatBytes(300), determineSizeString("vi", snap))
 }
 
 func TestStripANSI(t *testing.T) {
@@ -254,7 +255,7 @@ func TestUpdateFromProgressUpdate(t *testing.T) {
 		Connections: 8,
 		ETA:         10 * time.Second,
 	}
-	task.UpdateFromProgressUpdate(up)
+	task.UpdateFromProgressUpdate("vi", up)
 
 	assert.Equal(t, "new.mkv", task.FileName)
 	assert.Equal(t, int64(100), task.DownloadedSize)
@@ -265,13 +266,13 @@ func TestUpdateFromProgressUpdate(t *testing.T) {
 	assert.Equal(t, 10*time.Second, task.ETA)
 
 	// Message resets speed/ETA.
-	task.UpdateFromProgressUpdate(downloader.ProgressUpdate{Message: "processing"})
+	task.UpdateFromProgressUpdate("vi", downloader.ProgressUpdate{Message: "processing"})
 	assert.Equal(t, "processing", task.ProcessingMessage)
 	assert.Zero(t, task.Speed)
 	assert.Zero(t, task.ETA)
 
 	// Zero fields are ignored except Progress which is always overwritten.
-	task.UpdateFromProgressUpdate(downloader.ProgressUpdate{})
+	task.UpdateFromProgressUpdate("vi", downloader.ProgressUpdate{})
 	assert.InDelta(t, 0, task.Progress, 0.001)
 	assert.Equal(t, int64(100), task.DownloadedSize)
 }
@@ -279,7 +280,7 @@ func TestUpdateFromProgressUpdate(t *testing.T) {
 func TestUpdateFromUploadProgress(t *testing.T) {
 	task := newTestTask("t1", "g1", StatusUploading, time.Now())
 	up := uploader.ProgressUpdate{UploadedSize: 100, TotalSize: 200, Progress: 50, Speed: 10, ETA: 5 * time.Second}
-	task.UpdateFromUploadProgress(up)
+	task.UpdateFromUploadProgress("vi", up)
 
 	assert.Equal(t, int64(100), task.UploadedSize)
 	assert.Equal(t, int64(200), task.TotalSize)
@@ -287,11 +288,11 @@ func TestUpdateFromUploadProgress(t *testing.T) {
 	assert.Equal(t, int64(10), task.Speed)
 	assert.Equal(t, 5*time.Second, task.ETA)
 
-	task.UpdateFromUploadProgress(uploader.ProgressUpdate{Error: "boom"})
+	task.UpdateFromUploadProgress("vi", uploader.ProgressUpdate{Error: "boom"})
 	assert.Equal(t, "boom", task.Error)
 
 	// Zeros ignored.
-	task.UpdateFromUploadProgress(uploader.ProgressUpdate{})
+	task.UpdateFromUploadProgress("vi", uploader.ProgressUpdate{})
 	assert.Equal(t, int64(100), task.UploadedSize)
 }
 

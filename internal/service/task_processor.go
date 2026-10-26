@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"zee-mirror/internal/downloader"
 	"zee-mirror/internal/organizer"
 	"zee-mirror/internal/queue"
+	"zee-mirror/pkg/i18n"
 	"zee-mirror/plugins/registry"
 )
 
@@ -45,7 +45,7 @@ func (s *BotService) processTask(task *Task) {
 
 		tgFile, isOfficial, err := s.GetFileWithFallback(fileID)
 		if err != nil {
-			task.SetError(fmt.Sprintf("Không lấy được file Telegram: %v", err))
+			s.coreFailTask(task, "task_err_tg_file", err)
 			s.updateTaskStatus(task)
 			return
 		}
@@ -112,7 +112,7 @@ func (s *BotService) executeDownloadEngine(engine downloader.DownloadEngine, tas
 	outputDir := filepath.Join(s.TaskManager.DownloadDir, task.ID)
 
 	if err := os.MkdirAll(outputDir, 0750); err != nil {
-		task.SetError(fmt.Sprintf("%v: không tạo được thư mục đầu ra: %v", domain.ErrStorage, err))
+		s.coreFailTask(task, "task_err_output_dir", err)
 		s.updateTaskStatus(task)
 		return
 	}
@@ -124,8 +124,9 @@ func (s *BotService) executeDownloadEngine(engine downloader.DownloadEngine, tas
 
 	firstUpdate := true
 	lastUpdate := time.Now()
+	lang := s.coreTaskLang(task)
 	err := engine.Download(task.Ctx, &task.Task, outputDir, func(up downloader.ProgressUpdate) {
-		task.UpdateFromProgressUpdate(up)
+		task.UpdateFromProgressUpdate(lang, up)
 
 		if firstUpdate || time.Since(lastUpdate) >= 3*time.Second {
 			s.updateTaskStatus(task)
@@ -149,7 +150,7 @@ func (s *BotService) executeDownloadEngine(engine downloader.DownloadEngine, tas
 		categorizedErr := domain.CategorizeError(err)
 		if !domain.IsRetryable(categorizedErr) {
 			slog.Info("Non-retryable error, skipping retries", "taskID", task.ID, "error", err)
-			task.SetError(categorizedErr.Error())
+			s.coreFailTask(task, "", categorizedErr)
 			s.updateTaskStatus(task)
 			s.cleanupTask(task)
 			return
@@ -157,7 +158,7 @@ func (s *BotService) executeDownloadEngine(engine downloader.DownloadEngine, tas
 		if s.retryTask(task, err.Error()) {
 			return
 		}
-		task.SetError(err.Error())
+		s.coreFailTask(task, "", err)
 		s.updateTaskStatus(task)
 		s.cleanupTask(task)
 		return
@@ -182,7 +183,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 	slog.Info("findDownloadedFile result", "taskID", task.ID, "localPath", task.LocalPath, "outputDir", outputDir)
 	if task.LocalPath == "" {
 		if task.Error == "" {
-			task.SetError("Không tìm thấy file đã tải xuống")
+			task.SetError(i18n.T(s.coreTaskLang(task), "task_err_no_file"))
 		}
 		s.updateTaskStatus(task)
 		s.cleanupTask(task)
@@ -192,7 +193,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 
 	if task.Unzip && (organizer.IsArchiveFile(task.LocalPath) || organizer.LooksLikeArchive(task.LocalPath)) {
 		if err := s.extractArchive(task); err != nil {
-			task.SetError(fmt.Sprintf("Giải nén thất bại: %v", err))
+			s.coreFailTask(task, "task_err_extract", err)
 			s.updateTaskStatus(task)
 			s.cleanupTask(task)
 			return
@@ -201,7 +202,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 
 	if task.Zip {
 		if err := s.createZipArchive(task); err != nil {
-			task.SetError(fmt.Sprintf("Nén file thất bại: %v", err))
+			s.coreFailTask(task, "task_err_zip", err)
 			s.updateTaskStatus(task)
 			s.cleanupTask(task)
 			return
@@ -237,7 +238,7 @@ func (s *BotService) HandlePostDownload(task *Task, outputDir string) {
 			s.cleanupTask(task)
 			return
 		}
-		task.SetError(fmt.Sprintf("%v: Tải lên thất bại: %v", domain.ErrExternal, err))
+		s.coreFailTask(task, "task_err_upload", err)
 	} else {
 		task.SetStatus(StatusCompleted)
 	}

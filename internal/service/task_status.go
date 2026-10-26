@@ -6,6 +6,7 @@ import (
 	"strings"
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/organizer"
+	"zee-mirror/pkg/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -32,23 +33,23 @@ func (s *BotService) updateTaskStatus(task *Task) {
 		})
 
 		if existingID == 0 {
-			if s.sendVideoWithThumbnail(task, text) {
+			if s.sendVideoWithThumbnail(lang, task, text) {
 				return
 			}
 		}
 	}
 
 	slog.Debug("Sending final task message", "task_id", task.ID, "status", snapshot.Status)
-	s.sendFinalMessage(task, text)
+	s.sendFinalMessage(lang, task, text)
 }
 
-func (s *BotService) sendVideoWithThumbnail(task *Task, text string) bool {
+func (s *BotService) sendVideoWithThumbnail(lang string, task *Task, text string) bool {
 	snapshot := task.GetSnapshot()
 	if thumb, err := GenerateThumbnail(task.Ctx, snapshot.LocalPath, s.TaskManager.DownloadDir); err == nil {
 		photo := tgbotapi.NewPhoto(snapshot.ChatID, tgbotapi.FilePath(thumb))
 		photo.Caption = text
 		photo.ParseMode = MarkdownV2
-		if keyboard := s.buildCompletionKeyboard(snapshot); keyboard != nil {
+		if keyboard := s.buildCompletionKeyboard(lang, snapshot); keyboard != nil {
 			photo.ReplyMarkup = *keyboard
 		}
 		sentMsg, sendErr := s.Bot.Send(photo)
@@ -66,13 +67,13 @@ func (s *BotService) sendVideoWithThumbnail(task *Task, text string) bool {
 	return false
 }
 
-func (s *BotService) buildCompletionKeyboard(snapshot domain.TaskSnapshot) *tgbotapi.InlineKeyboardMarkup {
+func (s *BotService) buildCompletionKeyboard(lang string, snapshot domain.TaskSnapshot) *tgbotapi.InlineKeyboardMarkup {
 	if snapshot.Status != StatusCompleted || snapshot.RemoteURL == "" {
 		return nil
 	}
 
 	buttons := []tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardButtonURL(domain.BtnTextCloudLink, snapshot.RemoteURL),
+		tgbotapi.NewInlineKeyboardButtonURL(i18n.T(lang, "task_btn_cloud_link"), snapshot.RemoteURL),
 	}
 
 	if s.Config.IndexURL != "" {
@@ -86,14 +87,14 @@ func (s *BotService) buildCompletionKeyboard(snapshot domain.TaskSnapshot) *tgbo
 			}
 		}
 		indexURL := strings.TrimRight(s.Config.IndexURL, "/") + "/" + strings.TrimLeft(relPath, "/")
-		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonURL(domain.BtnTextIndexURL, indexURL))
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonURL(i18n.T(lang, "task_btn_index_link"), indexURL))
 	}
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons)
 	return &keyboard
 }
 
-func (s *BotService) sendFinalMessage(task *Task, text string) {
+func (s *BotService) sendFinalMessage(lang string, task *Task, text string) {
 	snapshot := task.GetSnapshot()
 
 	var msgID int
@@ -101,7 +102,7 @@ func (s *BotService) sendFinalMessage(task *Task, text string) {
 		msgID = task.ResultMessageID
 	})
 
-	keyboard := s.buildCompletionKeyboard(snapshot)
+	keyboard := s.buildCompletionKeyboard(lang, snapshot)
 
 	if msgID != 0 {
 		if keyboard != nil {
