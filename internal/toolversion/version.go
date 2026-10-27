@@ -103,7 +103,9 @@ func Latest(ctx context.Context, name string) (string, error) {
 			Version string `json:"version"`
 		} `json:"info"`
 	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&release); err != nil {
+	// PyPI's project JSON includes all historical releases; yt-dlp's response
+	// already exceeds 1 MiB.
+	if err := json.NewDecoder(io.LimitReader(response.Body, 8<<20)).Decode(&release); err != nil {
 		return "", err
 	}
 	version := release.Info.Version

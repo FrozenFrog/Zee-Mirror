@@ -320,7 +320,8 @@ func (s *BotService) FormatHealthCheckLang(lang string, checks []HealthCheck) st
 			if latest == "" {
 				latest = "—"
 			}
-			fmt.Fprintf(&content, "  %s\n", i18n.T(lang, "monitor_versions", utils.EscapeMarkdownV2(current), utils.EscapeMarkdownV2(latest)))
+			fmt.Fprintf(&content, "└ %s\n", i18n.T(lang, "monitor_version_current", utils.EscapeMarkdownV2(current)))
+			fmt.Fprintf(&content, "└ %s\n", i18n.T(lang, "monitor_version_latest", utils.EscapeMarkdownV2(latest)))
 		}
 	}
 

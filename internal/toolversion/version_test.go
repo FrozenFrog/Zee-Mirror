@@ -1,6 +1,12 @@
 package toolversion
 
-import "testing"
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestVersionParsing(t *testing.T) {
 	tests := []struct {
@@ -20,5 +26,29 @@ func TestVersionParsing(t *testing.T) {
 	}
 	if got := normalizeReleaseTag("v1.75.2"); got != "1.75.2" {
 		t.Errorf("rclone release tag: got %q", got)
+	}
+}
+
+func TestLatestYtdlpReadsLargePyPIResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"info":{"version":"2026.10.26"},"padding":"` + strings.Repeat("x", 1200000) + `"}`))
+	}))
+	defer server.Close()
+	original := definitions["yt-dlp"]
+	updated := original
+	updated.url = server.URL
+	definitions["yt-dlp"] = updated
+	latestCache.Lock()
+	delete(latestCache.values, "yt-dlp")
+	latestCache.Unlock()
+	t.Cleanup(func() {
+		definitions["yt-dlp"] = original
+		latestCache.Lock()
+		delete(latestCache.values, "yt-dlp")
+		latestCache.Unlock()
+	})
+	got, err := Latest(context.Background(), "yt-dlp")
+	if err != nil || got != "2026.10.26" {
+		t.Fatalf("Latest() = %q, %v; want 2026.10.26", got, err)
 	}
 }
