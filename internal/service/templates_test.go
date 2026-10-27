@@ -64,6 +64,8 @@ func TestFormatTaskProfessional(t *testing.T) {
 		assert.Contains(t, result, "task-123")
 		assert.Contains(t, result, "video.mp4")
 		assert.Contains(t, result, "50")
+		assert.Contains(t, result, "/cancel_task_123")
+		assert.NotContains(t, result, "/cancel_task-123")
 	})
 
 	t.Run("CompletedTask", func(t *testing.T) {

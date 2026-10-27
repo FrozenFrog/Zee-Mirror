@@ -353,6 +353,26 @@ func TestCancelTask(t *testing.T) {
 	assert.NotContains(t, tm.Tasks, "t3") // removed even if not cancellable
 }
 
+func TestResolveCancelCommandID(t *testing.T) {
+	task := newTestTask("abcnj-dhi", "g1", StatusDownloading, time.Now())
+	exactTask := newTestTask("exact_id", "g2", StatusDownloading, time.Now())
+	subTask := newTestTask("batch-id_1", "g3", StatusDownloading, time.Now())
+	batch := &BatchTask{ID: "batch-id", SubTasks: []*Task{subTask}}
+	s := &BotService{
+		TaskManager: &TaskManager{Tasks: map[string]*Task{
+			task.ID:      task,
+			exactTask.ID: exactTask,
+		}},
+		BatchManager: &BatchManager{Batches: map[string]*BatchTask{batch.ID: batch}},
+	}
+
+	assert.Equal(t, "abcnj-dhi", s.resolveCancelCommandID("abcnj_dhi"))
+	assert.Equal(t, "exact_id", s.resolveCancelCommandID("exact_id"))
+	assert.Equal(t, "batch-id", s.resolveCancelCommandID("batch_id"))
+	assert.Equal(t, "batch-id_1", s.resolveCancelCommandID("batch_id_1"))
+	assert.Equal(t, "missing_id", s.resolveCancelCommandID("missing_id"))
+}
+
 func TestCancelAllTasks(t *testing.T) {
 	tm := &TaskManager{Tasks: make(map[string]*Task)}
 	for _, tk := range []*Task{

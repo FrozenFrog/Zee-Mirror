@@ -212,7 +212,7 @@ func (s *BotService) buildStatusDashboardText(lang string, tasks []*Task, batche
 				emoji,
 				html.EscapeString(StatusLabel(lang, batch.Status)),
 				i18n.T(lang, "status_batch_progress", batch.Progress, batch.Completed, len(batch.SubTasks)),
-				i18n.T(lang, "task_card_cancel", batchID),
+				i18n.T(lang, "task_card_cancel", html.EscapeString(cancelCommandID(batch.ID))),
 			)
 			batch.Mu.RUnlock()
 		} else if task, ok := item.(*Task); ok {
@@ -405,7 +405,7 @@ func (s *BotService) HandleCancel(message *tgbotapi.Message, args string) {
 		return
 	}
 
-	taskID := args
+	taskID := s.resolveCancelCommandID(args)
 
 	if s.TaskManager.CancelTask(taskID) {
 		s.reply(message, GetSuccessMessage(coreTitle(lang, "task_title_cancelled"), fmt.Sprintf(i18n.T(lang, "task_cancelled"), taskID)))
@@ -448,6 +448,42 @@ func (s *BotService) HandleCancel(message *tgbotapi.Message, args string) {
 	}
 
 	s.reply(message, GetErrorMessageLang(lang, coreTitle(lang, "core_title_not_found"), fmt.Sprintf(i18n.T(lang, "task_not_found"), utils.EscapeMarkdownV2(taskID))))
+}
+
+// resolveCancelCommandID maps the Telegram-safe ID used by clickable
+// /cancel_<id> commands back to the task's real ID. Exact IDs keep priority,
+// so manually entered `/cancel <TaskID>` commands continue to work.
+func (s *BotService) resolveCancelCommandID(commandID string) string {
+	if s.TaskManager.GetTask(commandID) != nil {
+		return commandID
+	}
+
+	s.TaskManager.Mu.RLock()
+	for taskID := range s.TaskManager.Tasks {
+		if cancelCommandID(taskID) == commandID {
+			s.TaskManager.Mu.RUnlock()
+			return taskID
+		}
+	}
+	s.TaskManager.Mu.RUnlock()
+
+	s.BatchManager.Mu.RLock()
+	defer s.BatchManager.Mu.RUnlock()
+	for _, batch := range s.BatchManager.Batches {
+		if cancelCommandID(batch.ID) == commandID {
+			return batch.ID
+		}
+		batch.Mu.RLock()
+		for _, subTask := range batch.SubTasks {
+			if cancelCommandID(subTask.ID) == commandID {
+				batch.Mu.RUnlock()
+				return subTask.ID
+			}
+		}
+		batch.Mu.RUnlock()
+	}
+
+	return commandID
 }
 
 func (s *BotService) HandleCancelAll(message *tgbotapi.Message) {

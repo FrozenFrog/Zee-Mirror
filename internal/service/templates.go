@@ -43,10 +43,11 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 			streamLine = fmt.Sprintf("\n🌊 *Stream:* `%s`", utils.EscapeMarkdownV2Code(streamURL))
 		}
 
-		text = fmt.Sprintf("%s\n\n%s\n%s\n%s\n%s%s%s%s",
+		text = fmt.Sprintf("%s\n\n%s\n%s\n%s\n%s\n%s%s%s%s",
 			i18n.T(lang, "status_completed"),
 			i18n.T(lang, "task_done_name", utils.EscapeMarkdownV2Code(snapshot.FileName)),
 			i18n.T(lang, "task_done_size", utils.EscapeMarkdownV2Code(sizeStr)),
+			i18n.T(lang, "task_done_url", utils.EscapeMarkdownV2Code(snapshot.URL)),
 			i18n.T(lang, "task_done_time", utils.EscapeMarkdownV2Code(utils.FormatDuration(duration))),
 			i18n.T(lang, "task_done_path", utils.EscapeMarkdownV2Code(snapshot.RemotePath)),
 			playlistLine,
@@ -229,8 +230,14 @@ func FormatTaskProfessional(lang string, taskSnapshot domain.TaskSnapshot) strin
 		i18n.T(lang, "task_card_speed_eta",
 			html.EscapeString(utils.FormatSpeed(taskSnapshot.Speed)),
 			html.EscapeString(utils.FormatDuration(taskSnapshot.ETA))),
-		i18n.T(lang, "task_card_cancel", html.EscapeString(taskSnapshot.ID)),
+		i18n.T(lang, "task_card_cancel", html.EscapeString(cancelCommandID(taskSnapshot.ID))),
 	)
+}
+
+// cancelCommandID converts separators unsupported by Telegram bot-command
+// entities while keeping the task ID recognizable to the user.
+func cancelCommandID(taskID string) string {
+	return strings.ReplaceAll(taskID, "-", "_")
 }
 
 func GetStartKeyboard(lang string) tgbotapi.InlineKeyboardMarkup {
