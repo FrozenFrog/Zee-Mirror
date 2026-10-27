@@ -198,7 +198,7 @@ Google Drive, OneDrive, Mega, S3, Dropbox, and **40+ cloud providers** via rclon
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/ifauzeee/Zee-Mirror.git
+git clone https://github.com/FrozenFrog/Zee-Mirror.git
 cd Zee-Mirror
 ```
 

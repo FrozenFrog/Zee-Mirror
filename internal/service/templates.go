@@ -17,7 +17,7 @@ import (
 const (
 	LineSeparator    = "━━━━━━━━━━━━━━━━━━━━━━"
 	CompactSeparator = "──────────────────────"
-	RepoURL          = "https://github.com/ifauzeee/Zee-Mirror"
+	RepoURL          = "https://github.com/FrozenFrog/Zee-Mirror"
 )
 
 func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL string) string {

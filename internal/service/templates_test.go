@@ -155,7 +155,7 @@ func TestCompactSeparator(t *testing.T) {
 }
 
 func TestRepoURL(t *testing.T) {
-	assert.Equal(t, "https://github.com/ifauzeee/Zee-Mirror", service.RepoURL)
+	assert.Equal(t, "https://github.com/FrozenFrog/Zee-Mirror", service.RepoURL)
 }
 
 func TestUnknownSize(t *testing.T) {

@@ -92,7 +92,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
 
       <div className="p-8 pt-0 shrink-0 relative z-10 space-y-4 bg-gradient-to-t from-[#f8fafc] dark:from-[#050505] to-transparent via-[#f8fafc]/80 dark:via-[#050505]/80">
         <a
-          href="https://github.com/ifauzeee/Zee-Mirror"
+          href="https://github.com/FrozenFrog/Zee-Mirror"
           target="_blank"
           rel="noopener noreferrer"
           className="p-5 bg-slate-50/50 dark:bg-zinc-900/40 rounded-[2rem] flex items-center space-x-4 border border-slate-100 dark:border-white/5 shadow-inner hover:bg-slate-100 dark:hover:bg-zinc-900 transition-all group/credit cursor-pointer"
@@ -105,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tasksCount, onLogout }) => {
               {t('sidebar.maintainedBy')}
             </p>
             <p className="text-sm font-black text-slate-800 dark:text-white group-hover/credit:text-primary transition-colors">
-              ifauzee
+              FrozenFrog
             </p>
           </div>
         </a>
