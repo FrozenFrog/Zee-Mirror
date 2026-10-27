@@ -68,13 +68,6 @@ func HandleMirror(s *service.BotService, message *tgbotapi.Message, args string)
 		}
 		slog.Info("Mirror task created", "taskID", task.ID, "url", url)
 
-		confirmMsg := tgbotapi.NewMessage(message.Chat.ID,
-			i18n.T(lang, "dl_queued", task.ID, utils.EscapeMarkdownV2(fileName)))
-		confirmMsg.ParseMode = tgbotapi.ModeMarkdownV2
-		if _, err := s.Bot.Send(confirmMsg); err != nil {
-			slog.Error("Failed to send mirror confirmation", "error", err, "taskID", task.ID)
-		}
-
 		s.UpdateSharedDashboard(message.Chat.ID, true)
 		s.HandleAutoDelete(task)
 		return
@@ -143,13 +136,6 @@ func HandleLeech(s *service.BotService, message *tgbotapi.Message, args string) 
 			}
 		}
 		slog.Info("Leech task created", "taskID", task.ID, "url", url)
-
-		confirmMsg := tgbotapi.NewMessage(message.Chat.ID,
-			i18n.T(lang, "dl_queued", task.ID, utils.EscapeMarkdownV2(fileName)))
-		confirmMsg.ParseMode = tgbotapi.ModeMarkdownV2
-		if _, err := s.Bot.Send(confirmMsg); err != nil {
-			slog.Error("Failed to send leech confirmation", "error", err, "taskID", task.ID)
-		}
 
 		s.UpdateSharedDashboard(message.Chat.ID, true)
 		s.HandleAutoDelete(task)

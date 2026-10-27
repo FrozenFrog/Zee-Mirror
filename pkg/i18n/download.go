@@ -22,7 +22,6 @@ func init() {
 	register(map[string]map[string]string{
 		"vi": {
 			// handlers
-			"dl_queued":                   "✅ *ĐÃ THÊM VÀO HÀNG ĐỢI*\n\nTask: `%s`\nFile: `%s`",
 			"dl_toast_download_starting":  "✅ Bắt đầu tải xuống...",
 			"dl_playlist_empty":           "❌ *Lỗi*\n\nPlaylist trống hoặc không tìm thấy video nào\\.",
 			"dl_playlist_received":        "✅ *Đã nhận Playlist*\n\n🏷️ *Tiêu đề:* %s\n📦 *Số mục:* %d\n\nĐang xử lý các mục trong Playlist\\.\\.\\.",
@@ -162,7 +161,6 @@ func init() {
 			"plugin_torrent_removed":        "task đã bị xóa khỏi aria2",
 		},
 		"en": {
-			"dl_queued":                   "✅ *ADDED TO QUEUE*\n\nTask: `%s`\nFile: `%s`",
 			"dl_toast_download_starting":  "✅ Starting download...",
 			"dl_playlist_empty":           "❌ *Error*\n\nThe playlist is empty or no videos were found\\.",
 			"dl_playlist_received":        "✅ *Playlist Received*\n\n🏷️ *Title:* %s\n📦 *Items:* %d\n\nProcessing playlist items\\.\\.\\.",
@@ -294,7 +292,6 @@ func init() {
 			"plugin_torrent_removed":        "task was removed from aria2",
 		},
 		"id": {
-			"dl_queued":                   "✅ *DITAMBAHKAN KE ANTREAN*\n\nTask: `%s`\nFile: `%s`",
 			"dl_toast_download_starting":  "✅ Memulai download...",
 			"dl_playlist_empty":           "❌ *Error*\n\nPlaylist kosong atau tidak ada video yang ditemukan\\.",
 			"dl_playlist_received":        "✅ *Playlist Diterima*\n\n🏷️ *Judul:* %s\n📦 *Jumlah item:* %d\n\nMemproses item Playlist\\.\\.\\.",
@@ -426,7 +423,6 @@ func init() {
 			"plugin_torrent_removed":        "task telah dihapus dari aria2",
 		},
 		"ja": {
-			"dl_queued":                   "✅ *キューに追加しました*\n\nTask: `%s`\nファイル: `%s`",
 			"dl_toast_download_starting":  "✅ ダウンロードを開始します...",
 			"dl_playlist_empty":           "❌ *エラー*\n\nプレイリストが空か、動画が見つかりませんでした。",
 			"dl_playlist_received":        "✅ *プレイリストを受信しました*\n\n🏷️ *タイトル:* %s\n📦 *項目数:* %d\n\nプレイリストの項目を処理中…",
@@ -558,7 +554,6 @@ func init() {
 			"plugin_torrent_removed":        "Task が aria2 から削除されました",
 		},
 		"zh": {
-			"dl_queued":                   "✅ *已加入队列*\n\nTask: `%s`\n文件: `%s`",
 			"dl_toast_download_starting":  "✅ 开始下载...",
 			"dl_playlist_empty":           "❌ *错误*\n\n播放列表为空或未找到任何视频。",
 			"dl_playlist_received":        "✅ *已收到播放列表*\n\n🏷️ *标题:* %s\n📦 *条目数:* %d\n\n正在处理播放列表条目…",
