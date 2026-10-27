@@ -33,7 +33,7 @@ func init() {
 			"task_card_cancel":          "🚫 <b>Hủy:</b> /cancel_%s",
 
 			// Task result (MarkdownV2).
-			"task_done_name":      "📄 *Tên:* `%s`",
+			"task_done_name":      "📄 *Tên tập tin:* `%s`",
 			"task_done_size":      "📦 *Dung lượng:* `%s`",
 			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *Thời gian:* `%s`",
@@ -177,8 +177,8 @@ func init() {
 			"task_card_speed_eta":       "⚡ <b>Speed:</b> <code>%s</code> • ⏱️ <b>ETA:</b> <code>%s</code>",
 			"task_card_cancel":          "🚫 <b>Cancel:</b> /cancel_%s",
 
-			"task_done_name":      "📄 *Name:* `%s`",
-			"task_done_size":      "📦 *Size:* `%s`",
+			"task_done_name":      "📄 *FileName:* `%s`",
+			"task_done_size":      "📦 *FileSize:* `%s`",
 			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *Time:* `%s`",
 			"task_done_path":      "📁 *Path:* `%s`",

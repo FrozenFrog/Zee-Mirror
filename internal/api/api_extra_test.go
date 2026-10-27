@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,6 +33,42 @@ func TestGetClientIP(t *testing.T) {
 
 	req.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8")
 	assert.Equal(t, "1.2.3.4", getClientIP(req))
+}
+
+func TestHandleUpdateToolsUsesPip(t *testing.T) {
+	originalExecCommand := execCommand
+	t.Cleanup(func() { execCommand = originalExecCommand })
+
+	var command string
+	var arguments []string
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		command = name
+		arguments = append([]string(nil), args...)
+		return exec.CommandContext(ctx, "sh", "-c", "printf 'yt-dlp updated'")
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/tools/update", nil)
+	new(Server).handleUpdateTools(recorder, request)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, "python3", command)
+	assert.Equal(t, []string{
+		"-m", "pip", "install",
+		"--user",
+		"--break-system-packages",
+		"--no-cache-dir",
+		"--upgrade",
+		"yt-dlp[default]",
+	}, arguments)
+
+	var response struct {
+		Success bool   `json:"success"`
+		Output  string `json:"output"`
+	}
+	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.True(t, response.Success)
+	assert.Equal(t, "yt-dlp updated", response.Output)
 }
 
 func TestRateLimiter_AllowCountCleanup(t *testing.T) {

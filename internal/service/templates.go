@@ -47,7 +47,7 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 			i18n.T(lang, "status_completed"),
 			i18n.T(lang, "task_done_name", utils.EscapeMarkdownV2Code(snapshot.FileName)),
 			i18n.T(lang, "task_done_size", utils.EscapeMarkdownV2Code(sizeStr)),
-			i18n.T(lang, "task_done_url", utils.EscapeMarkdownV2Code(snapshot.URL)),
+			i18n.T(lang, "task_done_url", snapshot.URL),
 			i18n.T(lang, "task_done_time", utils.EscapeMarkdownV2Code(utils.FormatDuration(duration))),
 			i18n.T(lang, "task_done_path", utils.EscapeMarkdownV2Code(snapshot.RemotePath)),
 			playlistLine,

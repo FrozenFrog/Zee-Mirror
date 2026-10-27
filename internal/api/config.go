@@ -117,7 +117,14 @@ func (s *Server) handleUpdateTools(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	cmd := execCommand(ctx, "yt-dlp", "-U")
+	cmd := execCommand(ctx,
+		"python3", "-m", "pip", "install",
+		"--user",
+		"--break-system-packages",
+		"--no-cache-dir",
+		"--upgrade",
+		"yt-dlp[default]",
+	)
 	output, err := cmd.CombinedOutput()
 
 	result := map[string]interface{}{

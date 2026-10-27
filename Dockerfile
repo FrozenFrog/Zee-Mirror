@@ -91,7 +91,7 @@ USER botuser
 # Don't add app settings here: a non-empty environment variable overrides
 # the database value and is saved over it on every start.
 ENV HOME="/home/botuser" \
-    PATH="/usr/local/bin:/usr/bin:/bin:/home/botuser/.local/bin"
+    PATH="/home/botuser/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 EXPOSE 5248
 
