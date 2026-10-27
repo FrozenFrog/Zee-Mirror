@@ -26,9 +26,9 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 	case domain.StatusCompleted:
 		duration := calculateDuration(snapshot)
 		sizeStr := determineSizeString(lang, snapshot)
-		urlEscaped := strings.NewReplacer(")", "\\)", "\\", "\\\\").Replace(snapshot.URL)
-
-		originalLink := fmt.Sprintf("[🔗 *Original Link\\:*](%s)", urlEscaped)
+		
+		urlEscaped := strings.NewReplacer("\\", "\\\\", ")", "\\)").Replace(snapshot.URL)
+		originalLink := fmt.Sprintf("🔗 *Original Link\\:* [%s](%s)", utils.EscapeMarkdownV2(snapshot.URL), urlEscaped)
 
 		playlistLine := ""
 		if snapshot.PlaylistCount > 0 {
