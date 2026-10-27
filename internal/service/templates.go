@@ -22,13 +22,12 @@ const (
 
 func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL string) string {
 	var text string
+	urlEscaped := strings.NewReplacer("\\", "\\\\", ")", "\\)").Replace(snapshot.URL)
+	originalLink := fmt.Sprintf("[%s](%s)", utils.EscapeMarkdownV2(snapshot.URL), urlEscaped)
 	switch snapshot.Status {
 	case domain.StatusCompleted:
 		duration := calculateDuration(snapshot)
 		sizeStr := determineSizeString(lang, snapshot)
-		
-		urlEscaped := strings.NewReplacer("\\", "\\\\", ")", "\\)").Replace(snapshot.URL)
-		originalLink := fmt.Sprintf("🔗 *Original Link\\:* [%s](%s)", utils.EscapeMarkdownV2(snapshot.URL), urlEscaped)
 
 		playlistLine := ""
 		if snapshot.PlaylistCount > 0 {
@@ -50,16 +49,17 @@ func buildTaskStatusText(lang string, snapshot domain.TaskSnapshot, baseURL stri
 			i18n.T(lang, "status_completed"),
 			i18n.T(lang, "task_done_name", utils.EscapeMarkdownV2Code(snapshot.FileName)),
 			i18n.T(lang, "task_done_size", utils.EscapeMarkdownV2Code(sizeStr)),
-			originalLink,
+			i18n.T(lang, "task_orginal_link", originalLink),
 			i18n.T(lang, "task_done_time", utils.EscapeMarkdownV2Code(utils.FormatDuration(duration))),
 			i18n.T(lang, "task_done_path", utils.EscapeMarkdownV2Code(snapshot.RemotePath)),
 			playlistLine,
 			md5Line,
 			streamLine)
 	case domain.StatusFailed:
-		text = fmt.Sprintf("%s\n📄 `%s`\n%s",
+		text = fmt.Sprintf("%s\n📄 `%s`\n%s\n%s",
 			i18n.T(lang, "status_failed"),
 			utils.EscapeMarkdownV2Code(snapshot.FileName),
+			i18n.T(lang, "task_orginal_link", originalLink),
 			i18n.T(lang, "task_failed_error",
 				utils.EscapeMarkdownV2Code(utils.TruncateString(keyOrText(lang, snapshot.Error), 100))))
 	default:
