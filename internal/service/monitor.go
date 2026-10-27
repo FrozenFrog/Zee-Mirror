@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"zee-mirror/internal/toolversion"
 	"zee-mirror/pkg/i18n"
 	"zee-mirror/pkg/utils"
 
@@ -174,10 +175,12 @@ func createUsageBar(percentage float64, width int) string {
 }
 
 type HealthCheck struct {
-	Name    string
-	Status  string
-	Message string
-	Healthy bool
+	Name           string
+	Status         string
+	Message        string
+	Healthy        bool
+	CurrentVersion string
+	LatestVersion  string
 }
 
 // PerformHealthChecks is PerformHealthChecksLang in DefaultLang.
@@ -189,8 +192,11 @@ func (s *BotService) PerformHealthChecks() []HealthCheck {
 // (plain text) in lang.
 func (s *BotService) PerformHealthChecksLang(lang string) []HealthCheck {
 	var checks []HealthCheck
+	versionCtx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	versions := toolversion.All(versionCtx)
+	cancel()
 
-	aria2Check := HealthCheck{Name: "Aria2"}
+	aria2Check := HealthCheck{Name: "Aria2", CurrentVersion: versions["aria2"].Current, LatestVersion: versions["aria2"].Latest}
 	if _, err := os.Stat("/usr/bin/aria2c"); err == nil {
 		aria2Check.Status = IconOK
 		aria2Check.Message = i18n.T(lang, "monitor_aria2_found")
@@ -202,7 +208,7 @@ func (s *BotService) PerformHealthChecksLang(lang string) []HealthCheck {
 	}
 	checks = append(checks, aria2Check)
 
-	rcloneCheck := HealthCheck{Name: "Rclone"}
+	rcloneCheck := HealthCheck{Name: "Rclone", CurrentVersion: versions["rclone"].Current, LatestVersion: versions["rclone"].Latest}
 	if _, err := os.Stat(s.TaskManager.ConfigDir + "/rclone.conf"); err == nil {
 		rcloneCheck.Status = IconOK
 		rcloneCheck.Message = i18n.T(lang, "monitor_rclone_ok")
@@ -213,6 +219,16 @@ func (s *BotService) PerformHealthChecksLang(lang string) []HealthCheck {
 		rcloneCheck.Healthy = false
 	}
 	checks = append(checks, rcloneCheck)
+	ytdlpCheck := HealthCheck{Name: "yt-dlp", CurrentVersion: versions["yt-dlp"].Current, LatestVersion: versions["yt-dlp"].Latest}
+	if ytdlpCheck.CurrentVersion != "" {
+		ytdlpCheck.Status = IconOK
+		ytdlpCheck.Message = i18n.T(lang, "monitor_ytdlp_found")
+		ytdlpCheck.Healthy = true
+	} else {
+		ytdlpCheck.Status = IconError
+		ytdlpCheck.Message = i18n.T(lang, "monitor_ytdlp_missing")
+	}
+	checks = append(checks, ytdlpCheck)
 
 	diskCheck := HealthCheck{Name: i18n.T(lang, "monitor_disk_name")}
 	diskUsage := s.getDiskUsageOS()
@@ -296,6 +312,16 @@ func (s *BotService) FormatHealthCheckLang(lang string, checks []HealthCheck) st
 
 		fmt.Fprintf(&content, "%s *%s*\n", icon, utils.EscapeMarkdownV2(c.Name))
 		fmt.Fprintf(&content, "└ _%s_\n", utils.EscapeMarkdownV2(c.Message))
+		if c.Name == "Aria2" || c.Name == "Rclone" || c.Name == "yt-dlp" {
+			current, latest := c.CurrentVersion, c.LatestVersion
+			if current == "" {
+				current = "—"
+			}
+			if latest == "" {
+				latest = "—"
+			}
+			fmt.Fprintf(&content, "  %s\n", i18n.T(lang, "monitor_versions", utils.EscapeMarkdownV2(current), utils.EscapeMarkdownV2(latest)))
+		}
 	}
 
 	fmt.Fprintf(&content, "\n%s\n%s", CompactSeparator, i18n.T(lang, "monitor_checked_at", utils.EscapeMarkdownV2(time.Now().Format("15:04:05"))))

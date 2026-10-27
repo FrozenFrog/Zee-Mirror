@@ -73,6 +73,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/users/update", auth(s.handleUpdateUser))
 	mux.HandleFunc("/api/users/delete", auth(s.handleDeleteUser))
 	mux.HandleFunc("/api/tools/update", auth(s.handleUpdateTools))
+	mux.HandleFunc("/api/tools/versions", auth(s.handleToolVersions))
 	mux.HandleFunc("/api/config", auth(s.handleConfig))
 	mux.HandleFunc("/api/config/reload", auth(s.handleConfigReload))
 	mux.HandleFunc("/api/explorer/upload", auth(s.handleUpload))

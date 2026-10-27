@@ -18,6 +18,7 @@ import (
 
 	"zee-mirror/internal/domain"
 	"zee-mirror/internal/repository/mocks"
+	"zee-mirror/internal/toolversion"
 )
 
 func TestGetClientIP(t *testing.T) {
@@ -37,7 +38,11 @@ func TestGetClientIP(t *testing.T) {
 
 func TestHandleUpdateToolsUsesPip(t *testing.T) {
 	originalExecCommand := execCommand
-	t.Cleanup(func() { execCommand = originalExecCommand })
+	originalGetToolVersion := getToolVersion
+	t.Cleanup(func() { execCommand = originalExecCommand; getToolVersion = originalGetToolVersion })
+	getToolVersion = func(context.Context, string) toolversion.Version {
+		return toolversion.Version{Current: "2026.10.26", Latest: "2026.10.26"}
+	}
 
 	var command string
 	var arguments []string
@@ -64,11 +69,57 @@ func TestHandleUpdateToolsUsesPip(t *testing.T) {
 
 	var response struct {
 		Success bool   `json:"success"`
+		Current string `json:"current"`
+		Latest  string `json:"latest"`
 		Output  string `json:"output"`
 	}
 	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	assert.True(t, response.Success)
-	assert.Equal(t, "yt-dlp updated", response.Output)
+	assert.Equal(t, "2026.10.26", response.Current)
+	assert.Equal(t, "2026.10.26", response.Latest)
+	assert.Empty(t, response.Output)
+}
+
+func TestHandleUpdateToolsRcloneUsesWritableOverride(t *testing.T) {
+	originalExecCommand := execCommand
+	originalGetToolVersion := getToolVersion
+	t.Cleanup(func() { execCommand = originalExecCommand; getToolVersion = originalGetToolVersion })
+	t.Setenv("HOME", t.TempDir())
+	getToolVersion = func(context.Context, string) toolversion.Version {
+		return toolversion.Version{Current: "1.75.2", Latest: "1.75.2"}
+	}
+	var command string
+	var arguments []string
+	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		command, arguments = name, args
+		return exec.CommandContext(ctx, "sh", "-c", "printf 'updated'")
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/tools/update", strings.NewReader(`{"tool":"rclone"}`))
+	recorder := httptest.NewRecorder()
+	new(Server).handleUpdateTools(recorder, request)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, "rclone", command)
+	assert.Equal(t, []string{"selfupdate", "--output", filepath.Join(os.Getenv("HOME"), ".local", "bin", "rclone")}, arguments)
+	assert.DirExists(t, filepath.Join(os.Getenv("HOME"), ".local", "bin"))
+}
+
+func TestHandleUpdateToolsShowsCommandOutputOnlyOnFailure(t *testing.T) {
+	originalExecCommand := execCommand
+	t.Cleanup(func() { execCommand = originalExecCommand })
+	execCommand = func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "sh", "-c", "printf 'download failed' >&2; exit 1")
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/tools/update", strings.NewReader(`{"tool":"yt-dlp"}`))
+	recorder := httptest.NewRecorder()
+	new(Server).handleUpdateTools(recorder, request)
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	var response struct {
+		Error  string `json:"error"`
+		Output string `json:"output"`
+	}
+	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.Contains(t, response.Error, "exit status 1")
+	assert.Equal(t, "download failed", response.Output)
 }
 
 func TestRateLimiter_AllowCountCleanup(t *testing.T) {

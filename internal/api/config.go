@@ -3,12 +3,18 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 	"zee-mirror/internal/config"
 	"zee-mirror/internal/repository"
+	"zee-mirror/internal/toolversion"
 )
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -114,29 +120,75 @@ func (s *Server) handleUpdateTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	var request struct {
+		Tool string `json:"tool"`
+	}
+	if r.Body != nil {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&request); err != nil && !errors.Is(err, io.EOF) {
+			writeToolError(w, http.StatusBadRequest, "Invalid request", "")
+			return
+		}
+	}
+	if request.Tool == "" {
+		request.Tool = "yt-dlp"
+	}
+	if request.Tool != "yt-dlp" && request.Tool != "rclone" {
+		writeToolError(w, http.StatusBadRequest, "Unsupported tool", "")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
-
-	cmd := execCommand(ctx,
-		"python3", "-m", "pip", "install",
-		"--user",
-		"--break-system-packages",
-		"--no-cache-dir",
-		"--upgrade",
-		"yt-dlp[default]",
-	)
+	var cmdArgs []string
+	var command string
+	if request.Tool == "rclone" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			writeToolError(w, http.StatusInternalServerError, err.Error(), "")
+			return
+		}
+		path := filepath.Join(home, ".local", "bin", "rclone")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			writeToolError(w, http.StatusInternalServerError, err.Error(), "")
+			return
+		}
+		command = "rclone"
+		cmdArgs = []string{"selfupdate", "--output", path}
+	} else {
+		command = "python3"
+		cmdArgs = []string{"-m", "pip", "install", "--user", "--break-system-packages", "--no-cache-dir", "--upgrade", "yt-dlp[default]"}
+	}
+	cmd := execCommand(ctx, command, cmdArgs...)
 	output, err := cmd.CombinedOutput()
-
-	result := map[string]interface{}{
-		"success": err == nil,
-		"output":  string(output),
-	}
 	if err != nil {
-		result["error"] = err.Error()
+		writeToolError(w, http.StatusInternalServerError, err.Error(), strings.TrimSpace(string(output)))
+		return
 	}
-
+	version := getToolVersion(ctx, request.Tool)
+	result := map[string]interface{}{"success": true, "tool": request.Tool, "current": version.Current, "latest": version.Latest}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		slog.Error("Failed to encode git status response", "error", err)
+		slog.Error("Failed to encode tool update response", "error", err)
 	}
+}
+
+var getToolVersion = toolversion.Get
+
+func (s *Server) handleToolVersions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeToolError(w, http.StatusMethodNotAllowed, "Method not allowed", "")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toolversion.All(ctx)); err != nil {
+		slog.Error("Failed to encode tool versions", "error", err)
+	}
+}
+
+func writeToolError(w http.ResponseWriter, status int, message, output string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message, "output": output})
 }

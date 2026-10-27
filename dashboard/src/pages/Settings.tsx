@@ -23,6 +23,9 @@ interface SettingsProps {
   initialSettings?: SettingsState
 }
 
+type UpdateTool = 'yt-dlp' | 'rclone'
+type ToolVersion = { current: string; latest: string }
+
 const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
   const { showAlert, showToast } = usePopups()
   const { t } = useI18n()
@@ -31,8 +34,19 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
   )
   const [rawConfig, setRawConfig] = useState<string>('')
   const [isConfigLoading, setIsConfigLoading] = useState<boolean>(true)
-  const [updating, setUpdating] = useState(false)
-  const [updateResult, setUpdateResult] = useState<string | null>(null)
+  const [updating, setUpdating] = useState<UpdateTool | null>(null)
+  const [updateError, setUpdateError] = useState<Partial<Record<UpdateTool, string>>>({})
+  const [toolVersions, setToolVersions] = useState<Record<string, ToolVersion>>({})
+
+  const fetchToolVersions = useCallback(async () => {
+    if (!token) return
+    try {
+      const res = await api.get<Record<string, ToolVersion>>('/api/tools/versions')
+      setToolVersions(res.data)
+    } catch (err) {
+      console.error('Failed to fetch tool versions:', err)
+    }
+  }, [token])
 
   const fetchRawConfig = useCallback(async () => {
     if (!token) return
@@ -49,7 +63,8 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
   useEffect(() => {
     if (initialSettings) setSettings(initialSettings)
     fetchRawConfig()
-  }, [initialSettings, fetchRawConfig])
+    fetchToolVersions()
+  }, [initialSettings, fetchRawConfig, fetchToolVersions])
 
   const handleUpdateSettings = async () => {
     try {
@@ -75,17 +90,22 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
     }
   }
 
-  const handleUpdateTools = async () => {
-    setUpdating(true)
-    setUpdateResult(null)
+  const handleUpdateTool = async (tool: UpdateTool) => {
+    setUpdating(tool)
+    setUpdateError((previous) => ({ ...previous, [tool]: '' }))
     try {
-      const res = await api.post('/api/tools/update', {})
-      setUpdateResult(res.data.output || res.data.error || t('settings.toolsUpdated'))
+      const res = await api.post<{ current: string; latest: string }>('/api/tools/update', { tool })
+      setToolVersions((previous) => ({ ...previous, [tool]: res.data }))
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-      setUpdateResult(axiosErr.response?.data?.error || axiosErr.message || t('common.updateFailed'))
+      const axiosErr = err as { response?: { data?: { error?: string; output?: string } }; message?: string }
+      const detail = axiosErr.response?.data
+      setUpdateError((previous) => ({
+        ...previous,
+        [tool]: [detail?.error || axiosErr.message || t('common.updateFailed'), detail?.output]
+          .filter(Boolean).join('\n'),
+      }))
     } finally {
-      setUpdating(false)
+      setUpdating(null)
     }
   }
 
@@ -221,19 +241,28 @@ const Settings: React.FC<SettingsProps> = ({ token, initialSettings }) => {
               <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                 {t('settings.toolsDesc')}
               </p>
-              <button
-                onClick={handleUpdateTools}
-                disabled={updating}
-                className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-widest flex items-center justify-center space-x-3 hover:scale-[0.98] active:scale-[0.95] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RefreshCw size={20} className={updating ? 'animate-spin' : ''} />
-                <span>{updating ? t('settings.updating') : t('settings.updateYtdlp')}</span>
-              </button>
-              {updateResult && (
-                <pre className="mt-4 p-6 bg-slate-900/90 dark:bg-black/40 text-emerald-400 font-mono text-[13px] rounded-[2rem] border border-white/5 shadow-inner leading-relaxed whitespace-pre-wrap overflow-x-auto">
-                  {updateResult}
-                </pre>
-              )}
+              {(['yt-dlp', 'rclone'] as const).map((tool) => (
+                <div key={tool} className="p-6 rounded-[2.5rem] bg-slate-50/50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                  <h4 className="font-bold text-slate-900 dark:text-white mb-3">{tool}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                    {t('settings.currentVersion')}: {toolVersions[tool]?.current || t('settings.versionUnavailable')}
+                    {' · '}{t('settings.latestVersion')}: {toolVersions[tool]?.latest || t('settings.versionUnavailable')}
+                  </p>
+                  <button
+                    onClick={() => handleUpdateTool(tool)}
+                    disabled={updating !== null}
+                    className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-[2rem] font-black text-sm uppercase tracking-widest flex items-center justify-center space-x-3 hover:scale-[0.98] active:scale-[0.95] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw size={20} className={updating === tool ? 'animate-spin' : ''} />
+                    <span>{updating === tool ? t('settings.updating') : t(tool === 'yt-dlp' ? 'settings.updateYtdlp' : 'settings.updateRclone')}</span>
+                  </button>
+                  {updateError[tool] && (
+                    <pre className="mt-4 p-6 bg-slate-900/90 dark:bg-black/40 text-red-400 font-mono text-[13px] rounded-[2rem] border border-white/5 shadow-inner leading-relaxed whitespace-pre-wrap overflow-x-auto">
+                      {updateError[tool]}
+                    </pre>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
