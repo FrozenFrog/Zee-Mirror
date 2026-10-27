@@ -35,7 +35,6 @@ func init() {
 			// Task result (MarkdownV2).
 			"task_done_name":      "📄 *Tên tập tin:* `%s`",
 			"task_done_size":      "📦 *Dung lượng:* `%s`",
-			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *Thời gian:* `%s`",
 			"task_done_path":      "📁 *Đường dẫn:* `%s`",
 			"task_failed_error":   "Lỗi: `%s`",
@@ -179,7 +178,6 @@ func init() {
 
 			"task_done_name":      "📄 *FileName:* `%s`",
 			"task_done_size":      "📦 *FileSize:* `%s`",
-			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *Time:* `%s`",
 			"task_done_path":      "📁 *Path:* `%s`",
 			"task_failed_error":   "Error: `%s`",
@@ -314,7 +312,6 @@ func init() {
 
 			"task_done_name":      "📄 *Nama:* `%s`",
 			"task_done_size":      "📦 *Ukuran:* `%s`",
-			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *Waktu:* `%s`",
 			"task_done_path":      "📁 *Lokasi:* `%s`",
 			"task_failed_error":   "Kesalahan: `%s`",
@@ -449,7 +446,6 @@ func init() {
 
 			"task_done_name":      "📄 *名前:* `%s`",
 			"task_done_size":      "📦 *サイズ:* `%s`",
-			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *所要時間:* `%s`",
 			"task_done_path":      "📁 *パス:* `%s`",
 			"task_failed_error":   "エラー: `%s`",
@@ -584,7 +580,6 @@ func init() {
 
 			"task_done_name":      "📄 *名称:* `%s`",
 			"task_done_size":      "📦 *大小:* `%s`",
-			"task_done_url":       "🔗 *Link:* `%s`",
 			"task_done_time":      "⏱ *用时:* `%s`",
 			"task_done_path":      "📁 *路径:* `%s`",
 			"task_failed_error":   "错误: `%s`",
